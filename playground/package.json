@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "name": "nuxt-mermaid-content-playground",
+  "type": "module",
+  "scripts": {
+    "dev": "nuxi dev",
+    "build": "nuxi build",
+    "generate": "nuxi generate"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.6",
+    "nuxt": "^4.2.1"
+  },
+  "devDependencies": {
+    "@nuxt/content": "3.8.0"
+  }
+}
