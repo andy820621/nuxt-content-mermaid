@@ -13,7 +13,7 @@ import {
   DEFAULT_IMPORT_SOURCE,
   DEFAULT_LIGHT_THEME,
   DEFAULT_MERMAID_INIT,
-} from './constants'
+} from './runtime/constants'
 
 const MERMAID_BLOCK = /```mermaid([\s\S]*?)```/gi
 

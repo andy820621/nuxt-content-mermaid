@@ -4,7 +4,7 @@ import type { ModuleOptions } from '../../module'
 import {
   DEFAULT_IMPORT_SOURCE,
   DEFAULT_MERMAID_INIT,
-} from '../../constants'
+} from '../constants'
 
 declare global {
   var __nuxtMermaidLoader__: Promise<Mermaid> | undefined
