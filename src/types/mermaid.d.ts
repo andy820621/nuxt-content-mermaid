@@ -1,4 +1,5 @@
-import type { Mermaid, MermaidConfig } from 'mermaid'
+import type { Mermaid } from 'mermaid'
+import type { ModuleOptions } from '../module'
 
 declare module '#app' {
   interface NuxtApp {
@@ -13,16 +14,7 @@ declare module 'vue' {
 
 declare module 'nuxt/schema' {
   interface PublicRuntimeConfig {
-    mermaidContent?: {
-      enabled?: boolean
-      importSource?: string
-      init?: MermaidConfig
-      followColorMode?: boolean
-      lightTheme?: MermaidConfig['theme']
-      darkTheme?: MermaidConfig['theme']
-      mermaidComponent?: string
-      spinnerComponent?: string
-    }
+    mermaidContent?: Partial<ModuleOptions>
   }
 }
 

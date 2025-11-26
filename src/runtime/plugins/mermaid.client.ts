@@ -1,14 +1,10 @@
 import { defineNuxtPlugin, useRuntimeConfig } from '#app'
 import type { Mermaid, MermaidConfig } from 'mermaid'
-
-interface MermaidRuntimeConfig {
-  enabled?: boolean
-  importSource?: string
-  init?: MermaidConfig
-}
-
-const DEFAULT_SOURCE
-  = 'https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs'
+import type { ModuleOptions } from '../../module'
+import {
+  DEFAULT_IMPORT_SOURCE,
+  DEFAULT_MERMAID_INIT,
+} from '../../constants'
 
 declare global {
   var __nuxtMermaidLoader__: Promise<Mermaid> | undefined
@@ -36,7 +32,7 @@ async function loadMermaidFrom(source: string): Promise<Mermaid> {
 export default defineNuxtPlugin(() => {
   const runtimeConfig = useRuntimeConfig()
   const mermaidConfig = runtimeConfig.public?.mermaidContent as
-    | MermaidRuntimeConfig
+    | Pick<ModuleOptions, 'enabled' | 'loader'>
     | undefined
 
   if (mermaidConfig?.enabled === false) {
@@ -55,10 +51,11 @@ export default defineNuxtPlugin(() => {
     if (globalWithLoader.__nuxtMermaidLoader__)
       return globalWithLoader.__nuxtMermaidLoader__
 
-    const importSource = mermaidConfig?.importSource || DEFAULT_SOURCE
+    const importSource
+      = mermaidConfig?.loader?.importSource || DEFAULT_IMPORT_SOURCE
     const initOptions: MermaidConfig = {
-      startOnLoad: false,
-      ...mermaidConfig?.init,
+      ...DEFAULT_MERMAID_INIT,
+      ...mermaidConfig?.loader?.init,
     }
 
     globalWithLoader.__nuxtMermaidLoader__ = loadMermaidFrom(importSource)

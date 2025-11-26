@@ -1,15 +1,7 @@
+packages:
+  - "playground"
+
 onlyBuiltDependencies:
-  - ' '
-  - '-'
-  - '3'
-  - b
-  - better-sqlite3
-  - d
-  - e
-  - i
-  - l
-  - q
-  - r
-  - s
-  - t
-  - u
+  - "@parcel/watcher"
+  - "better-sqlite3"
+  - "esbuild"

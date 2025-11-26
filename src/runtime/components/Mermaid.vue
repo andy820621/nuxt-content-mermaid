@@ -20,6 +20,9 @@ const runtimeConfig = useRuntimeConfig()
 const mermaidRuntime = (runtimeConfig.public?.mermaidContent
   || {}) as Partial<ModuleOptions>
 const isEnabled = mermaidRuntime.enabled !== false
+const loaderOptions = mermaidRuntime.loader || {}
+const themeOptions = mermaidRuntime.theme || {}
+const componentOptions = mermaidRuntime.components || {}
 const colorMode = nuxtApp.$colorMode as { value: string } | undefined
 const { $mermaid } = nuxtApp
 const mermaidContainer = ref<HTMLDivElement | null>(null)
@@ -29,23 +32,30 @@ const isLoading = ref(false)
 let mermaidDefinition = ''
 let observer: IntersectionObserver | null = null
 const baseMermaidInit
-  = (mermaidRuntime.init as MermaidConfig | undefined) || {}
-const followColorMode = mermaidRuntime.followColorMode
-const lightTheme = mermaidRuntime.lightTheme
-const darkTheme = mermaidRuntime.darkTheme
+  = (loaderOptions.init as MermaidConfig | undefined) || {}
+const useColorModeTheme = themeOptions.useColorModeTheme
+const lightTheme = themeOptions.light
+const darkTheme = themeOptions.dark
 
 const mermaidTheme = computed(() => {
-  if (!followColorMode || !colorMode)
-    return baseMermaidInit.theme as MermaidConfig['theme'] | undefined
-  return colorMode.value === 'dark' ? darkTheme : lightTheme
+  // Color-mode aware path
+  if (useColorModeTheme && colorMode)
+    return colorMode.value === 'dark' ? darkTheme : lightTheme
+
+  // Static path: prefer loader.init.theme, then fall back to configured light -> dark
+  return (
+    (baseMermaidInit.theme as MermaidConfig['theme'] | undefined)
+    ?? lightTheme
+    ?? darkTheme
+  )
 })
 
 const configuredSpinnerName = computed(
-  () => mermaidRuntime.spinnerComponent?.trim() || '',
+  () => componentOptions.spinner?.trim() || '',
 )
 const customSpinner = shallowRef<Component | null>(null)
 const configuredMermaidImplName = computed(
-  () => mermaidRuntime.mermaidComponent?.trim() || '',
+  () => componentOptions.renderer?.trim() || '',
 )
 const customMermaidImpl = shallowRef<Component | null>(null)
 

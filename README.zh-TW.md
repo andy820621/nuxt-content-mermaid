@@ -19,12 +19,17 @@
 - **高度客製**：支援自訂渲染元件（Wrapper）、Loading Spinner 及 CDN 來源。
 - **Runtime Config**：支援透過環境變數動態覆寫設定。
 
+## 使用前提
+
+- Nuxt 4 (`nuxt@^4.0.0`)
+- `@nuxt/content@^3.8.0`（必須安裝）
+
 ## Quick Setup
 
 ### 1. 安裝模組
 
 ```bash
-npx nuxi module add nuxt-mermaid-content
+npx nuxi module add @barzhsieh/nuxt-content-mermaid
 ```
 
 ### 2. 配置 `nuxt.config.ts`
@@ -33,7 +38,7 @@ npx nuxi module add nuxt-mermaid-content
 
 ```ts
 export default defineNuxtConfig({
-  modules: ["nuxt-mermaid-content", "@nuxt/content"],
+  modules: ["@barzhsieh/nuxt-content-mermaid", "@nuxt/content"],
 });
 ```
 
@@ -63,14 +68,22 @@ graph LR
 export default defineNuxtConfig({
   mermaidContent: {
     enabled: true,
-    followColorMode: true,
-    lightTheme: "default",
-    darkTheme: "dark",
-    importSource:
-      "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs",
-    init: {
-      securityLevel: "strict",
-      // 其他傳遞給 mermaid.initialize() 的參數
+    loader: {
+      importSource:
+        "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs",
+      init: {
+        securityLevel: "strict",
+        // 其他傳遞給 mermaid.initialize() 的參數
+      },
+    },
+    theme: {
+      useColorModeTheme: true,
+      light: "default",
+      dark: "dark",
+    },
+    components: {
+      renderer: undefined,
+      spinner: undefined,
     },
   },
 });
@@ -78,16 +91,33 @@ export default defineNuxtConfig({
 
 ### 參數說明
 
-| 參數               | 類型      | 預設值         | 說明                                                 |
-| :----------------- | :-------- | :------------- | :--------------------------------------------------- |
-| `enabled`          | `boolean` | `true`         | 是否啟用模組與轉換邏輯。                             |
-| `importSource`     | `string`  | `jsdelivr CDN` | 指定 Mermaid ESM 的載入來源（支援 CDN 或本地路徑）。 |
-| `followColorMode`  | `boolean` | `true`         | 若安裝了 `@nuxtjs/color-mode`，是否自動切換主題。    |
-| `lightTheme`       | `string`  | `'default'`    | 當 `colorMode` 為 light 時的主題。                   |
-| `darkTheme`        | `string`  | `'dark'`       | 當 `colorMode` 為 dark 時的主題。                    |
-| `mermaidComponent` | `string`  | `undefined`    | 指定自訂的 Mermaid 實作元件名稱（見進階用法）。      |
-| `spinnerComponent` | `string`  | `undefined`    | 指定全域的 Loading 元件名稱。                        |
-| `init`             | `object`  | `{}`           | 直接傳遞給 `mermaid.initialize` 的原始設定。         |
+**Top-level**
+
+| 參數      | 類型      | 預設值 | 說明                           |
+| :-------- | :-------- | :----- | :----------------------------- |
+| `enabled` | `boolean` | `true` | 是否啟用模組與轉換邏輯。       |
+
+**loader**
+
+| 參數                  | 類型            | 預設值                  | 說明                                                       |
+| :-------------------- | :-------------- | :---------------------- | :--------------------------------------------------------- |
+| `loader.importSource` | `string`        | jsDelivr CDN            | 指定 Mermaid ESM 的載入來源（支援 CDN 或本地路徑）。       |
+| `loader.init`         | `MermaidConfig` | `{ startOnLoad: false }` | 直接傳遞給 `mermaid.initialize` 的原始設定。               |
+
+**theme**
+
+| 參數                        | 類型    | 預設值      | 說明                                                                                                    |
+| :-------------------------- | :------ | :---------- | :------------------------------------------------------------------------------------------------------ |
+| `theme.useColorModeTheme`   | boolean | `true`      | 若安裝了 `@nuxtjs/color-mode`，是否自動跟隨其主題。                                                    |
+| `theme.light`               | string  | `'default'` | 當 `colorMode` 為 light 時的主題，也可作為 fallback。                                                   |
+| `theme.dark`                | string  | `'dark'`    | 當 `colorMode` 為 dark 時的主題，也可作為 fallback。                                                    |
+
+**components**
+
+| 參數                     | 類型     | 預設值     | 說明                                                   |
+| :----------------------- | :------- | :--------- | :----------------------------------------------------- |
+| `components.renderer`    | `string` | `undefined` | 指定自訂的 Mermaid 實作元件名稱（見進階用法）。        |
+| `components.spinner`     | `string` | `undefined` | 指定全域的 Loading 元件名稱。                          |
 
 > **Note**: 所有設定皆可透過 `runtimeConfig.public.mermaidContent` 在部署時進行覆寫。
 
@@ -97,20 +127,24 @@ export default defineNuxtConfig({
 
 模組會依據以下優先順序決定主題：
 
-1. 若 `followColorMode: true` 且專案有安裝 `@nuxtjs/color-mode`：
-   - 偵測為 `dark` → 使用 `darkTheme`
-   - 偵測為 `light` → 使用 `lightTheme`
-2. 若未啟用 `followColorMode`，則使用 `init.theme` 或 Mermaid 預設值。
+1. 若 `theme.useColorModeTheme: true`，且專案有安裝 `@nuxtjs/color-mode`：  
+   - 偵測為 `dark` → 使用 `theme.dark`  
+   - 偵測為 `light` → 使用 `theme.light`
+2. 否則（color-mode 未安裝或 `theme.useColorModeTheme` 為 `false`）：  
+   - 優先使用 `loader.init.theme`。  
+   - 若未提供，依序回退至 `theme.light`，若沒有設置則會回退至 `theme.dark`。
 
 ### 自訂渲染元件 (Custom Component)
 
-若需完全接管 Mermaid 的渲染行為（例如：加入外框、ZoomIn/Out 功能），可指定 `mermaidComponent`。
+若需完全接管 Mermaid 的渲染行為（例如：加入外框、ZoomIn/Out 功能），可指定 `components.renderer`。
 
 1. 在 `nuxt.config.ts` 中指定元件名稱：
 
    ```ts
    mermaidContent: {
-     mermaidComponent: "MyCustomMermaid";
+     components: {
+       renderer: "MyCustomMermaid",
+     }
    }
    ```
 
@@ -136,10 +170,10 @@ export default defineNuxtConfig({
 <summary>Local Development Commands</summary>
 
 ```bash
-npm install
-npm run dev:prepare
-npm run dev       # Run playground
-npm run test      # Run tests
+pnpm install
+pnpm dev:prepare
+pnpm dev       # Run playground
+pnpm test      # Run tests
 ```
 
 </details>
@@ -150,11 +184,11 @@ npm run test      # Run tests
 
 <!-- Badges -->
 
-[npm-version-src]: https://img.shields.io/npm/v/nuxt-mermaid-content/latest.svg?style=flat&colorA=020420&colorB=00DC82
-[npm-version-href]: https://npmjs.com/package/nuxt-mermaid-content
-[npm-downloads-src]: https://img.shields.io/npm/dm/nuxt-mermaid-content.svg?style=flat&colorA=020420&colorB=00DC82
-[npm-downloads-href]: https://npmjs.com/package/nuxt-mermaid-content
-[license-src]: https://img.shields.io/npm/l/nuxt-mermaid-content.svg?style=flat&colorA=020420&colorB=00DC82
-[license-href]: https://npmjs.com/package/nuxt-mermaid-content
+[npm-version-src]: https://img.shields.io/npm/v/@barzhsieh/nuxt-content-mermaid/latest.svg?style=flat&colorA=020420&colorB=00DC82
+[npm-version-href]: https://npmjs.com/package/@barzhsieh/nuxt-content-mermaid
+[npm-downloads-src]: https://img.shields.io/npm/dm/@barzhsieh/nuxt-content-mermaid.svg?style=flat&colorA=020420&colorB=00DC82
+[npm-downloads-href]: https://npmjs.com/package/@barzhsieh/nuxt-content-mermaid
+[license-src]: https://img.shields.io/npm/l/@barzhsieh/nuxt-content-mermaid.svg?style=flat&colorA=020420&colorB=00DC82
+[license-href]: https://npmjs.com/package/@barzhsieh/nuxt-content-mermaid
 [nuxt-src]: https://img.shields.io/badge/Nuxt-020420?logo=nuxt.js
 [nuxt-href]: https://nuxt.com

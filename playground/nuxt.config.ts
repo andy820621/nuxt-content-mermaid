@@ -10,11 +10,19 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-11-24',
   nitro: { compatibilityDate: '2025-11-24' },
   mermaidContent: {
-    // followColorMode: false,
-    // lightTheme: 'forest',
-    // darkTheme: 'neutral',
-    // init: { theme: "forest" },
-    // mermaidComponent: "MyMermaid",
-    // spinnerComponent: "MySpinner",
+    loader: {
+      // importSource: '/mermaid/mermaid.esm.min.mjs',
+      importSource: 'https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs',
+      // init: { theme: 'base' },
+    },
+    theme: {
+      // useColorModeTheme: true,
+      light: 'default',
+      dark: 'dark',
+    },
+    components: {
+      // renderer: 'MyMermaid',
+      // spinner: 'MySpinner',
+    },
   },
 })
