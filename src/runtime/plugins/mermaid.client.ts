@@ -40,7 +40,7 @@ export default defineNuxtPlugin(() => {
       provide: {
         mermaid: async () => {
           throw new Error(
-            '[nuxt-mermaid-content] Mermaid is disabled via config.',
+            '[nuxt-content-mermaid] Mermaid is disabled via config.',
           )
         },
       },

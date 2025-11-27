@@ -8,41 +8,44 @@ import {
   computed,
   watch,
   shallowRef,
+  useTemplateRef,
 } from 'vue'
 
-import type { Component } from 'vue'
+import type { Component, ComputedRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { ModuleOptions } from '../../module'
+import { enqueueRender } from '../utils'
 import Spinner from './Spinner.vue'
 
 const nuxtApp = useNuxtApp()
 const runtimeConfig = useRuntimeConfig()
-const mermaidRuntime = (runtimeConfig.public?.mermaidContent
+// Get module options from public runtimeConfig `mermaidContent` (configured in nuxt.config.ts)
+const mermaidContent = (runtimeConfig.public?.mermaidContent
   || {}) as Partial<ModuleOptions>
-const isEnabled = mermaidRuntime.enabled !== false
-const loaderOptions = mermaidRuntime.loader || {}
-const themeOptions = mermaidRuntime.theme || {}
-const componentOptions = mermaidRuntime.components || {}
-const colorMode = nuxtApp.$colorMode as { value: string } | undefined
-const { $mermaid } = nuxtApp
-const mermaidContainer = ref<HTMLDivElement | null>(null)
-const isMounted = ref(false)
-const hasRenderedOnce = ref(false)
-const isLoading = ref(false)
-let mermaidDefinition = ''
-let observer: IntersectionObserver | null = null
-const baseMermaidInit
-  = (loaderOptions.init as MermaidConfig | undefined) || {}
+const isEnabled = mermaidContent.enabled !== false
+const loaderOptions = mermaidContent.loader || {}
+const themeOptions = mermaidContent.theme || {}
+const componentOptions = mermaidContent.components || {}
+
+const baseMermaidInit = (loaderOptions.init as MermaidConfig | undefined) || {}
 const useColorModeTheme = themeOptions.useColorModeTheme
 const lightTheme = themeOptions.light
 const darkTheme = themeOptions.dark
 
+const colorMode = nuxtApp.$colorMode as { value: string } | undefined
+const { $mermaid } = nuxtApp
+
+const mermaidContainer = useTemplateRef('mermaidContainer')
+const hasRenderedOnce = ref(false)
+const isLoading = ref(false)
+
+let mermaidDefinition = '' // Mermaid definition extracted from slot content
+let observer: IntersectionObserver | null = null
+
 const mermaidTheme = computed(() => {
-  // Color-mode aware path
   if (useColorModeTheme && colorMode)
     return colorMode.value === 'dark' ? darkTheme : lightTheme
 
-  // Static path: prefer loader.init.theme, then fall back to configured light -> dark
   return (
     (baseMermaidInit.theme as MermaidConfig['theme'] | undefined)
     ?? lightTheme
@@ -50,14 +53,11 @@ const mermaidTheme = computed(() => {
   )
 })
 
-const configuredSpinnerName = computed(
-  () => componentOptions.spinner?.trim() || '',
-)
+const configuredSpinnerName = computed(() => componentOptions.spinner?.trim() || '')
 const customSpinner = shallowRef<Component | null>(null)
-const configuredMermaidImplName = computed(
-  () => componentOptions.renderer?.trim() || '',
-)
+const configuredMermaidImplName = computed(() => componentOptions.renderer?.trim() || '')
 const customMermaidImpl = shallowRef<Component | null>(null)
+const spinnerComponent = computed<Component | string>(() => customSpinner.value || Spinner)
 
 function normalizeIdentifier(value: string) {
   return (
@@ -76,6 +76,7 @@ async function resolveAppComponent(
   label: string,
 ): Promise<Component | null> {
   const target = normalizeIdentifier(name)
+  // Search the paths returned by import.meta.glob and return the file whose name matches the given one.
   const matchEntry = Object.entries(appComponents).find(([path]) => {
     const base = path.split(/[\\/]/).pop() || ''
     const normalized = normalizeIdentifier(base)
@@ -84,20 +85,20 @@ async function resolveAppComponent(
 
   if (!matchEntry) {
     console.warn(
-      `[nuxt-mermaid-content] Cannot find ${label} component:`,
+      `[nuxt-content-mermaid] Cannot find ${label} component:`,
       name,
     )
     return null
   }
 
   try {
-    const [, loader] = matchEntry
-    const mod = await loader()
-    return mod.default || (mod as unknown as Component)
+    const [, componentLoader] = matchEntry
+    const mod = await componentLoader()
+    return mod.default || mod
   }
   catch (error) {
     console.error(
-      `[nuxt-mermaid-content] Failed to load ${label} component:`,
+      `[nuxt-content-mermaid] Failed to load ${label} component:`,
       error,
     )
     return null
@@ -108,43 +109,32 @@ if (import.meta.client && isEnabled) {
   const appComponents: Record<string, () => Promise<{ default: Component }>>
     = import.meta.glob<{ default: Component }>('~/components/**/*.{vue,js,ts}')
 
-  watch(
-    configuredSpinnerName,
-    async (name) => {
-      if (!name) {
-        customSpinner.value = null
-        return
-      }
-      customSpinner.value = await resolveAppComponent(
-        name,
-        appComponents,
-        'spinner',
-      )
-    },
-    { immediate: true },
-  )
+  function watchCustomAppComponent(
+    nameRef: ComputedRef<string>,
+    targetRef: { value: Component | null },
+    label: 'spinner' | 'mermaid',
+  ) {
+    watch(
+      nameRef,
+      async (name) => {
+        if (!name) {
+          targetRef.value = null
+          return
+        }
 
-  watch(
-    configuredMermaidImplName,
-    async (name) => {
-      if (!name) {
-        customMermaidImpl.value = null
-        return
-      }
+        targetRef.value = await resolveAppComponent(
+          name,
+          appComponents,
+          label,
+        )
+      },
+      { immediate: true },
+    )
+  }
 
-      customMermaidImpl.value = await resolveAppComponent(
-        name,
-        appComponents,
-        'mermaid',
-      )
-    },
-    { immediate: true },
-  )
+  watchCustomAppComponent(configuredSpinnerName, customSpinner, 'spinner')
+  watchCustomAppComponent(configuredMermaidImplName, customMermaidImpl, 'mermaid')
 }
-
-const spinnerComponent = computed<Component | string>(() => {
-  return customSpinner.value || Spinner
-})
 
 function serializeMermaidFromNode(root: Node): string {
   const TEXT_NODE = 3
@@ -165,81 +155,90 @@ function serializeMermaidFromNode(root: Node): string {
   return ''
 }
 
+function extractMermaidDefinition(container: HTMLDivElement) {
+  const pre = container.querySelector('pre')
+  const code = container.querySelector('code')
+
+  if (code) return code.textContent?.trim() || ''
+
+  if (pre) return pre.textContent?.trim() || ''
+
+  return serializeMermaidFromNode(container).trim()
+}
+
 async function renderMermaid() {
   if (!mermaidContainer.value || !mermaidDefinition) return
-  try {
-    isLoading.value = true
-    const mermaid = await $mermaid()
-    const theme = mermaidTheme.value
-    const initOptions: MermaidConfig = {
-      startOnLoad: false,
-      ...baseMermaidInit,
-      theme,
+
+  // Show spinner while waiting in queue
+  isLoading.value = true
+
+  const performRender = async () => {
+    // Check if component is still mounted
+    if (!mermaidContainer.value) return
+
+    try {
+      const mermaid = await $mermaid()
+      const initOptions: MermaidConfig = {
+        startOnLoad: false,
+        ...baseMermaidInit,
+        theme: mermaidTheme.value,
+      }
+      mermaid.initialize(initOptions)
+      mermaidContainer.value.textContent = mermaidDefinition
+      await nextTick()
+
+      await mermaid.run({
+        nodes: [mermaidContainer.value],
+        suppressErrors: true,
+      })
+
+      hasRenderedOnce.value = true
+
+      // Add a small delay to ensure unique IDs (Mermaid uses Date.now())
+      await new Promise(resolve => setTimeout(resolve, 5))
     }
-    mermaid.initialize(initOptions)
-    mermaidContainer.value.removeAttribute('data-processed')
-    mermaidContainer.value.textContent = mermaidDefinition
-    await nextTick()
-    await mermaid.run({
-      nodes: [mermaidContainer.value],
-      suppressErrors: true,
-    })
-    hasRenderedOnce.value = true
-    isLoading.value = false
+    catch (error) {
+      console.error('[nuxt-content-mermaid]', error)
+      if (mermaidContainer.value)
+        mermaidContainer.value.innerHTML = '⚠️ Mermaid Diagram Error'
+    }
+    finally {
+      isLoading.value = false
+    }
   }
-  catch (error) {
-    console.error('[nuxt-mermaid-content]', error)
-    if (mermaidContainer.value)
-      mermaidContainer.value.innerHTML = '⚠️ Mermaid Diagram Error'
-    isLoading.value = false
-  }
+
+  // Chain the render request
+  await enqueueRender(performRender)
 }
 
 function setupMermaidContainer() {
-  if (mermaidContainer.value) {
-    // Extract content from <code> or <pre> tags (Nuxt Content wraps ``` blocks in these)
-    const pre = mermaidContainer.value.querySelector('pre')
-    const code = mermaidContainer.value.querySelector('code')
+  const container = mermaidContainer.value
+  if (!container) return
 
-    if (code) {
-      // Prefer <code> content (most common for ``` blocks)
-      mermaidDefinition = code.textContent?.trim() || ''
-    }
-    else if (pre) {
-      // Fallback to <pre> if no <code>
-      mermaidDefinition = pre.textContent?.trim() || ''
-    }
-    else {
-      // Last resort: serialize the entire slot
-      mermaidDefinition = serializeMermaidFromNode(
-        mermaidContainer.value,
-      ).trim()
-    }
+  if (!mermaidDefinition)
+    mermaidDefinition = extractMermaidDefinition(container)
 
-    observer = new IntersectionObserver(
-      (entries) => {
-        // If the element is visible and we haven't rendered it yet
-        if (entries[0]?.isIntersecting && !hasRenderedOnce.value) {
-          renderMermaid()
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && !hasRenderedOnce.value) {
+        renderMermaid()
 
-          // Disconnect the observer after the first successful render
-          if (observer) {
-            observer.disconnect()
-          }
-        }
-      },
-      { threshold: 0.1 },
-    )
+        if (observer) observer.disconnect()
+      }
+    },
+    { threshold: 0.1 },
+  )
 
-    observer.observe(mermaidContainer.value)
-  }
+  observer.observe(container)
 }
 
-onMounted(async () => {
+onMounted(() => {
   if (!isEnabled) return
-  isMounted.value = true
-  await nextTick()
-  setupMermaidContainer()
+
+  // Extract definition from the same container (including SSR <slot>) to avoid hydration mismatch when switching structure
+  if (mermaidContainer.value)
+    mermaidDefinition = extractMermaidDefinition(mermaidContainer.value)
+  nextTick(() => setupMermaidContainer())
 })
 
 onUnmounted(() => {
@@ -253,43 +252,39 @@ watch(mermaidTheme, () => {
 </script>
 
 <template>
-  <component
-    :is="customMermaidImpl"
-    v-if="customMermaidImpl"
-  >
-    <slot />
-  </component>
-
-  <div
-    v-else-if="!isEnabled"
-    class="mermaid"
-  >
-    <slot />
-  </div>
-
-  <div
-    v-else-if="isMounted"
-    class="mermaid-wrapper"
-  >
+  <div class="mermaid-outer-wrapper">
     <div
-      ref="mermaidContainer"
-      class="mermaid"
+      v-if="!isEnabled"
+      class="mermaid-wrapper"
     >
-      <slot />
+      <div ref="mermaidContainer">
+        <slot />
+      </div>
     </div>
 
-    <template v-if="isLoading && !hasRenderedOnce">
-      <slot name="loading">
-        <component :is="spinnerComponent" />
-      </slot>
-    </template>
-  </div>
+    <component
+      :is="customMermaidImpl"
+      v-else-if="customMermaidImpl"
+      :spinner="spinnerComponent"
+    >
+      <slot />
+    </component>
 
-  <div
-    v-else
-    class="mermaid"
-  >
-    <slot />
+    <div
+      v-else
+      class="mermaid-wrapper"
+    >
+      <div ref="mermaidContainer">
+        <!-- Initially show the slot's <pre><code> for SSR; client-side rendering will replace it with the mermaid SVG -->
+        <slot />
+      </div>
+
+      <template v-if="isLoading && !hasRenderedOnce">
+        <slot name="loading">
+          <component :is="spinnerComponent" />
+        </slot>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -300,9 +295,19 @@ watch(mermaidTheme, () => {
   justify-content: center;
   align-items: center;
 }
+.mermaid-wrapper :deep(pre),
+.mermaid-wrapper :deep(code) {
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  margin: 0;
+  max-height: 160px;
+  overflow: hidden;
+}
 .mermaid:not([data-processed]) {
+  /* Hide text before Mermaid processes to avoid flickering */
   color: transparent;
-  min-height: 10px; /* Give it a minimum height so the observer can see it */
+  min-height: 10px;
 }
 .mermaid {
   display: flex;
@@ -318,7 +323,7 @@ watch(mermaidTheme, () => {
   white-space: normal !important;
   overflow: visible !important;
 }
-/* In some themes, the foreignObject wrapper can also clip; make it visible. */
+/* Some Mermaid themes apply overflow: hidden on foreignObject, forcing it to visible here */
 .mermaid foreignObject {
   overflow: visible !important;
 }

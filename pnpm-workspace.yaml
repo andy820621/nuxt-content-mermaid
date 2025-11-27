@@ -1,7 +1,8 @@
 packages:
-  - "playground"
+  - playground
 
 onlyBuiltDependencies:
-  - "@parcel/watcher"
-  - "better-sqlite3"
-  - "esbuild"
+  - '@parcel/watcher'
+  - better-sqlite3
+  - esbuild
+  - unrs-resolver

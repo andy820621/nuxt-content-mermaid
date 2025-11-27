@@ -85,7 +85,7 @@ graph LR
   A[1 < 2 & 3 > 1] --> B["x < y && y > z"]
 ```
 
-```mermaid
+```html
 <pre>
 <code>
 <

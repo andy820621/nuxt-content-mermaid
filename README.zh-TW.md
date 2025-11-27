@@ -1,6 +1,6 @@
 [English](./README.md) | [中文](./README.zh-TW.md)
 
-# nuxt-mermaid-content
+# nuxt-content-mermaid
 
 [![npm version][npm-version-src]][npm-version-href]
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
@@ -163,6 +163,45 @@ export default defineNuxtConfig({
      </div>
    </template>
    ```
+
+#### 載入中指示
+
+模組在首次渲染前會使用內建的 spinner，如需替換可在 `components.spinner` 指定元件名稱；該元件也會以 `spinner` prop 傳入你的自訂渲染元件，方便直接渲染。
+
+以下是極簡的設定與元件示例：
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mermaidContent: {
+    components: {
+      renderer: 'MyCustomMermaid',
+      spinner: 'MySpinner', // 選填：改用自己的全域 Loading 元件
+    }
+  }
+})
+```
+
+```vue
+<!-- components/MyCustomMermaid.vue -->
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import type { Component } from 'vue'
+
+const props = defineProps<{ spinner: Component | string }>()
+const loading = ref(true)
+onMounted(() => { loading.value = false })
+</script>
+
+<template>
+  <div class="my-mermaid">
+    <component v-if="loading" :is="props.spinner" />
+    <Mermaid v-else>
+      <slot />
+    </Mermaid>
+  </div>
+</template>
+```
 
 ## Contribution
 

@@ -1,6 +1,6 @@
 [English](./README.md) | [中文](./README.zh-TW.md)
 
-# nuxt-mermaid-content
+# nuxt-content-mermaid
 
 [![npm version][npm-version-src]][npm-version-href]
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
@@ -163,6 +163,45 @@ If you want full control over rendering (for example to add a border, zoom contr
      </div>
    </template>
    ```
+
+#### Loading Indicator
+
+The module renders a built-in spinner before the first Mermaid render. If you set `components.spinner`, the named component will replace the default spinner and will be passed into your custom renderer as a `spinner` prop.
+
+Minimal example that uses the provided spinner while waiting for your own loading logic:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mermaidContent: {
+    components: {
+      renderer: 'MyCustomMermaid',
+      spinner: 'MySpinner', // optional: globally replace the default spinner
+    },
+  },
+})
+```
+
+```vue
+<!-- components/MyCustomMermaid.vue -->
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import type { Component } from 'vue'
+
+const props = defineProps<{ spinner: Component | string }>()
+const loading = ref(true)
+onMounted(() => { loading.value = false })
+</script>
+
+<template>
+  <div class="my-mermaid">
+    <component v-if="loading" :is="props.spinner" />
+    <Mermaid v-else>
+      <slot />
+    </Mermaid>
+  </div>
+</template>
+```
 
 ## Contribution
 

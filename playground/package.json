@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "nuxt-mermaid-content-playground",
+  "name": "nuxt-content-mermaid-playground",
   "type": "module",
   "scripts": {
     "dev": "nuxi dev",
