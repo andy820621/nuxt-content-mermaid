@@ -13,6 +13,14 @@ declare module 'vue' {
 }
 
 declare module 'nuxt/schema' {
+  interface NuxtConfig {
+    mermaidContent?: ModuleOptions
+  }
+
+  interface NuxtOptions {
+    mermaidContent?: ModuleOptions
+  }
+
   interface PublicRuntimeConfig {
     mermaidContent?: Partial<ModuleOptions>
   }
