@@ -27,6 +27,12 @@ const loaderOptions = mermaidContent.loader || {}
 const themeOptions = mermaidContent.theme || {}
 const componentOptions = mermaidContent.components || {}
 
+const lazyOption = loaderOptions.lazy
+const isLazy = lazyOption !== false
+const lazyThreshold = typeof lazyOption === 'object' && typeof lazyOption.threshold === 'number'
+  ? lazyOption.threshold
+  : 0.1
+
 const baseMermaidInit = (loaderOptions.init as MermaidConfig | undefined) || {}
 const useColorModeTheme = themeOptions.useColorModeTheme
 const lightTheme = themeOptions.light
@@ -218,6 +224,11 @@ function setupMermaidContainer() {
   if (!mermaidDefinition)
     mermaidDefinition = extractMermaidDefinition(container)
 
+  if (!isLazy) {
+    renderMermaid()
+    return
+  }
+
   observer = new IntersectionObserver(
     (entries) => {
       if (entries[0]?.isIntersecting && !hasRenderedOnce.value) {
@@ -226,7 +237,7 @@ function setupMermaidContainer() {
         if (observer) observer.disconnect()
       }
     },
-    { threshold: 0.1 },
+    { threshold: lazyThreshold },
   )
 
   observer.observe(container)

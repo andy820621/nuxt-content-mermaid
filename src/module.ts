@@ -35,6 +35,12 @@ export interface ModuleOptions {
      * Pass-through to `mermaid.initialize`
      */
     init?: MermaidConfig
+    /**
+     * Whether to lazy load the diagram when it enters the viewport.
+     * Can be a boolean or an object with IntersectionObserver options.
+     * @default true
+     */
+    lazy?: boolean | { threshold?: number }
   }
   /**
    * Options related to theme handling
@@ -72,6 +78,7 @@ const DEFAULTS = {
   loader: {
     importSource: DEFAULT_IMPORT_SOURCE,
     init: { ...DEFAULT_MERMAID_INIT },
+    lazy: true,
   },
   theme: {
     useColorModeTheme: true,
