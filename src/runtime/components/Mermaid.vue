@@ -44,6 +44,8 @@ const { $mermaid } = nuxtApp
 const mermaidContainer = useTemplateRef('mermaidContainer')
 const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
+const hasError = ref(false)
+const errorContent = shallowRef<unknown | null>(null)
 
 let mermaidDefinition = '' // Mermaid definition extracted from slot content
 let observer: IntersectionObserver | null = null
@@ -63,6 +65,8 @@ const configuredSpinnerName = computed(() => componentOptions.spinner?.trim() ||
 const customSpinner = shallowRef<Component | null>(null)
 const configuredMermaidImplName = computed(() => componentOptions.renderer?.trim() || '')
 const customMermaidImpl = shallowRef<Component | null>(null)
+const configuredErrorName = computed(() => componentOptions.error?.trim() || '')
+const errorComponent = shallowRef<Component | null>(null)
 const spinnerComponent = computed<Component | string>(() => customSpinner.value || Spinner)
 
 function normalizeIdentifier(value: string) {
@@ -118,7 +122,7 @@ if (import.meta.client && isEnabled) {
   function watchCustomAppComponent(
     nameRef: ComputedRef<string>,
     targetRef: { value: Component | null },
-    label: 'spinner' | 'mermaid',
+    label: 'spinner' | 'mermaid' | 'error',
   ) {
     watch(
       nameRef,
@@ -140,6 +144,7 @@ if (import.meta.client && isEnabled) {
 
   watchCustomAppComponent(configuredSpinnerName, customSpinner, 'spinner')
   watchCustomAppComponent(configuredMermaidImplName, customMermaidImpl, 'mermaid')
+  watchCustomAppComponent(configuredErrorName, errorComponent, 'error')
 }
 
 function serializeMermaidFromNode(root: Node): string {
@@ -182,6 +187,9 @@ async function renderMermaid() {
     // Check if component is still mounted
     if (!mermaidContainer.value) return
 
+    hasError.value = false
+    errorContent.value = null
+
     try {
       const mermaid = await $mermaid()
       const initOptions: MermaidConfig = {
@@ -205,8 +213,11 @@ async function renderMermaid() {
     }
     catch (error) {
       console.error('[nuxt-content-mermaid]', error)
+      hasError.value = true
+      errorContent.value = error
+
       if (mermaidContainer.value)
-        mermaidContainer.value.innerHTML = '⚠️ Mermaid Diagram Error'
+        mermaidContainer.value.innerHTML = ''
     }
     finally {
       isLoading.value = false
@@ -295,6 +306,27 @@ watch(mermaidTheme, () => {
           <component :is="spinnerComponent" />
         </slot>
       </template>
+      <template v-else-if="hasError">
+        <slot
+          name="error"
+          :error="errorContent"
+          :source="mermaidDefinition"
+        >
+          <component
+            :is="errorComponent"
+            v-if="errorComponent"
+            :error="errorContent"
+            :source="mermaidDefinition"
+          />
+
+          <div
+            v-else
+            class="mermaid-error-default"
+          >
+            ⚠️ Mermaid Diagram Error
+          </div>
+        </slot>
+      </template>
     </div>
   </div>
 </template>
@@ -314,6 +346,9 @@ watch(mermaidTheme, () => {
   margin: 0;
   max-height: 160px;
   overflow: hidden;
+}
+.mermaid-error-default {
+  text-align: center;
 }
 .mermaid:not([data-processed]) {
   /* Hide text before Mermaid processes to avoid flickering */

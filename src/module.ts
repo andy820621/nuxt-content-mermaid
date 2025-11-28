@@ -70,6 +70,12 @@ export interface ModuleOptions {
      * If not provided, the module's built-in `Spinner.vue` will be used.
      */
     spinner?: string
+    /**
+     * Error component name to display when Mermaid rendering fails.
+     * This should be a globally available component name (e.g., under the project `components/` directory).
+     * If not provided, the module's built-in fallback message will be used.
+     */
+    error?: string
   }
 }
 
@@ -88,6 +94,7 @@ const DEFAULTS = {
   components: {
     renderer: undefined,
     spinner: undefined,
+    error: undefined,
   },
 } satisfies ModuleOptions
 

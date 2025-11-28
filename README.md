@@ -16,7 +16,7 @@ A Nuxt module designed for integrating Mermaid with `@nuxt/content`. It automati
 - **Automatic conversion**: Parses Markdown code blocks and replaces them with a `<Mermaid>` rendering component.
 - **Performance friendly**: Supports lazy loading — Mermaid core and related resources are only loaded when the component mounts.
 - **Theme integration**: Integrates with `@nuxtjs/color-mode` to automatically switch between light and dark Mermaid themes.
-- **Highly customizable**: Allows custom wrapper components, loading spinners, and custom CDN or local import sources.
+- **Highly customizable**: Allows custom wrapper components, loading spinners, error views, and custom CDN or local import sources.
 - **Runtime config**: Settings can be overridden at deployment time through runtime config / environment variables.
 
 ## Requirements
@@ -84,6 +84,7 @@ export default defineNuxtConfig({
     components: {
       renderer: undefined,
       spinner: undefined,
+      error: undefined,
     },
   },
 });
@@ -118,6 +119,7 @@ export default defineNuxtConfig({
 | :------------------------ | :------- | :---------- | :----------------------------------------------------------------------- |
 | `components.renderer`     | `string` | `undefined` | Optional: custom Mermaid renderer component name.                        |
 | `components.spinner`      | `string` | `undefined` | Optional: global loading spinner component name.                         |
+| `components.error`        | `string` | `undefined` | Optional: global error component name when Mermaid rendering fails.      |
 
 > **Note**: All options can be overridden at runtime via `runtimeConfig.public.mermaidContent`.
 
@@ -203,6 +205,78 @@ onMounted(() => { loading.value = false })
 </template>
 ```
 
+### Wrapper Example
+
+You can wrap `<Mermaid>` inside your own Vue component.
+For example, you can bundle a title, loading state, and error/fallback UI, then drop it anywhere in templates:
+
+```vue
+<!-- WrapperMermaid.vue -->
+<template>
+  <section>
+    <header v-if="title">{{ title }}</header>
+
+    <Mermaid>
+      <slot>
+        <pre><code>{{ code }}</code></pre>
+      </slot>
+
+      <template #loading>
+        <component :is="spinner" v-if="spinner" />
+        <p v-else>Diagram loading…</p>
+      </template>
+
+      <template #error="{ error, source }">
+        <p>Render failed: {{ error instanceof Error ? error.message : String(error) }}</p>
+        <pre><code>{{ source }}</code></pre>
+      </template>
+    </Mermaid>
+  </section>
+</template>
+```
+
+```vue
+<!-- usage -->
+<WrapperMermaid
+  title="Demo Diagram"
+  spinner="MySpinner"
+>
+  <pre><code>graph TD; A-->B; B-->C; C-->A</code></pre>
+</WrapperMermaid>
+```
+
+Copy or adapt this pattern to centralize the common slots you want to reuse.
+
+### Error Handling
+
+When Mermaid parsing/rendering fails, the component exposes an `error` slot and supports a global error component via `components.error`. Both receive the thrown error and the original Mermaid source for inspection.
+
+```vue
+<Mermaid>
+  <pre><code>graph TD; A-->B; B-->C; C-->A</code></pre>
+
+  <template #error="{ error, source }">
+    <p>Render failed: {{ error instanceof Error ? error.message : String(error) }}</p>
+    <details>
+      <summary>Show definition</summary>
+      <pre><code>{{ source }}</code></pre>
+    </details>
+  </template>
+</Mermaid>
+```
+
+To reuse a global error view everywhere, register it once and reference it in config:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mermaidContent: {
+    components: {
+      error: 'MermaidError', // globally registered component name
+    },
+  },
+})
+```
 ## Contribution
 
 <details>

@@ -16,7 +16,7 @@
 - **自動轉換**：解析 Markdown 代碼區塊並替換為 `<Mermaid>` 渲染元件。
 - **效能優化**：支援 Lazy Loading，僅在元件掛載時載入 Mermaid 核心與資源。
 - **主題整合**：無縫整合 `@nuxtjs/color-mode`，自動切換 Light/Dark 對應主題。
-- **高度客製**：支援自訂渲染元件（Wrapper）、Loading Spinner 及 CDN 來源。
+- **高度客製**：支援自訂渲染元件（Wrapper）、Loading Spinner、錯誤畫面以及 CDN 來源。
 - **Runtime Config**：支援透過環境變數動態覆寫設定。
 
 ## 使用前提
@@ -84,6 +84,7 @@ export default defineNuxtConfig({
     components: {
       renderer: undefined,
       spinner: undefined,
+      error: undefined,
     },
   },
 });
@@ -118,6 +119,7 @@ export default defineNuxtConfig({
 | :----------------------- | :------- | :--------- | :----------------------------------------------------- |
 | `components.renderer`    | `string` | `undefined` | 指定自訂的 Mermaid 實作元件名稱（見進階用法）。        |
 | `components.spinner`     | `string` | `undefined` | 指定全域的 Loading 元件名稱。                          |
+| `components.error`       | `string` | `undefined` | 指定全域的錯誤顯示元件名稱，渲染失敗時會使用。         |
 
 > **Note**: 所有設定皆可透過 `runtimeConfig.public.mermaidContent` 在部署時進行覆寫。
 
@@ -201,6 +203,78 @@ onMounted(() => { loading.value = false })
     </Mermaid>
   </div>
 </template>
+```
+
+### 元件使用方式
+
+可以用 `<Mermaid>` 自己包一個的 Vue 元件 。
+例如，你可以同時放入標題、Loading 與錯誤顯示，之後就能在任意模板重複使用：
+```vue
+<!-- WrapperMermaid.vue -->
+<template>
+  <section>
+    <header v-if="title">{{ title }}</header>
+
+    <Mermaid>
+      <slot>
+        <pre><code>{{ code }}</code></pre>
+      </slot>
+
+      <template #loading>
+        <component :is="spinner" v-if="spinner" />
+        <p v-else>Diagram loading…</p>
+      </template>
+
+      <template #error="{ error, source }">
+        <p>渲染失敗：{{ error instanceof Error ? error.message : String(error) }}</p>
+        <pre><code>{{ source }}</code></pre>
+      </template>
+    </Mermaid>
+  </section>
+</template>
+```
+
+```vue
+<!-- 使用範例 -->
+<WrapperMermaid
+  title="Demo Diagram"
+  spinner="MySpinner"
+>
+  <pre><code>graph TD; A-->B; B-->C; C-->A</code></pre>
+</WrapperMermaid>
+```
+
+可依需求調整此模式，把常用的 slot 寫在一個可重用的包裝元件中。
+
+### 錯誤處理
+
+當 Mermaid 解析或渲染失敗時，`<Mermaid>` 會觸發 `error` slot，並可透過 `components.error` 指定全域錯誤元件。兩者都會拿到錯誤內容與原始 Mermaid 定義，方便除錯。
+
+```vue
+<Mermaid>
+  <pre><code>graph TD; A-->B; B-->C; C-->A</code></pre>
+
+  <template #error="{ error, source }">
+    <p>渲染失敗：{{ error instanceof Error ? error.message : String(error) }}</p>
+    <details>
+      <summary>查看原始定義</summary>
+      <pre><code>{{ source }}</code></pre>
+    </details>
+  </template>
+</Mermaid>
+```
+
+若想一次註冊、全域套用自訂錯誤畫面，可在設定中指定元件名稱：
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mermaidContent: {
+    components: {
+      error: 'MermaidError', // 全域註冊的元件名稱
+    },
+  },
+})
 ```
 
 ## Contribution
