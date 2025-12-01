@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.0.3
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v1.0.2...v1.0.3)
+
+### 🩹 Fixes
+
+- Clear mermaid processed flag before rerender ([0244573](https://github.com/andy820621/nuxt-content-mermaid/commit/0244573))
+
+### 📖 Documentation
+
+- Update deps & installation instructions in README files ([b19ed92](https://github.com/andy820621/nuxt-content-mermaid/commit/b19ed92))
+
+### 🏡 Chore
+
+- Migrate to pnpm catalogs and align compatibility ranges ([bab7d15](https://github.com/andy820621/nuxt-content-mermaid/commit/bab7d15))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v1.0.2
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v1.0.1...v1.0.2)
