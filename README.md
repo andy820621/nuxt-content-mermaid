@@ -9,7 +9,8 @@
 [![Mermaid](https://img.shields.io/badge/mermaid-11.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
-A Nuxt module designed for integrating Mermaid with `@nuxt/content`. It automatically converts `mermaid` code blocks in Markdown into responsive chart components, and supports lazy loading and dark/light theme switching.
+A Nuxt module designed for integrating [**Mermaid**](https://mermaid.js.org/) with [**Nuxt Content v3**](https://content.nuxt.com/docs/getting-started).
+It automatically converts `mermaid` code blocks in Markdown into responsive chart components, and supports lazy loading and dark/light theme switching.
 
 ## Features
 
@@ -28,13 +29,30 @@ A Nuxt module designed for integrating Mermaid with `@nuxt/content`. It automati
 
 ### 1. Install the module
 
+**Auto-setup (adds to `modules` automatically):**
+
 ```bash
 npx nuxi module add @barzhsieh/nuxt-content-mermaid
 ```
 
+> Nuxt CLI installs third-party modules as regular `dependencies` by default. If you prefer `devDependencies`, move it after install or use the manual option below.
+
+**Install as dev dependency (manual modules entry):**
+
+```bash
+# pnpm
+pnpm add -D @barzhsieh/nuxt-content-mermaid
+
+# npm
+npm install -D @barzhsieh/nuxt-content-mermaid
+
+# yarn
+yarn add -D @barzhsieh/nuxt-content-mermaid
+```
+
 ### 2. Configure `nuxt.config.ts`
 
-Make sure the module is included in the `modules` array (if you used `nuxi module add`, this is added automatically):
+Make sure the module is included in the `modules` array (skip if you used `nuxi module add`):
 
 ```ts
 export default defineNuxtConfig({

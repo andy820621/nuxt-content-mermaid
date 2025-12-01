@@ -2,6 +2,16 @@
   "name": "@barzhsieh/nuxt-content-mermaid",
   "version": "1.0.2",
   "description": "A Nuxt module designed for integrating Mermaid with `@nuxt/content`. It automatically converts `mermaid` code blocks in Markdown into responsive chart components, and supports lazy loading and dark/light theme switching.",
+  "keywords": [
+    "nuxt",
+    "nuxt-module",
+    "content",
+    "nuxt-content",
+    "markdown",
+    "mermaid",
+    "diagram",
+    "mdc"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/andy820621/nuxt-content-mermaid.git"
@@ -49,8 +59,8 @@
   },
   "devDependencies": {
     "@nuxt/content": "3.8.0",
-    "@nuxt/devtools": "^3.1.0",
-    "@nuxt/eslint-config": "^1.10.0",
+    "@nuxt/devtools": "^3.1.1",
+    "@nuxt/eslint-config": "^1.11.0",
     "@nuxt/module-builder": "^1.0.2",
     "@nuxt/schema": "^4.2.1",
     "@nuxt/test-utils": "^3.20.1",
@@ -61,10 +71,11 @@
     "mermaid": "^11.12.1",
     "nuxt": "^4.2.1",
     "typescript": "~5.9.3",
-    "vitest": "^4.0.10",
+    "vitest": "^4.0.14",
     "vue-tsc": "^3.1.4"
   },
   "volta": {
     "node": "22.21.1"
-  }
+  },
+  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a"
 }

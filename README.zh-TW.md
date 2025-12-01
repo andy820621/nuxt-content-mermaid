@@ -9,7 +9,8 @@
 [![Mermaid](https://img.shields.io/badge/mermaid-11.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
-專為 Nuxt + `@nuxt/content` 設計的 Mermaid 整合模組。能自動將 Markdown 中的 ```mermaid 區塊轉換為響應式的圖表元件，並支援 Lazy Loading 與深色模式切換。
+專為 [**Nuxt Content v3**](https://content.nuxt.com/docs/getting-started) 整合 [**Mermaid**](https://mermaid.js.org/) 的模組。
+能自動將 Markdown 中的 ```mermaid 區塊轉換為響應式的圖表元件，並支援 Lazy Loading 與深色模式切換。
 
 ## Features
 
@@ -28,13 +29,30 @@
 
 ### 1. 安裝模組
 
+**自動設定（自動寫入 `modules`）：**
+
 ```bash
 npx nuxi module add @barzhsieh/nuxt-content-mermaid
 ```
 
+> Nuxt CLI 對第三方模組預設會裝到 `dependencies`。若想放 `devDependencies`，請裝完後移動或改用下方手動安裝。
+
+**裝到 `devDependencies`（需手動加入 `modules`）：**
+
+```bash
+# pnpm
+pnpm add -D @barzhsieh/nuxt-content-mermaid
+
+# npm
+npm install -D @barzhsieh/nuxt-content-mermaid
+
+# yarn
+yarn add -D @barzhsieh/nuxt-content-mermaid
+```
+
 ### 2. 配置 `nuxt.config.ts`
 
-確保模組已加入 `modules` 清單（若使用 `nuxi module add` 則會自動加入）：
+確保模組已加入 `modules` 清單（若使用 `nuxi module add` 則可略過）：
 
 ```ts
 export default defineNuxtConfig({
