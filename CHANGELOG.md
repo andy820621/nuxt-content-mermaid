@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.4
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v1.0.3...v1.0.4)
+
+### 🩹 Fixes
+
+- Change release scripts to use pnpm ([52eb4a2](https://github.com/andy820621/nuxt-content-mermaid/commit/52eb4a2))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v1.0.3
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v1.0.2...v1.0.3)
