@@ -198,6 +198,7 @@ async function renderMermaid() {
         theme: mermaidTheme.value,
       }
       mermaid.initialize(initOptions)
+      mermaidContainer.value.removeAttribute('data-processed')
       mermaidContainer.value.textContent = mermaidDefinition
       await nextTick()
 
