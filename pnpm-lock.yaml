@@ -4,61 +4,118 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  dev:
+    '@nuxt/devtools':
+      specifier: 3.1.1
+      version: 3.1.1
+    '@nuxt/eslint-config':
+      specifier: 1.11.0
+      version: 1.11.0
+    '@nuxt/module-builder':
+      specifier: 1.0.2
+      version: 1.0.2
+    '@nuxtjs/color-mode':
+      specifier: 4.0.0
+      version: 4.0.0
+    changelogen:
+      specifier: ^0.6.2
+      version: 0.6.2
+    defu:
+      specifier: ^6.1.4
+      version: 6.1.4
+    eslint:
+      specifier: ^9.39.1
+      version: 9.39.1
+    nuxt:
+      specifier: 4.2.1
+      version: 4.2.1
+    typescript:
+      specifier: ~5.9.3
+      version: 5.9.3
+    vue-tsc:
+      specifier: ^3.1.4
+      version: 3.1.5
+  integrations:
+    '@nuxt/content':
+      specifier: 3.8.0
+      version: 3.8.0
+    '@nuxt/kit':
+      specifier: 4.2.1
+      version: 4.2.1
+    '@nuxt/schema':
+      specifier: 4.2.1
+      version: 4.2.1
+    mermaid:
+      specifier: ^11.12.1
+      version: 11.12.1
+  test:
+    '@nuxt/test-utils':
+      specifier: 3.20.1
+      version: 3.20.1
+    vitest:
+      specifier: ^4.0.14
+      version: 4.0.14
+  types:
+    '@types/node':
+      specifier: latest
+      version: 24.10.1
+
 importers:
 
   .:
     dependencies:
       '@nuxt/kit':
-        specifier: ^4.2.1
+        specifier: catalog:integrations
         version: 4.2.1(magicast@0.5.1)
       defu:
-        specifier: ^6.1.4
+        specifier: catalog:dev
         version: 6.1.4
     devDependencies:
       '@nuxt/content':
-        specifier: 3.8.0
+        specifier: catalog:integrations
         version: 3.8.0(better-sqlite3@12.4.6)(magicast@0.5.1)
       '@nuxt/devtools':
-        specifier: ^3.1.1
+        specifier: catalog:dev
         version: 3.1.1(vite@7.2.4(@types/node@24.10.1)(jiti@2.6.1)(terser@5.44.1)(yaml@2.8.1))(vue@3.5.24(typescript@5.9.3))
       '@nuxt/eslint-config':
-        specifier: ^1.11.0
+        specifier: catalog:dev
         version: 1.11.0(@typescript-eslint/utils@8.48.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(@vue/compiler-sfc@3.5.24)(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
       '@nuxt/module-builder':
-        specifier: ^1.0.2
+        specifier: catalog:dev
         version: 1.0.2(@nuxt/cli@3.30.0(magicast@0.5.1))(@vue/compiler-core@3.5.24)(esbuild@0.25.12)(typescript@5.9.3)(vue-tsc@3.1.5(typescript@5.9.3))(vue@3.5.24(typescript@5.9.3))
       '@nuxt/schema':
-        specifier: ^4.2.1
+        specifier: catalog:integrations
         version: 4.2.1
       '@nuxt/test-utils':
-        specifier: ^3.20.1
+        specifier: catalog:test
         version: 3.20.1(magicast@0.5.1)(typescript@5.9.3)(vitest@4.0.14(@types/node@24.10.1)(jiti@2.6.1)(terser@5.44.1)(yaml@2.8.1))
       '@nuxtjs/color-mode':
-        specifier: ^4.0.0
+        specifier: catalog:dev
         version: 4.0.0(magicast@0.5.1)
       '@types/node':
-        specifier: latest
+        specifier: catalog:types
         version: 24.10.1
       changelogen:
-        specifier: ^0.6.2
+        specifier: catalog:dev
         version: 0.6.2(magicast@0.5.1)
       eslint:
-        specifier: ^9.39.1
+        specifier: catalog:dev
         version: 9.39.1(jiti@2.6.1)
       mermaid:
-        specifier: ^11.12.1
+        specifier: catalog:integrations
         version: 11.12.1
       nuxt:
-        specifier: ^4.2.1
+        specifier: catalog:dev
         version: 4.2.1(@parcel/watcher@2.5.1)(@types/node@24.10.1)(@vue/compiler-sfc@3.5.24)(better-sqlite3@12.4.6)(db0@0.3.4(better-sqlite3@12.4.6))(eslint@9.39.1(jiti@2.6.1))(ioredis@5.8.2)(magicast@0.5.1)(optionator@0.9.4)(rollup@4.53.3)(terser@5.44.1)(typescript@5.9.3)(vite@7.2.4(@types/node@24.10.1)(jiti@2.6.1)(terser@5.44.1)(yaml@2.8.1))(vue-tsc@3.1.5(typescript@5.9.3))(yaml@2.8.1)
       typescript:
-        specifier: ~5.9.3
+        specifier: catalog:dev
         version: 5.9.3
       vitest:
-        specifier: ^4.0.14
+        specifier: catalog:test
         version: 4.0.14(@types/node@24.10.1)(jiti@2.6.1)(terser@5.44.1)(yaml@2.8.1)
       vue-tsc:
-        specifier: ^3.1.4
+        specifier: catalog:dev
         version: 3.1.5(typescript@5.9.3)
 
   playground:
@@ -66,13 +123,16 @@ importers:
       better-sqlite3:
         specifier: ^12.4.6
         version: 12.4.6
-      nuxt:
-        specifier: ^4.2.1
-        version: 4.2.1(@parcel/watcher@2.5.1)(@types/node@24.10.1)(@vue/compiler-sfc@3.5.24)(better-sqlite3@12.4.6)(db0@0.3.4(better-sqlite3@12.4.6))(eslint@9.39.1(jiti@2.6.1))(ioredis@5.8.2)(magicast@0.5.1)(optionator@0.9.4)(rollup@4.53.3)(terser@5.44.1)(typescript@5.9.3)(vite@7.2.4(@types/node@24.10.1)(jiti@2.6.1)(terser@5.44.1)(yaml@2.8.1))(vue-tsc@3.1.5(typescript@5.9.3))(yaml@2.8.1)
     devDependencies:
       '@nuxt/content':
-        specifier: 3.8.0
+        specifier: catalog:integrations
         version: 3.8.0(better-sqlite3@12.4.6)(magicast@0.5.1)
+      '@nuxtjs/color-mode':
+        specifier: catalog:dev
+        version: 4.0.0(magicast@0.5.1)
+      nuxt:
+        specifier: catalog:dev
+        version: 4.2.1(@parcel/watcher@2.5.1)(@types/node@24.10.1)(@vue/compiler-sfc@3.5.24)(better-sqlite3@12.4.6)(db0@0.3.4(better-sqlite3@12.4.6))(eslint@9.39.1(jiti@2.6.1))(ioredis@5.8.2)(magicast@0.5.1)(optionator@0.9.4)(rollup@4.53.3)(terser@5.44.1)(typescript@5.9.3)(vite@7.2.4(@types/node@24.10.1)(jiti@2.6.1)(terser@5.44.1)(yaml@2.8.1))(vue-tsc@3.1.5(typescript@5.9.3))(yaml@2.8.1)
 
 packages:
 
@@ -1503,10 +1563,6 @@ packages:
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0
       typescript: '>=4.8.4 <6.0.0'
-
-  '@typescript-eslint/types@8.47.0':
-    resolution: {integrity: sha512-nHAE6bMKsizhA2uuYZbEbmp5z2UpffNrPEqiKIeN7VsV6UY/roxanWfoRrf6x/k9+Obf+GQdkm0nPU+vnMXo9A==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@typescript-eslint/types@8.48.0':
     resolution: {integrity: sha512-cQMcGQQH7kwKoVswD1xdOytxQR60MWKM1di26xSUtxehaDs/32Zpqsu5WJlXTtTTqyAVK8R7hvsUnIXRS+bjvA==}
@@ -4054,10 +4110,6 @@ packages:
     peerDependencies:
       postcss: ^8.4.32
 
-  postcss-selector-parser@7.1.0:
-    resolution: {integrity: sha512-8sLjZwK0R+JlxlYcTuVnyT2v+htpdrjDOKuMcOVdYjt52Lh8hWRYpxBPoKx/Zg+bcjc3wx6fmQevMmUztS/ccA==}
-    engines: {node: '>=4'}
-
   postcss-selector-parser@7.1.1:
     resolution: {integrity: sha512-orRsuYpJVw8LdAwqqLykBj9ecS5/cRHlI5+nvTo8LcCKmzDmqVORXtOIYEEQuL9D4BxtA1lm5isAqzQZCoQ6Eg==}
     engines: {node: '>=4'}
@@ -5459,7 +5511,7 @@ snapshots:
   '@es-joy/jsdoccomment@0.76.0':
     dependencies:
       '@types/estree': 1.0.8
-      '@typescript-eslint/types': 8.47.0
+      '@typescript-eslint/types': 8.48.0
       comment-parser: 1.4.1
       esquery: 1.6.0
       jsdoc-type-pratt-parser: 6.10.0
@@ -6639,7 +6691,7 @@ snapshots:
   '@stylistic/eslint-plugin@5.6.1(eslint@9.39.1(jiti@2.6.1))':
     dependencies:
       '@eslint-community/eslint-utils': 4.9.0(eslint@9.39.1(jiti@2.6.1))
-      '@typescript-eslint/types': 8.47.0
+      '@typescript-eslint/types': 8.48.0
       eslint: 9.39.1(jiti@2.6.1)
       eslint-visitor-keys: 4.2.1
       espree: 10.4.0
@@ -6872,8 +6924,6 @@ snapshots:
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
-
-  '@typescript-eslint/types@8.47.0': {}
 
   '@typescript-eslint/types@8.48.0': {}
 
@@ -8036,14 +8086,14 @@ snapshots:
   eslint-plugin-import-lite@0.3.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3):
     dependencies:
       '@eslint-community/eslint-utils': 4.9.0(eslint@9.39.1(jiti@2.6.1))
-      '@typescript-eslint/types': 8.47.0
+      '@typescript-eslint/types': 8.48.0
       eslint: 9.39.1(jiti@2.6.1)
     optionalDependencies:
       typescript: 5.9.3
 
   eslint-plugin-import-x@4.16.1(@typescript-eslint/utils@8.48.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.6.1)):
     dependencies:
-      '@typescript-eslint/types': 8.47.0
+      '@typescript-eslint/types': 8.48.0
       comment-parser: 1.4.1
       debug: 4.4.3
       eslint: 9.39.1(jiti@2.6.1)
@@ -9854,7 +9904,7 @@ snapshots:
   postcss-calc@10.1.1(postcss@8.5.6):
     dependencies:
       postcss: 8.5.6
-      postcss-selector-parser: 7.1.0
+      postcss-selector-parser: 7.1.1
       postcss-value-parser: 4.2.0
 
   postcss-colormin@7.0.5(postcss@8.5.6):
@@ -9874,7 +9924,7 @@ snapshots:
   postcss-discard-comments@7.0.5(postcss@8.5.6):
     dependencies:
       postcss: 8.5.6
-      postcss-selector-parser: 7.1.0
+      postcss-selector-parser: 7.1.1
 
   postcss-discard-duplicates@7.0.2(postcss@8.5.6):
     dependencies:
@@ -9900,7 +9950,7 @@ snapshots:
       caniuse-api: 3.0.0
       cssnano-utils: 5.0.1(postcss@8.5.6)
       postcss: 8.5.6
-      postcss-selector-parser: 7.1.0
+      postcss-selector-parser: 7.1.1
 
   postcss-minify-font-values@7.0.1(postcss@8.5.6):
     dependencies:
@@ -9925,12 +9975,12 @@ snapshots:
     dependencies:
       cssesc: 3.0.0
       postcss: 8.5.6
-      postcss-selector-parser: 7.1.0
+      postcss-selector-parser: 7.1.1
 
   postcss-nested@7.0.2(postcss@8.5.6):
     dependencies:
       postcss: 8.5.6
-      postcss-selector-parser: 7.1.0
+      postcss-selector-parser: 7.1.1
 
   postcss-normalize-charset@7.0.1(postcss@8.5.6):
     dependencies:
@@ -9994,11 +10044,6 @@ snapshots:
       postcss: 8.5.6
       postcss-value-parser: 4.2.0
 
-  postcss-selector-parser@7.1.0:
-    dependencies:
-      cssesc: 3.0.0
-      util-deprecate: 1.0.2
-
   postcss-selector-parser@7.1.1:
     dependencies:
       cssesc: 3.0.0
@@ -10013,7 +10058,7 @@ snapshots:
   postcss-unique-selectors@7.0.4(postcss@8.5.6):
     dependencies:
       postcss: 8.5.6
-      postcss-selector-parser: 7.1.0
+      postcss-selector-parser: 7.1.1
 
   postcss-value-parser@4.2.0: {}
 
@@ -10573,7 +10618,7 @@ snapshots:
     dependencies:
       browserslist: 4.28.0
       postcss: 8.5.6
-      postcss-selector-parser: 7.1.0
+      postcss-selector-parser: 7.1.1
 
   stylis@4.3.6: {}
 

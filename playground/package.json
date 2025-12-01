@@ -8,10 +8,11 @@
     "generate": "nuxi generate"
   },
   "dependencies": {
-    "better-sqlite3": "^12.4.6",
-    "nuxt": "^4.2.1"
+    "better-sqlite3": "^12.4.6"
   },
   "devDependencies": {
-    "@nuxt/content": "3.8.0"
+    "@nuxt/content": "catalog:integrations",
+    "@nuxtjs/color-mode": "catalog:dev",
+    "nuxt": "catalog:dev"
   }
 }

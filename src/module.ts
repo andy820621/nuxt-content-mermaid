@@ -103,7 +103,7 @@ export default defineNuxtModule<ModuleOptions>({
     name: '@barzhsieh/nuxt-content-mermaid',
     configKey: 'mermaidContent',
     compatibility: {
-      nuxt: '^4.0.0',
+      nuxt: '^3.20.1 || ^4.1.0',
     },
   },
   defaults: {

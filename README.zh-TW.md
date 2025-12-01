@@ -22,8 +22,8 @@
 
 ## 使用前提
 
-- Nuxt 4 (`nuxt@^4.0.0`)
-- `@nuxt/content@^3.8.0`（必須安裝）
+- Nuxt 3.19 以上或 4.1 以上（`nuxt@^3.20.1 || ^4.1.0`）
+- `@nuxt/content@>=3.5.0`
 
 ## Quick Setup
 

@@ -22,8 +22,8 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
 
 ## Requirements
 
-- Nuxt 4 (`nuxt@^4.0.0`)
-- `@nuxt/content@^3.8.0`
+- Nuxt 3.19+ or 4.1+ (`nuxt@^3.20.1 || ^4.1.0`)
+- `@nuxt/content@>=3.5.0`
 
 ## Quick Setup
 
