@@ -11,8 +11,6 @@ export default defineNuxtConfig({
   nitro: { compatibilityDate: '2025-11-24' },
   mermaidContent: {
     loader: {
-      // importSource: '/mermaid/mermaid.esm.min.mjs',
-      // importSource: 'https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs',
       // init: { theme: 'base' },
       // lazy: false, // true/false also { threshold: 1.0 }
     },

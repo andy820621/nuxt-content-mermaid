@@ -10,7 +10,6 @@ import type { FileBeforeParseHook } from '@nuxt/content'
 import type { MermaidConfig } from 'mermaid'
 import {
   DEFAULT_DARK_THEME,
-  DEFAULT_IMPORT_SOURCE,
   DEFAULT_LIGHT_THEME,
   DEFAULT_MERMAID_INIT,
 } from './runtime/constants'
@@ -27,10 +26,6 @@ export interface ModuleOptions {
    * Options related to loading mermaid
    */
   loader?: {
-    /**
-     * Mermaid ESM source, can be a CDN URL or local /public path
-     */
-    importSource?: string
     /**
      * Pass-through to `mermaid.initialize`
      */
@@ -82,7 +77,6 @@ export interface ModuleOptions {
 const DEFAULTS = {
   enabled: true,
   loader: {
-    importSource: DEFAULT_IMPORT_SOURCE,
     init: { ...DEFAULT_MERMAID_INIT },
     lazy: true,
   },

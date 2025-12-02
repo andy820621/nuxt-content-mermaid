@@ -52,7 +52,8 @@
   },
   "dependencies": {
     "@nuxt/kit": "catalog:integrations",
-    "defu": "catalog:dev"
+    "defu": "catalog:dev",
+    "mermaid": "catalog:integrations"
   },
   "peerDependencies": {
     "nuxt": "^3.20.1 || ^4.1.0",
@@ -69,7 +70,6 @@
     "@types/node": "catalog:types",
     "changelogen": "catalog:dev",
     "eslint": "catalog:dev",
-    "mermaid": "catalog:integrations",
     "nuxt": "catalog:dev",
     "typescript": "catalog:dev",
     "vitest": "catalog:test",

@@ -87,12 +87,11 @@ export default defineNuxtConfig({
   mermaidContent: {
     enabled: true,
     loader: {
-      importSource:
-        "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs",
       init: {
         securityLevel: "strict",
         // 其他傳遞給 mermaid.initialize() 的參數
       },
+      lazy: true,
     },
     theme: {
       useColorModeTheme: true,
@@ -118,10 +117,10 @@ export default defineNuxtConfig({
 
 **loader**
 
-| 參數                  | 類型            | 預設值                  | 說明                                                       |
-| :-------------------- | :-------------- | :---------------------- | :--------------------------------------------------------- |
-| `loader.importSource` | `string`        | jsDelivr CDN            | 指定 Mermaid ESM 的載入來源（支援 CDN 或本地路徑）。       |
-| `loader.init`         | `MermaidConfig` | `{ startOnLoad: false }` | 直接傳遞給 `mermaid.initialize` 的原始設定。               |
+| 參數             | 類型                                   | 預設值                   | 說明                                                                  |
+| :--------------- | :------------------------------------- | :----------------------- | :---------------------------------------------------------------------- |
+| `loader.init`    | `MermaidConfig`                        | `{ startOnLoad: false }` | 直接傳遞給 `mermaid.initialize` 的原始設定。                            |
+| `loader.lazy`    | `boolean \| { threshold?: number }` | `true`                  | 元件進入 viewport 時才載入 Mermaid；設為 `false` 會在前一刻就載入。 |
 
 **theme**
 

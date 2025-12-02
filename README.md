@@ -87,12 +87,11 @@ export default defineNuxtConfig({
   mermaidContent: {
     enabled: true,
     loader: {
-      importSource:
-        "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs",
       init: {
         securityLevel: "strict",
         // additional options passed to mermaid.initialize()
       },
+      lazy: true,
     },
     theme: {
       useColorModeTheme: true,
@@ -118,10 +117,10 @@ export default defineNuxtConfig({
 
 **loader**
 
-| Option                 | Type               | Default      | Description                                                            |
-| :--------------------- | :----------------- | :----------- | :--------------------------------------------------------------------- |
-| `loader.importSource`  | `string`           | jsDelivr CDN | Source to load Mermaid ESM from (supports CDN or a local path).        |
-| `loader.init`          | `MermaidConfig`    | `{ startOnLoad: false }` | Raw options object passed to `mermaid.initialize`.                     |
+| Option            | Type                                  | Default                | Description                                                                      |
+| :---------------- | :------------------------------------ | :--------------------- | :------------------------------------------------------------------------------- |
+| `loader.init`     | `MermaidConfig`                       | `{ startOnLoad: false }` | Raw options object passed to `mermaid.initialize`.                               |
+| `loader.lazy`     | `boolean \| { threshold?: number }` | `true`                 | Lazy load Mermaid when the component enters the viewport; set `false` to preload. |
 
 **theme**
 
