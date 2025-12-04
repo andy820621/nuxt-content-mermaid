@@ -20,14 +20,26 @@ declare module 'vue' {
 
 declare module 'nuxt/schema' {
   interface NuxtConfig {
+    contentMermaid?: ModuleOptions
+    /**
+     * @deprecated 改用 `contentMermaid`
+     */
     mermaidContent?: ModuleOptions
   }
 
   interface NuxtOptions {
+    contentMermaid?: ModuleOptions
+    /**
+     * @deprecated 改用 `contentMermaid`
+     */
     mermaidContent?: ModuleOptions
   }
 
   interface PublicRuntimeConfig {
+    contentMermaid?: Partial<ModuleOptions>
+    /**
+     * @deprecated 改用 `contentMermaid`
+     */
     mermaidContent?: Partial<ModuleOptions>
   }
 }

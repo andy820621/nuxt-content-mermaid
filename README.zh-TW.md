@@ -79,12 +79,13 @@ graph LR
 
 ## Configuration
 
-你可以透過 `mermaidContent` 選項進行全域設定。
+你可以透過 `contentMermaid` 選項進行全域設定。  
+（`mermaidContent` 仍會被接受以維持相容，但已棄用，未來版本會移除。）
 
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  mermaidContent: {
+  contentMermaid: {
     enabled: true,
     loader: {
       init: {
@@ -138,7 +139,7 @@ export default defineNuxtConfig({
 | `components.spinner`     | `string` | `undefined` | 指定全域的 Loading 元件名稱。                          |
 | `components.error`       | `string` | `undefined` | 指定全域的錯誤顯示元件名稱，渲染失敗時會使用。         |
 
-> **Note**: 所有設定皆可透過 `runtimeConfig.public.mermaidContent` 在部署時進行覆寫。
+> **Note**: 所有設定皆可透過 `runtimeConfig.public.contentMermaid` 在部署時進行覆寫（`runtimeConfig.public.mermaidContent` 仍支援但已棄用）。
 
 ## Advanced Usage
 
@@ -210,7 +211,7 @@ graph TD
 
 1. **圖表內的 `%%{init: ...}%%`** —— 最優先，直接由 Mermaid 處理。  
 2. **frontmatter `config`** —— 深度合併在模組的 `loader.init` 之上。  
-3. **模組層級的 `mermaidContent.loader.init`** —— 專案的全域預設。  
+3. **模組層級的 `contentMermaid.loader.init`** —— 專案的全域預設。  
 
 ### 自訂渲染元件 (Custom Component)
 
@@ -219,7 +220,7 @@ graph TD
 1. 在 `nuxt.config.ts` 中指定元件名稱：
 
    ```ts
-   mermaidContent: {
+   contentMermaid: {
      components: {
        renderer: "MyCustomMermaid",
      }
@@ -251,7 +252,7 @@ graph TD
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  mermaidContent: {
+  contentMermaid: {
     components: {
       renderer: 'MyCustomMermaid',
       spinner: 'MySpinner', // 選填：改用自己的全域 Loading 元件
@@ -345,7 +346,7 @@ onMounted(() => { loading.value = false })
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  mermaidContent: {
+  contentMermaid: {
     components: {
       error: 'MermaidError', // 全域註冊的元件名稱
     },

@@ -4,6 +4,7 @@ import {
   addPlugin,
   addComponent,
   addTypeTemplate,
+  useLogger,
 } from '@nuxt/kit'
 import { defu } from 'defu'
 import type { FileBeforeParseHook } from '@nuxt/content'
@@ -96,7 +97,7 @@ const DEFAULTS = {
 export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: '@barzhsieh/nuxt-content-mermaid',
-    configKey: 'mermaidContent',
+    configKey: 'contentMermaid',
     compatibility: {
       nuxt: '^3.20.1 || ^4.1.0',
     },
@@ -105,20 +106,43 @@ export default defineNuxtModule<ModuleOptions>({
     ...DEFAULTS,
   },
   setup(options, nuxt) {
-    const resolvedOptions = defu(options, DEFAULTS)
+    const logger = useLogger('nuxt-content-mermaid')
+    const warn = (message: string) => logger.warn(message)
+
+    const deprecatedOptions = (nuxt.options as { mermaidContent?: ModuleOptions }).mermaidContent
+    const hasDeprecatedOptions = deprecatedOptions
+      && typeof deprecatedOptions === 'object'
+      && Object.keys(deprecatedOptions).length > 0
+
+    if (hasDeprecatedOptions)
+      warn('[nuxt-content-mermaid] `mermaidContent` is deprecated, please switch to `contentMermaid`. The old key is still read for now but will be removed in a future release.')
+
+    const resolvedOptions = defu(
+      {},
+      options,
+      deprecatedOptions,
+      DEFAULTS,
+    ) as ModuleOptions
 
     const resolver = createResolver(import.meta.url)
     const runtimeDir = resolver.resolve('./runtime')
 
     const publicRuntimeConfig = nuxt.options.runtimeConfig.public
-    const runtimeOverrides = (publicRuntimeConfig.mermaidContent
+    const runtimeOverrides = (publicRuntimeConfig.contentMermaid
+      || publicRuntimeConfig.mermaidContent
       || {}) as Partial<ModuleOptions>
 
+    if (!publicRuntimeConfig.contentMermaid && publicRuntimeConfig.mermaidContent)
+      warn('[nuxt-content-mermaid] `runtimeConfig.public.mermaidContent` is deprecated, please use `runtimeConfig.public.contentMermaid` instead.')
+
     const runtimeMermaidConfig = defu(
+      {},
       runtimeOverrides,
       resolvedOptions,
     ) as ModuleOptions
 
+    publicRuntimeConfig.contentMermaid
+      = runtimeMermaidConfig as typeof publicRuntimeConfig.contentMermaid
     publicRuntimeConfig.mermaidContent
       = runtimeMermaidConfig as typeof publicRuntimeConfig.mermaidContent
 

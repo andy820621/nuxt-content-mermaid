@@ -25,13 +25,14 @@ const props = defineProps<{
 
 const nuxtApp = useNuxtApp()
 const runtimeConfig = useRuntimeConfig()
-// Get module options from public runtimeConfig `mermaidContent` (configured in nuxt.config.ts)
-const mermaidContent = (runtimeConfig.public?.mermaidContent
+// Get module options from public runtimeConfig (prefers `contentMermaid`, falls back to deprecated `mermaidContent`)
+const contentMermaidOptions = (runtimeConfig.public?.contentMermaid
+  || runtimeConfig.public?.mermaidContent
   || {}) as Partial<ModuleOptions>
-const isEnabled = mermaidContent.enabled !== false
-const loaderOptions = mermaidContent.loader || {}
-const themeOptions = mermaidContent.theme || {}
-const componentOptions = mermaidContent.components || {}
+const isEnabled = contentMermaidOptions.enabled !== false
+const loaderOptions = contentMermaidOptions.loader || {}
+const themeOptions = contentMermaidOptions.theme || {}
+const componentOptions = contentMermaidOptions.components || {}
 
 const lazyOption = loaderOptions.lazy
 const isLazy = lazyOption !== false

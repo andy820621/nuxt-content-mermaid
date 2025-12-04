@@ -13,7 +13,9 @@ const globalWithLoader = globalThis as typeof globalThis & {
 
 export default defineNuxtPlugin(() => {
   const runtimeConfig = useRuntimeConfig()
-  const mermaidConfig = runtimeConfig.public?.mermaidContent as ModuleOptions
+  const mermaidConfig = (runtimeConfig.public?.contentMermaid
+    ?? runtimeConfig.public?.mermaidContent
+    ?? {}) as ModuleOptions
 
   if (mermaidConfig?.enabled === false) {
     return {

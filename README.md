@@ -79,12 +79,13 @@ The module will automatically transform the block into an SVG chart component.
 
 ## Configuration
 
-You can configure the module globally through the `mermaidContent` option.
+You can configure the module globally through the `contentMermaid` option.
+(`mermaidContent` is still accepted for backward compatibility, but will be removed in a future release.)
 
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  mermaidContent: {
+  contentMermaid: {
     enabled: true,
     loader: {
       init: {
@@ -138,7 +139,7 @@ export default defineNuxtConfig({
 | `components.spinner`      | `string` | `undefined` | Optional: global loading spinner component name.                         |
 | `components.error`        | `string` | `undefined` | Optional: global error component name when Mermaid rendering fails.      |
 
-> **Note**: All options can be overridden at runtime via `runtimeConfig.public.mermaidContent`.
+> **Note**: All options can be overridden at runtime via `runtimeConfig.public.contentMermaid` (`runtimeConfig.public.mermaidContent` remains supported but deprecated).
 
 ## Advanced Usage
 
@@ -208,7 +209,7 @@ The actual priority order when settings take effect is as follows:
 
 1. **`%%{init: ...}%%` within the diagram** — Highest priority, processed directly by Mermaid.
 2. **Frontmatter `config`** — merged on top of the module's `loader.init`.
-3. **Module-level `mermaidContent.loader.init`** — Project default settings.
+3. **Module-level `contentMermaid.loader.init`** — Project default settings.
 
 ### Custom Rendering Component
 
@@ -217,7 +218,7 @@ If you want full control over rendering (for example to add a border, zoom contr
 1. Specify the component name in `nuxt.config.ts`:
 
    ```ts
-   mermaidContent: {
+   contentMermaid: {
      components: {
        renderer: "MyCustomMermaid",
      },
@@ -249,7 +250,7 @@ Minimal example that uses the provided spinner while waiting for your own loadin
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  mermaidContent: {
+  contentMermaid: {
     components: {
       renderer: 'MyCustomMermaid',
       spinner: 'MySpinner', // optional: globally replace the default spinner
@@ -344,7 +345,7 @@ To reuse a global error view everywhere, register it once and reference it in co
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  mermaidContent: {
+  contentMermaid: {
     components: {
       error: 'MermaidError', // globally registered component name
     },
