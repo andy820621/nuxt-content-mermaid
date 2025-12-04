@@ -11,7 +11,8 @@ import type { MermaidConfig } from 'mermaid'
 import {
   DEFAULT_DARK_THEME,
   DEFAULT_LIGHT_THEME,
-  DEFAULT_MERMAID_INIT,
+  DEFAULT_MERMAID_CONFIG,
+  DEFAULT_FRONTMATTER_CONFIG_KEY,
 } from './runtime/constants'
 
 const MERMAID_BLOCK = /```mermaid([\s\S]*?)```/gi
@@ -77,7 +78,7 @@ export interface ModuleOptions {
 const DEFAULTS = {
   enabled: true,
   loader: {
-    init: { ...DEFAULT_MERMAID_INIT },
+    init: { ...DEFAULT_MERMAID_CONFIG },
     lazy: true,
   },
   theme: {
@@ -164,7 +165,6 @@ export {}
       const { file } = ctx
 
       if (!file.id?.endsWith('.md')) return
-
       if (!file.body.toLowerCase().includes('```mermaid')) return
 
       file.body = transformMermaidCodeBlocks(
@@ -184,13 +184,17 @@ function escapeHtml(text: string) {
     .replace(/'/g, '&#39;')
 }
 
-function transformMermaidCodeBlocks(body: string, componentName: string) {
+export function transformMermaidCodeBlocks(
+  body: string,
+  componentName: string,
+  frontmatterConfigKey: string = DEFAULT_FRONTMATTER_CONFIG_KEY,
+) {
   return body.replace(MERMAID_BLOCK, (_, rawCode = '') => {
     const code = rawCode.trim()
     if (!code) return _
     const escaped = escapeHtml(code)
 
-    return `<${componentName}>
+    return `<${componentName} :config="${frontmatterConfigKey}">
 <pre><code>${escaped}
 </code></pre>
 </${componentName}>`

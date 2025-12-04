@@ -1,4 +1,5 @@
-import type { Mermaid } from 'mermaid'
+import type { DefineComponent } from 'vue'
+import type { Mermaid, MermaidConfig } from 'mermaid'
 import type { ModuleOptions } from '../module'
 
 declare module '#app' {
@@ -9,6 +10,11 @@ declare module '#app' {
 declare module 'vue' {
   interface ComponentCustomProperties {
     $mermaid: () => Promise<Mermaid>
+  }
+  interface GlobalComponents {
+    Mermaid: DefineComponent<{
+      config?: MermaidConfig
+    }>
   }
 }
 

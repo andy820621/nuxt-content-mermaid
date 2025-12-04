@@ -1,6 +1,6 @@
 # Demo
 
-[Go To Test Page](./test "Test Page")
+[Mermaid Catalog](./mermaid "Mermaid Cases")
 
 ## Mermaid Diagram (Above the fold)
 

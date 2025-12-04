@@ -22,7 +22,7 @@
 
 ## 使用前提
 
-- Nuxt 3.19 以上或 4.1 以上（`nuxt@^3.20.1 || ^4.1.0`）
+- `nuxt@^3.20.1 || ^4.1.0`
 - `@nuxt/content@>=3.5.0`
 
 ## Quick Setup
@@ -35,7 +35,7 @@
 npx nuxi module add @barzhsieh/nuxt-content-mermaid
 ```
 
-> Nuxt CLI 對第三方模組預設會裝到 `dependencies`。若想放 `devDependencies`，請裝完後移動或改用下方手動安裝。
+> Nuxt CLI 對第三方模組預設會裝到 `dependencies`。若你偏好放在 `devDependencies`，請安裝完後移動或改用下方的方式手動安裝。
 
 **裝到 `devDependencies`（需手動加入 `modules`）：**
 
@@ -152,6 +152,65 @@ export default defineNuxtConfig({
 2. 否則（color-mode 未安裝或 `theme.useColorModeTheme` 為 `false`）：  
    - 優先使用 `loader.init.theme`。  
    - 若未提供，依序回退至 `theme.light`，若沒有設置則會回退至 `theme.dark`。
+
+### 以 frontmatter 覆寫單頁設定
+
+每篇 Markdown 都可以透過於 frontmatter 中加入 `config` 欄位來覆寫模組設定。
+
+````markdown
+---
+title: 單篇覆寫 Mermaid 設定範例
+config:
+  theme: forest
+  flowchart:
+    htmlLabels: false
+---
+
+```mermaid
+flowchart LR
+  A["<b>允許 HTML labels？</b>"] --> B{不允許}
+```
+````
+
+> **重要：如果要使用 frontmatter 控制設定，請在 `content.config.ts` 的 collection schema 中宣告它，例如：**
+>
+> ```ts
+> import { defineContentConfig, defineCollection, z } from '@nuxt/content'
+>
+> export default defineContentConfig({
+>   collections: {
+>     content: defineCollection({
+>       type: 'page',
+>       source: '**',
+>       schema: z.object({
+>         config: z.record(z.unknown()).optional(), // 宣告 config 欄位
+>       }).passthrough(),
+>     }),
+>   },
+> })
+> ```
+
+### `%%{init}%%` 語法、frontmatter 與模組設定的優先順序
+
+Mermaid 本身也支援在圖表內透過 `%%{init: ...}%%` 語法覆寫設定，例如：
+
+````markdown
+```mermaid
+%%{init: { 'theme': 'forest', 'flowchart': { 'curve': 'step' } }}%%
+graph TD
+  A[Input] --> B{Valid?}
+  B -- Yes --> C[Persist]
+  B -- No  --> D[Error]
+```
+````
+
+> 細節可參考 [Mermaid 官方文件](https://mermaid.js.org/config/directives.html#declaring-directives)
+
+實際生效時的優先順序如下：
+
+1. **圖表內的 `%%{init: ...}%%`** —— 最優先，直接由 Mermaid 處理。  
+2. **frontmatter `config`** —— 深度合併在模組的 `loader.init` 之上。  
+3. **模組層級的 `mermaidContent.loader.init`** —— 專案的全域預設。  
 
 ### 自訂渲染元件 (Custom Component)
 

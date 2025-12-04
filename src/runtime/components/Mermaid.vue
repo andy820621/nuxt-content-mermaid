@@ -14,8 +14,14 @@ import {
 import type { Component, ComputedRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { ModuleOptions } from '../../module'
+import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
 import { enqueueRender } from '../utils'
 import Spinner from './Spinner.vue'
+
+const props = defineProps<{
+  // Using `unknown` to avoid Vue runtime prop type warnings when user's collection schema is misconfigured; actual validation below.
+  config?: MermaidConfig | string | unknown
+}>()
 
 const nuxtApp = useNuxtApp()
 const runtimeConfig = useRuntimeConfig()
@@ -50,15 +56,43 @@ const errorContent = shallowRef<unknown | null>(null)
 let mermaidDefinition = '' // Mermaid definition extracted from slot content
 let observer: IntersectionObserver | null = null
 
-const mermaidTheme = computed(() => {
-  if (useColorModeTheme && colorMode)
-    return colorMode.value === 'dark' ? darkTheme : lightTheme
+const frontmatterConfig = computed<MermaidConfig | undefined>(() => {
+  const value = props.config
+  if (!value)
+    return undefined
 
-  return (
-    (baseMermaidInit.theme as MermaidConfig['theme'] | undefined)
-    ?? lightTheme
-    ?? darkTheme
-  )
+  if (typeof value !== 'object') {
+    if (import.meta.dev) {
+      console.warn(
+        '[nuxt-content-mermaid] Ignoring non-object `config` prop on <Mermaid> component. '
+        + 'This usually means your `content.config.ts` collection schema did not declare `config` as a JSON field. '
+        + 'See README section about per-page overrides via frontmatter.',
+        value,
+      )
+    }
+    return undefined
+  }
+
+  return value as MermaidConfig
+})
+
+const mermaidTheme = computed(() => {
+  return resolveMermaidTheme({
+    useColorModeTheme,
+    colorModeValue: colorMode?.value,
+    frontmatterTheme: frontmatterConfig.value?.theme,
+    baseTheme: baseMermaidInit.theme as MermaidConfig['theme'] | undefined,
+    lightTheme,
+    darkTheme,
+  })
+})
+
+const effectiveMermaidInit = computed<MermaidConfig>(() => {
+  return mergeMermaidConfig({
+    baseConfig: baseMermaidInit,
+    overrideConfig: frontmatterConfig.value,
+    theme: mermaidTheme.value,
+  })
 })
 
 const configuredSpinnerName = computed(() => componentOptions.spinner?.trim() || '')
@@ -192,12 +226,7 @@ async function renderMermaid() {
 
     try {
       const mermaid = await $mermaid()
-      const initOptions: MermaidConfig = {
-        startOnLoad: false,
-        ...baseMermaidInit,
-        theme: mermaidTheme.value,
-      }
-      mermaid.initialize(initOptions)
+      mermaid.initialize(effectiveMermaidInit.value)
       mermaidContainer.value.removeAttribute('data-processed')
       mermaidContainer.value.textContent = mermaidDefinition
       await nextTick()
@@ -272,6 +301,15 @@ watch(mermaidTheme, () => {
   if (!isEnabled) return
   if (hasRenderedOnce.value) renderMermaid()
 })
+
+watch(
+  frontmatterConfig,
+  () => {
+    if (!isEnabled) return
+    if (hasRenderedOnce.value) renderMermaid()
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -335,9 +373,7 @@ watch(mermaidTheme, () => {
 <style scoped>
 .mermaid-wrapper {
   position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  text-align: center;
 }
 .mermaid-wrapper :deep(pre),
 .mermaid-wrapper :deep(code) {
@@ -356,22 +392,19 @@ watch(mermaidTheme, () => {
   color: transparent;
   min-height: 10px;
 }
-.mermaid {
-  display: flex;
-  justify-content: center;
-}
+
 /*
   Mermaid's generated label containers sometimes apply overflow: hidden and nowrap,
   which can clip long CJK text. Allow wrapping and visible overflow for node/edge labels.
 */
-.mermaid .label,
-.mermaid .nodeLabel,
-.mermaid .edgeLabel {
+.mermaid-wrapper :deep(.label),
+.mermaid-wrapper :deep(.nodeLabel),
+.mermaid-wrapper :deep(.edgeLabel){
   white-space: normal !important;
   overflow: visible !important;
 }
 /* Some Mermaid themes apply overflow: hidden on foreignObject, forcing it to visible here */
-.mermaid foreignObject {
+.mermaid-wrapper :deep(foreignObject) {
   overflow: visible !important;
 }
 </style>

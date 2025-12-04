@@ -14,10 +14,7 @@ export default createConfigForNuxt({
   },
 }).append({
   rules: {
-    // Allow single-word component names "Mermaid" and Nuxt dynamic route component "[...slug]"
-    'vue/multi-word-component-names': [
-      'error',
-      { ignores: ['Mermaid', 'Spinner', '[...slug]'] },
-    ],
+    // Allow single-word component names for playground and dynamic routes
+    'vue/multi-word-component-names': 'off',
   },
 })

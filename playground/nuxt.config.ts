@@ -11,11 +11,15 @@ export default defineNuxtConfig({
   nitro: { compatibilityDate: '2025-11-24' },
   mermaidContent: {
     loader: {
-      // init: { theme: 'base' },
+      // init: {
+      //   theme: 'base',
+      //   logLevel: 'info',
+      //   fontFamily: 'Courier New', // Visual check:
+      // },
       // lazy: false, // true/false also { threshold: 1.0 }
     },
     theme: {
-      // useColorModeTheme: true,
+      // useColorModeTheme: false,
       // light: 'default',
       // dark: 'dark',
     },

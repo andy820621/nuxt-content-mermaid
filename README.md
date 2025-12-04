@@ -22,7 +22,7 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
 
 ## Requirements
 
-- Nuxt 3.19+ or 4.1+ (`nuxt@^3.20.1 || ^4.1.0`)
+- `nuxt@^3.20.1 || ^4.1.0`
 - `@nuxt/content@>=3.5.0`
 
 ## Quick Setup
@@ -152,6 +152,63 @@ The module determines the active Mermaid theme with the following priority:
 2. Otherwise (color-mode missing or `theme.useColorModeTheme` is `false`):  
    - Use `loader.init.theme` if provided.  
    - Else fall back to `theme.light`, then `theme.dark`.
+
+### Override Per-Page Settings with Frontmatter
+
+Each Markdown file can override module settings by adding a `config` field in the frontmatter.
+````markdown
+---
+title: Example of Overriding Mermaid Settings Per Page
+config:
+  theme: forest
+  flowchart:
+    htmlLabels: false
+---
+```mermaid
+flowchart LR
+  A["<b>Allow HTML labels?</b>"] --> B{Not allowed}
+```
+````
+
+> **Important: If you want to control settings via frontmatter, declare it in the collection schema in `content.config.ts`, for example:**
+>
+> ```ts
+> import { defineContentConfig, defineCollection, z } from '@nuxt/content'
+>
+> export default defineContentConfig({
+>   collections: {
+>     content: defineCollection({
+>       type: 'page',
+>       source: '**',
+>       schema: z.object({
+>         config: z.record(z.unknown()).optional(), // Declare config field
+>       }).passthrough(),
+>     }),
+>   },
+> })
+> ```
+
+### Priority Order of `%%{init}%%` Syntax, Frontmatter, and Module Settings
+
+Mermaid itself also supports overriding settings within diagrams using the `%%{init: ...}%%` syntax, for example:
+````markdown
+```mermaid
+%%{init: { 'theme': 'forest', 'flowchart': { 'curve': 'step' } }}%%
+
+graph TD
+  A[Input] --> B{Valid?}
+  B -- Yes --> C[Persist]
+  B -- No  --> D[Error]
+```
+````
+
+> For details, refer to the [official Mermaid documentation](https://mermaid.js.org/config/directives.html#declaring-directives)
+
+The actual priority order when settings take effect is as follows:
+
+1. **`%%{init: ...}%%` within the diagram** — Highest priority, processed directly by Mermaid.
+2. **Frontmatter `config`** — merged on top of the module's `loader.init`.
+3. **Module-level `mermaidContent.loader.init`** — Project default settings.
 
 ### Custom Rendering Component
 

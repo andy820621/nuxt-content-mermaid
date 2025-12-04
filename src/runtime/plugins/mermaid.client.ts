@@ -1,7 +1,7 @@
 import { defineNuxtPlugin, useRuntimeConfig } from '#app'
 import type { Mermaid, MermaidConfig } from 'mermaid'
 import type { ModuleOptions } from '../../module'
-import { DEFAULT_MERMAID_INIT } from '../constants'
+import { DEFAULT_MERMAID_CONFIG } from '../constants'
 
 declare global {
   var __nuxtMermaidLoader__: Promise<Mermaid> | undefined
@@ -13,9 +13,7 @@ const globalWithLoader = globalThis as typeof globalThis & {
 
 export default defineNuxtPlugin(() => {
   const runtimeConfig = useRuntimeConfig()
-  const mermaidConfig = runtimeConfig.public?.mermaidContent as
-    | Pick<ModuleOptions, 'enabled' | 'loader'>
-    | undefined
+  const mermaidConfig = runtimeConfig.public?.mermaidContent as ModuleOptions
 
   if (mermaidConfig?.enabled === false) {
     return {
@@ -34,7 +32,7 @@ export default defineNuxtPlugin(() => {
       return globalWithLoader.__nuxtMermaidLoader__
 
     const initOptions: MermaidConfig = {
-      ...DEFAULT_MERMAID_INIT,
+      ...DEFAULT_MERMAID_CONFIG,
       ...mermaidConfig?.loader?.init,
     }
 
