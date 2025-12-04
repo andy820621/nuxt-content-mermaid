@@ -202,12 +202,18 @@ function serializeMermaidFromNode(root: Node): string {
 }
 
 function extractMermaidDefinition(container: HTMLDivElement) {
+  const codeNodes = Array.from(container.querySelectorAll('code'))
+
+  if (codeNodes.length > 0) {
+    return codeNodes
+      .map(node => node.textContent || '')
+      .join('\n')
+      .trim()
+  }
+
   const pre = container.querySelector('pre')
-  const code = container.querySelector('code')
-
-  if (code) return code.textContent?.trim() || ''
-
-  if (pre) return pre.textContent?.trim() || ''
+  if (pre)
+    return pre.textContent?.trim() || ''
 
   return serializeMermaidFromNode(container).trim()
 }

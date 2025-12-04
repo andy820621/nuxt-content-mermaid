@@ -195,7 +195,6 @@ Mermaid itself also supports overriding settings within diagrams using the `%%{i
 ````markdown
 ```mermaid
 %%{init: { 'theme': 'forest', 'flowchart': { 'curve': 'step' } }}%%
-
 graph TD
   A[Input] --> B{Valid?}
   B -- Yes --> C[Persist]
