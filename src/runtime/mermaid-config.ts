@@ -30,16 +30,23 @@ export function resolveMermaidTheme(options: ThemeOptions) {
   return baseTheme ?? lightTheme ?? darkTheme
 }
 
-interface MergeOptions {
+interface MergeOptions extends MermaidConfig {
   baseConfig?: MermaidConfig
   overrideConfig?: MermaidConfig
   theme?: MermaidConfig['theme']
 }
 
 export function mergeMermaidConfig(options: MergeOptions): MermaidConfig {
-  const { baseConfig, overrideConfig, theme } = options
+  const {
+    baseConfig,
+    overrideConfig,
+    theme,
+    ...overrides
+  } = options
+
   const merged = defu(
     {},
+    overrides || {},
     overrideConfig || {},
     baseConfig || {},
   ) as MermaidConfig

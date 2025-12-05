@@ -2,6 +2,13 @@
 title: Class Diagram - relationships
 type: class
 variant: associations
+config:
+  class:
+    diagramPadding: 32
+    nodeSpacing: 60
+    rankSpacing: 80
+    htmlLabels: true
+    hideEmptyMembersBox: true
 expect: Shows inheritance, composition/aggregation, interface implementation, and labelled associations.
 notes:
   - Includes attributes/methods to verify layout and font rendering.

@@ -2,6 +2,13 @@
 title: Class Diagram - personal finance ledger
 type: class
 variant: finance-ledger
+config:
+  class:
+    diagramPadding: 24
+    nodeSpacing: 50
+    rankSpacing: 70
+    htmlLabels: true
+    defaultRenderer: dagre-wrapper
 expect: Multiplicity, composition, and shared references for accounts, transactions, categories, budgets, tags, and attachments are rendered correctly.
 notes:
   - Uses ASCII comments and labels so it stays readable in both themes.
