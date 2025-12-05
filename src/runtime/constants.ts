@@ -7,7 +7,7 @@ export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
   theme: 'default',
   fontFamily: 'Arial, sans-serif, 微軟正黑體',
   securityLevel: 'strict',
-  // logLevel: 'warn',
+  logLevel: 'error',
 }
 
 export const DEFAULT_FRONTMATTER_CONFIG_KEY = 'config'

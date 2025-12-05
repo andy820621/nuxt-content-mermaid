@@ -40,9 +40,6 @@ async function renderMermaid() {
         nodes: [mermaidContainer.value],
         suppressErrors: true,
       })
-
-      // Add delay
-      await new Promise(resolve => setTimeout(resolve, 5))
     }
     catch (e) {
       console.error(e)

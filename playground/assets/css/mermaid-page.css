@@ -49,6 +49,51 @@ html[data-theme="dark"] .mermaid-page {
   --code-fg: #e2e8f0;
 }
 
+/* Catalog page variant - Cyan color scheme */
+.mermaid-page--catalog {
+  --accent: #0ea5e9;
+  --accent-strong: #0284c7;
+  --on-accent: #0b1220;
+  --surface-muted: #edf2f7;
+  --shadow-lift: 0 14px 40px -12px rgba(14, 165, 233, 0.25);
+  --text-secondary: #42526b;
+  --tag-bg: #e0f2fe;
+  --tag-fg: #0f172a;
+  --chip-hover-bg: #f0f9ff;
+  --hero-gradient: linear-gradient(135deg, #0f172a 0%, #0ea5e9 55%, #67e8f9 100%);
+  --card-top: linear-gradient(90deg, rgba(14, 165, 233, 0.7), rgba(14, 165, 233, 0));
+  font-family: "Space Grotesk", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+html[data-theme="dark"] .mermaid-page--catalog {
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --on-accent: #0b1220;
+  --surface: #0f172a;
+  --surface-strong: #0c1524;
+  --surface-muted: #0b162a;
+  --border: #1f2937;
+  --shadow-soft: 0 14px 38px -14px rgba(0, 0, 0, 0.65);
+  --shadow-lift: 0 16px 42px -12px rgba(56, 189, 248, 0.35);
+  --text-secondary: #cbd5e1;
+  --tag-bg: rgba(56, 189, 248, 0.14);
+  --tag-fg: #e0f2fe;
+  --chip-hover-bg: rgba(56, 189, 248, 0.12);
+  --hero-gradient: linear-gradient(135deg, #38bdf8 0%, #67e8f9 40%, #c7f9ff 100%);
+  --card-top: linear-gradient(90deg, rgba(103, 232, 249, 0.9), rgba(14, 165, 233, 0.2));
+  --muted-bg: #0b1220;
+  --code-bg: #0b1624;
+}
+
+/* Detail page variant - Same dark theme as catalog for consistency */
+html[data-theme="dark"] .mermaid-page--detail {
+  --surface: #0f172a;
+  --surface-strong: #0c1524;
+  --surface-muted: #0b162a;
+  --border: #1f2937;
+  --shadow-soft: 0 14px 38px -14px rgba(0, 0, 0, 0.65);
+}
+
 .page-container.mermaid-page {
   max-width: 1200px;
   margin: 0 auto;
@@ -98,7 +143,7 @@ html[data-theme="dark"] .mermaid-page {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--accent);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -113,7 +158,7 @@ html[data-theme="dark"] .mermaid-page {
   font-size: 2.6rem;
   font-weight: 800;
   line-height: 1.2;
-  margin: 0 0 18px 0;
+  margin: 0 0 16px 0;
   background: var(--hero-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -209,9 +254,6 @@ html[data-theme="dark"] .mermaid-page {
   transition: all 0.25s ease;
 }
 
-.mermaid-page .filter-chip:hover {
-  transform: translateY(-2px);
-}
 .mermaid-page .filter-chip:not(.filter-chip--active):hover {
   border-color: var(--border-strong);
   color: var(--accent-strong);
@@ -236,7 +278,7 @@ html[data-theme="dark"] .mermaid-page {
   padding: 4px 10px;
   background: var(--tag-bg);
   color: var(--tag-fg);
-  border-radius: 999px;
+  border-radius: 8px;
   font-weight: 650;
 }
 
@@ -419,6 +461,6 @@ html[data-theme="dark"] .mermaid-page {
   padding: 24px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: var(--surface);
+  background: var(--surface-strong);
   box-shadow: var(--shadow-soft);
 }

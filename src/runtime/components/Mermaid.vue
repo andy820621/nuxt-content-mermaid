@@ -259,9 +259,6 @@ async function renderMermaid() {
       })
 
       hasRenderedOnce.value = true
-
-      // Add a small delay to ensure unique IDs (Mermaid uses Date.now())
-      await new Promise(resolve => setTimeout(resolve, 5))
     }
     catch (error) {
       console.error('[nuxt-content-mermaid]', error)
