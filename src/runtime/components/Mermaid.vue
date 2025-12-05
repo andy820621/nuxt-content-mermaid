@@ -191,11 +191,27 @@ function serializeMermaidFromNode(root: Node): string {
   if (root.nodeType === ELEMENT_NODE) {
     const el = root as HTMLElement
     const tag = el.tagName?.toUpperCase()
-    if (tag === 'BR') return '<br/>'
+    if (tag === 'BR') return '\n'
+
+    const blockTags = [
+      'DIV', 'P', 'LI', 'TR', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+      'BLOCKQUOTE', 'PRE', 'UL', 'OL', 'DL', 'DT', 'DD',
+      'TABLE', 'THEAD', 'TBODY', 'TFOOT',
+      'SECTION', 'ARTICLE', 'ASIDE', 'HEADER', 'FOOTER', 'MAIN',
+    ]
+
+    const isBlock
+      = blockTags.includes(tag)
+        || el.classList.contains('line') // Nuxt Content / Shiki
+        || el.classList.contains('code-line') // Other code highlighters
+
     let out = ''
     el.childNodes.forEach((child) => {
       out += serializeMermaidFromNode(child)
     })
+
+    if (isBlock) return '\n' + out + '\n'
+
     return out
   }
   return ''
@@ -206,14 +222,13 @@ function extractMermaidDefinition(container: HTMLDivElement) {
 
   if (codeNodes.length > 0) {
     return codeNodes
-      .map(node => node.textContent || '')
+      .map(node => serializeMermaidFromNode(node))
       .join('\n')
       .trim()
   }
 
   const pre = container.querySelector('pre')
-  if (pre)
-    return pre.textContent?.trim() || ''
+  if (pre) return serializeMermaidFromNode(pre).trim()
 
   return serializeMermaidFromNode(container).trim()
 }
