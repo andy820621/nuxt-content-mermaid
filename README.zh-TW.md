@@ -10,7 +10,7 @@
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
 專為 [**Nuxt Content v3**](https://content.nuxt.com/docs/getting-started) 整合 [**Mermaid**](https://mermaid.js.org/) 的模組。
-能自動將 Markdown 中的 ```mermaid 區塊轉換為響應式的圖表元件，並支援 Lazy Loading 與深色模式切換。
+能自動將 Markdown 中的 \`\`\`mermaid 區塊轉換為響應式的圖表元件，並支援 Lazy Loading 與深色模式切換。
 
 ## Features
 

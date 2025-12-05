@@ -43,11 +43,11 @@ const toggle = () => {
 :global(body) {
   margin: 0;
   font-family:
-    ui-sans-serif,
+    "Space Grotesk",
+    "Inter",
+    "Segoe UI",
     system-ui,
     -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
     sans-serif;
   background-color: var(--body-bg);
   color: var(--body-fg);
@@ -58,10 +58,26 @@ const toggle = () => {
 :global(html[data-theme="light"]) {
   --body-bg: #f8fafc;
   --body-fg: #0f172a;
+  --surface: #ffffff;
+  --surface-strong: #f8fafc;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --accent: #0ea5e9;
+  --accent-strong: #0284c7;
+  --on-accent: #0b1220;
+  --shadow-soft: 0 12px 30px -18px rgba(15, 23, 42, 0.25);
 }
 :global(html[data-theme="dark"]) {
   --body-bg: #0f172a;
   --body-fg: #e2e8f0;
+  --surface: #0b1220;
+  --surface-strong: #0c1524;
+  --border: #1f2937;
+  --border-strong: #334155;
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --on-accent: #0b1220;
+  --shadow-soft: 0 14px 38px -14px rgba(0, 0, 0, 0.65);
 }
 
 .app-shell {
@@ -77,33 +93,41 @@ const toggle = () => {
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  color: var(--body-fg);
 }
 .mode-indicator strong {
   font-weight: 600;
 }
 .toggle-btn {
-  border: none;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 0.5rem 1.5rem;
   font-size: 0.9rem;
-  background-color: #6366f1;
-  color: #fff;
+  background-color: var(--accent);
+  color: var(--on-accent);
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--shadow-soft);
 }
 .toggle-btn:hover {
-  background-color: #4f46e5;
+  background-color: var(--accent-strong);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 .content-area {
   flex: 1;
   padding: 1.5rem;
   border-radius: 1rem;
-  background-color: color-mix(in srgb, var(--body-bg) 85%, #ffffff);
-  box-shadow: 0 10px 35px rgba(15, 23, 42, 0.15);
-  transition: background-color 0.25s ease;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  transition:
+  background-color 0.25s ease,
+  border-color 0.25s ease,
+  box-shadow 0.25s ease;
 }
-:global(html[data-theme="dark"]) .content-area {
-  background-color: color-mix(in srgb, var(--body-bg) 65%, #000000);
-  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.4);
+:global(html[data-theme="dark"] .content-area) {
+  border-color: var(--border-strong);
+  background-color: color-mix(in srgb, var(--surface) 81%, #ffffff 24%);
 }
 </style>

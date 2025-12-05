@@ -1,6 +1,7 @@
 export default defineNuxtConfig({
   modules: ['../src/module', '@nuxt/content', '@nuxtjs/color-mode'],
   devtools: { enabled: true },
+  css: ['~/assets/css/mermaid-page.css'],
   colorMode: {
     preference: 'system',
     fallback: 'light',

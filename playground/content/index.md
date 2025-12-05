@@ -1,96 +1,33 @@
-# Demo
+# Nuxt Content + Mermaid Playground
 
-[Mermaid Catalog](./mermaid "Mermaid Cases")
+Welcome! This page is the entry point for experimenting with the `nuxt-content-mermaid` module in both light and dark modes. Use it as a quick tour of how Markdown code blocks become live Mermaid diagrams.
 
-## Mermaid Diagram (Above the fold)
+## Quick Navigation
+- [Mermaid Diagram Gallery](/mermaid): Browse the curated cases and filter by diagram type.
+- Theme toggle: use the `Switch to light/dark` button (top-right) to see how diagrams and UI react to color mode.
 
+## What You Can Learn Here
+- How Mermaid code blocks render inside Nuxt Content markdown without extra setup.
+- How theme variables and borders/shadows behave across light/dark modes (matches the styles in `mermaid-page.css`).
+- How per-page content links into the catalog (`/mermaid`) and detailed pages (`/mermaid/...`).
+
+## Module Highlights (adapted from the README)
+- Automatic conversion: `mermaid` code blocks become responsive chart components.
+- Performance friendly: lazy loads Mermaid assets only when needed.
+- Theme-aware: works with `@nuxtjs/color-mode` so Mermaid respects light/dark.
+- Flexible UI: optional custom renderer/spinner/error components if you want your own chrome.
+- Runtime-friendly: module defaults can be overridden via runtime config or per-page frontmatter.
+
+## Try It Out
+1) Toggle light/dark and note the accent colors, cards, and tags.  
+2) Open the [Mermaid Diagram Gallery](/mermaid) and filter by type.  
+3) Click any card to view the detailed page, read expected behavior/config, and see the rendered chart.  
+
+## Quick Mermaid Example
 ```mermaid
 graph LR
-  A --> B
-  B --> C
-  C --> A
-```
-
----
-
-## Long Content Before Second Diagram
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-## Mermaid Diagram (Below the fold)
-
-```mermaid
-graph TD
-  Start([Scroll Down]) --> Visible{{Is diagram visible?}}
-  Visible -- Yes --> Render[Run mermaid.render]
-  Visible -- No --> Wait[Do nothing]
-```
-
-## Test with special characters
-
-```mermaid
-graph LR
-  A[1 < 2 & 3 > 1] --> B["x < y && y > z"]
-```
-
-```html
-<pre>
-<code>
-<
->
-&
-</code>
-</pre>
+  A[Entry Page] --> B[Mermaid Catalog]
+  B --> C{Pick a case}
+  C -->|View| D[Diagram Rendered]
+  C -->|Back| A
 ```
