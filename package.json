@@ -56,8 +56,8 @@
     "mermaid": "catalog:integrations"
   },
   "peerDependencies": {
-    "nuxt": "^3.20.1 || ^4.1.0",
-    "@nuxt/content": ">=3.5.0"
+    "@nuxt/content": ">=3.5.0",
+    "nuxt": "^3.20.1 || ^4.1.0"
   },
   "devDependencies": {
     "@nuxt/content": "catalog:integrations",

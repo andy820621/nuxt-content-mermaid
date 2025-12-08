@@ -21,6 +21,7 @@ import Spinner from './Spinner.vue'
 const props = defineProps<{
   // Using `unknown` to avoid Vue runtime prop type warnings when user's collection schema is misconfigured; actual validation below.
   config?: MermaidConfig | string | unknown
+  code?: string
 }>()
 
 const nuxtApp = useNuxtApp()
@@ -54,7 +55,9 @@ const isLoading = ref(false)
 const hasError = ref(false)
 const errorContent = shallowRef<unknown | null>(null)
 
-let mermaidDefinition = '' // Mermaid definition extracted from slot content
+const decodedCode = computed(() => props.code ? decodeURIComponent(props.code) : '')
+// Holds the mermaid definition - defaults to decoded prop, falls back to DOM extraction for direct component usage
+const mermaidDefinition = ref(decodedCode.value)
 let observer: IntersectionObserver | null = null
 
 const frontmatterConfig = computed<MermaidConfig | undefined>(() => {
@@ -234,7 +237,7 @@ function extractMermaidDefinition(container: HTMLDivElement) {
 }
 
 async function renderMermaid() {
-  if (!mermaidContainer.value || !mermaidDefinition) return
+  if (!mermaidContainer.value || !mermaidDefinition.value) return
 
   // Show spinner while waiting in queue
   isLoading.value = true
@@ -250,7 +253,7 @@ async function renderMermaid() {
       const mermaid = await $mermaid()
       mermaid.initialize(effectiveMermaidInit.value)
       mermaidContainer.value.removeAttribute('data-processed')
-      mermaidContainer.value.textContent = mermaidDefinition
+      mermaidContainer.value.textContent = mermaidDefinition.value
       await nextTick()
 
       await mermaid.run({
@@ -281,9 +284,6 @@ function setupMermaidContainer() {
   const container = mermaidContainer.value
   if (!container) return
 
-  if (!mermaidDefinition)
-    mermaidDefinition = extractMermaidDefinition(container)
-
   if (!isLazy) {
     renderMermaid()
     return
@@ -306,9 +306,9 @@ function setupMermaidContainer() {
 onMounted(() => {
   if (!isEnabled) return
 
-  // Extract definition from the same container (including SSR <slot>) to avoid hydration mismatch when switching structure
-  if (mermaidContainer.value)
-    mermaidDefinition = extractMermaidDefinition(mermaidContainer.value)
+  // Extract definition: prefer code prop, fallback to DOM extraction for direct component usage
+  if (!mermaidDefinition.value && mermaidContainer.value)
+    mermaidDefinition.value = extractMermaidDefinition(mermaidContainer.value)
   nextTick(() => setupMermaidContainer())
 })
 
@@ -329,6 +329,12 @@ watch(
   },
   { deep: true },
 )
+
+watch(decodedCode, (newCode) => {
+  if (!isEnabled) return
+  mermaidDefinition.value = newCode
+  if (hasRenderedOnce.value) renderMermaid()
+})
 </script>
 
 <template>
@@ -346,8 +352,11 @@ watch(
       :is="customMermaidImpl"
       v-else-if="customMermaidImpl"
       :spinner="spinnerComponent"
+      :code="decodedCode"
     >
-      <slot />
+      <slot>
+        <pre v-if="decodedCode"><code>{{ decodedCode }}</code></pre>
+      </slot>
     </component>
 
     <div
@@ -356,7 +365,9 @@ watch(
     >
       <div ref="mermaidContainer">
         <!-- Initially show the slot's <pre><code> for SSR; client-side rendering will replace it with the mermaid SVG -->
-        <slot />
+        <slot>
+          <pre v-if="decodedCode"><code>{{ decodedCode }}</code></pre>
+        </slot>
       </div>
 
       <template v-if="isLoading && !hasRenderedOnce">

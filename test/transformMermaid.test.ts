@@ -14,7 +14,6 @@ describe('transformMermaidCodeBlocks', () => {
 
     const output = transformMermaidCodeBlocks(body, 'Mermaid')
 
-    expect(output).toContain('<Mermaid :config="config">')
-    expect(output).toContain('</Mermaid>')
+    expect(output).toContain('<Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
   })
 })

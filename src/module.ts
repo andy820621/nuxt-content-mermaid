@@ -199,15 +199,6 @@ export {}
   },
 })
 
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
 export function transformMermaidCodeBlocks(
   body: string,
   componentName: string,
@@ -216,11 +207,8 @@ export function transformMermaidCodeBlocks(
   return body.replace(MERMAID_BLOCK, (_, rawCode = '') => {
     const code = rawCode.trim()
     if (!code) return _
-    const escaped = escapeHtml(code)
+    const encoded = encodeURIComponent(code)
 
-    return `<${componentName} :config="${frontmatterConfigKey}">
-<pre><code>${escaped}
-</code></pre>
-</${componentName}>`
+    return `<${componentName} :config="${frontmatterConfigKey}" code="${encoded}"></${componentName}>`
   })
 }
