@@ -463,4 +463,139 @@ html[data-theme="dark"] .mermaid-page--detail {
   border-radius: 16px;
   background: var(--surface-strong);
   box-shadow: var(--shadow-soft);
+  overflow: auto;
+
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* Custom Scrollbar for Webkit */
+.mermaid-page .content-area::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.mermaid-page .content-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mermaid-page .content-area::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 3px;
+}
+
+.mermaid-page .content-area::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
+}
+
+/* ========================================
+   Mermaid Pie Chart - Dark Mode Text Fix
+   ======================================== */
+
+/*
+ * Use #playground-app [id^="mermaid"] to match Mermaid's ID-based selectors and achieve
+ * higher specificity than Mermaid's inline styles.
+ * Specificity: ID (#playground-app) + Attribute ([id^="mermaid"]) + Class > ID (#mermaid-...) + Class
+ */
+
+/* Dark mode overrides for pie chart text elements */
+html[data-theme="dark"] #playground-app [id^="mermaid"] .pieTitleText {
+  fill: #f8fafc !important;
+}
+
+html[data-theme="dark"] #playground-app [id^="mermaid"] .slice {
+  fill: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] #playground-app [id^="mermaid"] .legend text {
+  fill: #cbd5e1 !important;
+}
+
+/* Also support system preference via prefers-color-scheme */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .pieTitleText {
+    fill: #f8fafc !important;
+  }
+
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .slice {
+    fill: #e2e8f0 !important;
+  }
+
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .legend text {
+    fill: #cbd5e1 !important;
+  }
+}
+
+/* ========================================
+   Mermaid Gantt Chart - Dark Mode Text Fix
+   ======================================== */
+
+/*
+ * Gantt "done" tasks have light gray background (doneTaskBkgColor: lightgrey)
+ * but in dark mode, text may be white/light, making it unreadable.
+ * Force dark text color for done task labels.
+ *
+ * Use #playground-app [id^="mermaid"] to override Mermaid's ID-scoped styles.
+ */
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneText0,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneText1,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneText2,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneText3 {
+  fill: #1e293b !important;
+}
+
+/* doneCrit (done + critical) also has light background */
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneCritText0,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneCritText1,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneCritText2,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .doneCritText3 {
+  fill: #1e293b !important;
+}
+
+/* Active tasks have light blue background - ensure readable text */
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeText0,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeText1,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeText2,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeText3 {
+  fill: #1e293b !important;
+}
+
+/* activeCrit tasks */
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeCritText0,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeCritText1,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeCritText2,
+html[data-theme="dark"] #playground-app [id^="mermaid"] .activeCritText3 {
+  fill: #1e293b !important;
+}
+
+/* Also support system preference via prefers-color-scheme */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneText0,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneText1,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneText2,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneText3 {
+    fill: #1e293b !important;
+  }
+
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneCritText0,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneCritText1,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneCritText2,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .doneCritText3 {
+    fill: #1e293b !important;
+  }
+
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeText0,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeText1,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeText2,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeText3 {
+    fill: #1e293b !important;
+  }
+
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeCritText0,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeCritText1,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeCritText2,
+  html:not([data-theme="light"]) #playground-app [id^="mermaid"] .activeCritText3 {
+    fill: #1e293b !important;
+  }
 }

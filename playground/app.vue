@@ -19,7 +19,10 @@ const toggle = () => {
 
 <template>
   <NuxtLayout>
-    <div class="app-shell">
+    <div
+      id="playground-app"
+      class="app-shell"
+    >
       <header class="navbar">
         <div class="container navbar-content">
           <div class="brand">

@@ -26,8 +26,8 @@ graph TD
     C --> E[Explore Gallery]
     D --> F[Read Docs]
     F --> B
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style E fill:#bbf,stroke:#333,stroke-width:2px
+    style A fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+    style E fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 ```
 
 ## 📚 What You Can Learn Here
