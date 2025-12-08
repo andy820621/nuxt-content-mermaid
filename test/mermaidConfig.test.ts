@@ -53,6 +53,16 @@ describe('mermaid config helpers', () => {
 
     expect(
       resolveMermaidTheme({
+        useColorModeTheme: true,
+        colorModeValue: 'light',
+        lightTheme: 'default',
+        darkTheme: 'dark',
+        baseTheme: 'base',
+      }),
+    ).toBe('default')
+
+    expect(
+      resolveMermaidTheme({
         useColorModeTheme: false,
         baseTheme: 'base',
         lightTheme: 'default',
