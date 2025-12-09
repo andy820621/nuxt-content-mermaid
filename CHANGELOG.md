@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.0.1
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.0...v2.0.1)
+
+### 🩹 Fixes
+
+- Pre-bundle @braintree/sanitize-url to resolve named export errors ([1d36b83](https://github.com/andy820621/nuxt-content-mermaid/commit/1d36b83))
+- Center SVG diagrams by setting display inline-block ([75d08d4](https://github.com/andy820621/nuxt-content-mermaid/commit/75d08d4))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.0.0
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v1.0.4...v2.0.0)
