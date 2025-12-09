@@ -5,6 +5,7 @@ import type { ModuleOptions } from '../src/module'
 const addPlugin = vi.fn()
 const addComponent = vi.fn()
 const addTypeTemplate = vi.fn()
+const addVitePlugin = vi.fn()
 const loggerWarn = vi.fn()
 
 vi.mock('@nuxt/kit', () => ({
@@ -15,6 +16,7 @@ vi.mock('@nuxt/kit', () => ({
   addPlugin,
   addComponent,
   addTypeTemplate,
+  addVitePlugin,
   useLogger: () => ({
     warn: loggerWarn,
   }),
@@ -22,11 +24,11 @@ vi.mock('@nuxt/kit', () => ({
 
 interface NuxtStub {
   options: { runtimeConfig: { public: Record<string, unknown> } }
-  hook: (name: string, fn: (ctx: FileBeforeParseHook) => void) => void
+  hook: (name: string, fn: (...args: unknown[]) => void) => void
 }
 
 function createNuxtStub() {
-  const hooks: Record<string, Array<(ctx: FileBeforeParseHook) => void>> = {}
+  const hooks: Record<string, Array<(...args: unknown[]) => void>> = {}
   const nuxt: NuxtStub = {
     options: { runtimeConfig: { public: {} } },
     hook: (name, fn) => {

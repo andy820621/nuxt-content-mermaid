@@ -4,6 +4,7 @@ import {
   addPlugin,
   addComponent,
   addTypeTemplate,
+  addVitePlugin,
   useLogger,
 } from '@nuxt/kit'
 import { defu } from 'defu'
@@ -17,6 +18,7 @@ import {
 } from './runtime/constants'
 
 const MERMAID_BLOCK = /```mermaid([\s\S]*?)```/gi
+const SANITIZE_URL_PACKAGE = '@braintree/sanitize-url'
 
 export interface ModuleOptions {
   /**
@@ -156,6 +158,18 @@ export default defineNuxtModule<ModuleOptions>({
 
     const isEnabled = runtimeMermaidConfig.enabled !== false
     if (!isEnabled) return
+
+    // Ensure Vite pre-bundles sanitize-url so named exports work when mermaid lazily imports it in dev
+    addVitePlugin(() => ({
+      name: 'nuxt-content-mermaid:optimize-deps',
+      configEnvironment(name, config) {
+        if (name === 'client') {
+          config.optimizeDeps ||= {}
+          config.optimizeDeps.include ||= []
+          config.optimizeDeps.include.push(SANITIZE_URL_PACKAGE)
+        }
+      },
+    }))
 
     // Inject client plugin
     addPlugin({
