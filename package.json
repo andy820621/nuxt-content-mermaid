@@ -71,6 +71,7 @@
     "changelogen": "catalog:dev",
     "eslint": "catalog:dev",
     "nuxt": "catalog:dev",
+    "playwright": "catalog:test",
     "typescript": "catalog:dev",
     "vitest": "catalog:test",
     "vue-tsc": "catalog:dev"
