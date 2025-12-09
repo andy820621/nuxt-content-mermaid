@@ -31,6 +31,7 @@ const contentMermaidOptions = (runtimeConfig.public?.contentMermaid
   || runtimeConfig.public?.mermaidContent
   || {}) as Partial<ModuleOptions>
 const isEnabled = contentMermaidOptions.enabled !== false
+const debug = contentMermaidOptions.debug || false
 const loaderOptions = contentMermaidOptions.loader || {}
 const themeOptions = contentMermaidOptions.theme || {}
 const componentOptions = contentMermaidOptions.components || {}
@@ -249,8 +250,11 @@ async function renderMermaid() {
     hasError.value = false
     errorContent.value = null
 
+    const startTime = performance.now()
+
     try {
       const mermaid = await $mermaid()
+      // Re-initialize with current config (theme changes, frontmatter overrides, etc.)
       mermaid.initialize(effectiveMermaidInit.value)
       mermaidContainer.value.removeAttribute('data-processed')
       mermaidContainer.value.textContent = mermaidDefinition.value
@@ -258,10 +262,15 @@ async function renderMermaid() {
 
       await mermaid.run({
         nodes: [mermaidContainer.value],
-        suppressErrors: true,
+        suppressErrors: !debug,
       })
 
       hasRenderedOnce.value = true
+
+      if (debug) {
+        const endTime = performance.now()
+        console.log(`[nuxt-content-mermaid] ⏱️  Rendered in ${(endTime - startTime).toFixed(2)}ms`)
+      }
     }
     catch (error) {
       console.error('[nuxt-content-mermaid]', error)
@@ -277,7 +286,7 @@ async function renderMermaid() {
   }
 
   // Chain the render request
-  await enqueueRender(performRender)
+  await enqueueRender(performRender, debug)
 }
 
 function setupMermaidContainer() {

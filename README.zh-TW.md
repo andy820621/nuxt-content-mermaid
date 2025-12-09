@@ -115,6 +115,7 @@ export default defineNuxtConfig({
 | 參數      | 類型      | 預設值 | 說明                           |
 | :-------- | :-------- | :----- | :----------------------------- |
 | `enabled` | `boolean` | `true` | 是否啟用模組與轉換邏輯。       |
+| `debug`   | `boolean` | `false` | 啟用除錯模式；見下方 Debug 說明。 |
 
 **loader**
 
@@ -142,6 +143,15 @@ export default defineNuxtConfig({
 > **Note**: 所有設定皆可透過 `runtimeConfig.public.contentMermaid` 在部署時進行覆寫（`runtimeConfig.public.mermaidContent` 仍支援但已棄用）。
 
 ## Advanced Usage
+
+### Debug 模式
+
+**`contentMermaid.debug`**（預設 `false`）：
+  - **自動配置**：若未手動設定 `loader.init.logLevel` 或 `suppressErrorRendering`，開啟 debug 模式會自動將 `logLevel` 設為 `1` (Info)，並將 `suppressErrorRendering` 設為 `false`（允許 Mermaid 在 DOM 中顯示錯誤訊息）。
+  - **執行行為**：
+    - **Debug 開啟**：`mermaid.run` 使用 `suppressErrors: false`，發生錯誤時會拋出完整堆疊以便除錯。
+    - **Debug 關閉**：`mermaid.run` 使用 `suppressErrors: true`，避免單一圖表錯誤中斷其他圖表的渲染。
+  - **主控台輸出**：模組會額外輸出渲染佇列的診斷資訊與執行時間統計。
 
 ### 主題與顏色模式 (Color Mode)
 

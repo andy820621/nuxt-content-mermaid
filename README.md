@@ -115,6 +115,7 @@ export default defineNuxtConfig({
 | Option    | Type      | Default | Description                                          |
 | :-------- | :-------- | :------ | :--------------------------------------------------- |
 | `enabled` | `boolean` | `true`  | Whether the module and its conversion logic are on.  |
+| `debug`   | `boolean` | `false` | Enable verbose diagnostics; see Debug section below. |
 
 **loader**
 
@@ -142,6 +143,15 @@ export default defineNuxtConfig({
 > **Note**: All options can be overridden at runtime via `runtimeConfig.public.contentMermaid` (`runtimeConfig.public.mermaidContent` remains supported but deprecated).
 
 ## Advanced Usage
+
+### Debug mode
+
+**`contentMermaid.debug`** (default `false`):
+  - **Auto-config**: If you did **not** set `loader.init.logLevel` or `suppressErrorRendering`, debug defaults them to `logLevel: 1` and `suppressErrorRendering: false` (Mermaid shows errors in the DOM). If you set them explicitly, your values win.
+  - **Runtime behavior**:
+    - **Debug on**: `mermaid.run` uses `suppressErrors: false`, errors throw with full stack traces for debugging.
+    - **Debug off**: `mermaid.run` uses `suppressErrors: true`, so one failing chart won't block others.
+  - **Console output**: Adds queue diagnostics and render-time stats.
 
 ### Theme & Color Mode
 

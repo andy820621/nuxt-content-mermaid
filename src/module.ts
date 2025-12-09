@@ -25,6 +25,11 @@ export interface ModuleOptions {
    */
   enabled?: boolean
   /**
+   * Enable debug mode for detailed logging and error reporting
+   * @default false
+   */
+  debug?: boolean
+  /**
    * Options related to loading mermaid
    */
   loader?: {

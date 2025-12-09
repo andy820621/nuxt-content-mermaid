@@ -11,6 +11,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-11-24',
   nitro: { compatibilityDate: '2025-11-24' },
   contentMermaid: {
+    debug: true,
     loader: {
       // init: {
       //   theme: 'base',

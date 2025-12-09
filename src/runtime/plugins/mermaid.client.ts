@@ -33,9 +33,19 @@ export default defineNuxtPlugin(() => {
     if (globalWithLoader.__nuxtMermaidLoader__)
       return globalWithLoader.__nuxtMermaidLoader__
 
+    const debug = mermaidConfig?.debug || false
+    const userInit = mermaidConfig?.loader?.init || {}
+    const hasUserLogLevel = Object.prototype.hasOwnProperty.call(userInit, 'logLevel')
+    const hasUserSuppressErrorRendering
+      = Object.prototype.hasOwnProperty.call(userInit, 'suppressErrorRendering')
+
     const initOptions: MermaidConfig = {
       ...DEFAULT_MERMAID_CONFIG,
-      ...mermaidConfig?.loader?.init,
+      ...userInit,
+      logLevel: hasUserLogLevel ? userInit.logLevel : (debug ? 1 : 5),
+      suppressErrorRendering: hasUserSuppressErrorRendering
+        ? userInit.suppressErrorRendering
+        : !debug,
     }
 
     globalWithLoader.__nuxtMermaidLoader__ = (async () => {
