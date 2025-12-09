@@ -423,6 +423,10 @@ watch(decodedCode, (newCode) => {
   max-height: 160px;
   overflow: hidden;
 }
+.mermaid-wrapper :deep(svg) {
+  display: inline-block;
+  vertical-align: middle;
+}
 .mermaid-error-default {
   text-align: center;
 }
