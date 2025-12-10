@@ -167,6 +167,30 @@ The module determines the active Mermaid theme with the following priority:
 ### Override Per-Page Settings with Frontmatter
 
 Each Markdown file can override module settings by adding a `config` field in the frontmatter.
+
+> **⚠️ To use frontmatter `config` overrides, you MUST declare the `config` field in your collection schema in `content.config.ts`.**
+> Without this, Nuxt Content will not parse the `config` field as a JSON object, and your overrides will not work.
+
+Add this to your `content.config.ts`:
+
+```ts
+import { defineContentConfig, defineCollection, z } from '@nuxt/content'
+
+export default defineContentConfig({
+  collections: {
+    content: defineCollection({
+      type: 'page',
+      source: '**',
+      schema: z.object({
+        config: z.record(z.unknown()).optional(), // ← Declare config field
+      }).passthrough(),
+    }),
+  },
+})
+```
+
+Then use it in your Markdown frontmatter:
+
 ````markdown
 ---
 title: Example of Overriding Mermaid Settings Per Page
@@ -180,24 +204,6 @@ flowchart LR
   A["<b>Allow HTML labels?</b>"] --> B{Not allowed}
 ```
 ````
-
-> **Important: If you want to control settings via frontmatter, declare it in the collection schema in `content.config.ts`, for example:**
->
-> ```ts
-> import { defineContentConfig, defineCollection, z } from '@nuxt/content'
->
-> export default defineContentConfig({
->   collections: {
->     content: defineCollection({
->       type: 'page',
->       source: '**',
->       schema: z.object({
->         config: z.record(z.unknown()).optional(), // Declare config field
->       }).passthrough(),
->     }),
->   },
-> })
-> ```
 
 ### Priority Order of `%%{init}%%` Syntax, Frontmatter, and Module Settings
 

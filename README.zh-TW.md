@@ -168,6 +168,29 @@ export default defineNuxtConfig({
 
 每篇 Markdown 都可以透過於 frontmatter 中加入 `config` 欄位來覆寫模組設定。
 
+> **⚠️ 若要使用 frontmatter `config` 覆寫，務必在 `content.config.ts` 的 collection schema 中宣告 `config` 欄位。**  
+> 若未宣告，Nuxt Content 不會將 `config` 解析為 JSON 物件，覆寫將無法生效。
+
+在 `content.config.ts` 加上：
+
+```ts
+import { defineContentConfig, defineCollection, z } from '@nuxt/content'
+
+export default defineContentConfig({
+  collections: {
+    content: defineCollection({
+      type: 'page',
+      source: '**',
+      schema: z.object({
+        config: z.record(z.unknown()).optional(), // 宣告 config 欄位
+      }).passthrough(),
+    }),
+  },
+})
+```
+
+接著在 Markdown frontmatter 使用：
+
 ````markdown
 ---
 title: 單篇覆寫 Mermaid 設定範例
@@ -182,24 +205,6 @@ flowchart LR
   A["<b>允許 HTML labels？</b>"] --> B{不允許}
 ```
 ````
-
-> **重要：如果要使用 frontmatter 控制設定，請在 `content.config.ts` 的 collection schema 中宣告它，例如：**
->
-> ```ts
-> import { defineContentConfig, defineCollection, z } from '@nuxt/content'
->
-> export default defineContentConfig({
->   collections: {
->     content: defineCollection({
->       type: 'page',
->       source: '**',
->       schema: z.object({
->         config: z.record(z.unknown()).optional(), // 宣告 config 欄位
->       }).passthrough(),
->     }),
->   },
-> })
-> ```
 
 ### `%%{init}%%` 語法、frontmatter 與模組設定的優先順序
 

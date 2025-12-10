@@ -67,9 +67,11 @@ const frontmatterConfig = computed<MermaidConfig | undefined>(() => {
     return undefined
 
   if (typeof value !== 'object') {
-    if (import.meta.dev) {
+    // Only warn if it looks like a schema misconfiguration (received a primitive type)
+    // Skip warning for null or undefined (which are valid when config is optional in schema)
+    if (import.meta.dev && value !== null && value !== undefined) {
       console.warn(
-        '[nuxt-content-mermaid] Ignoring non-object `config` prop on <Mermaid> component. '
+        '[nuxt-content-mermaid] Received non-object `config` prop on <Mermaid> component. '
         + 'This usually means your `content.config.ts` collection schema did not declare `config` as a JSON field. '
         + 'See README section about per-page overrides via frontmatter.',
         value,
