@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.1.0-alpha.0
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.1...v2.1.0-alpha.0)
+
+### 🚀 Enhancements
+
+- **theme:** ⚠️  Remove useColorModeTheme toggle and implement Strict Semantic Resolution ([f7aaf88](https://github.com/andy820621/nuxt-content-mermaid/commit/f7aaf88))
+
+### 📖 Documentation
+
+- Clarify frontmatter config schema requirement ([e5df40a](https://github.com/andy820621/nuxt-content-mermaid/commit/e5df40a))
+
+### 🏡 Chore
+
+- **release:** Add pre-release scripts for minor versions (alpha, beta, rc) ([eb67e1c](https://github.com/andy820621/nuxt-content-mermaid/commit/eb67e1c))
+
+#### ⚠️ Breaking Changes
+
+- **theme:** ⚠️  Remove useColorModeTheme toggle and implement Strict Semantic Resolution ([f7aaf88](https://github.com/andy820621/nuxt-content-mermaid/commit/f7aaf88))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.0.1
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.0...v2.0.1)
