@@ -1,5 +1,39 @@
 # Changelog
 
+## v2.1.0-alpha.1
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.1...v2.1.0-alpha.1)
+
+### 🚀 Enhancements
+
+- **theme:** ⚠️  Add useMermaidTheme composable for manual theme control ([3105f7e](https://github.com/andy820621/nuxt-content-mermaid/commit/3105f7e))
+
+### 🩹 Fixes
+
+- Auto-import useMermaidTheme composable ([703770c](https://github.com/andy820621/nuxt-content-mermaid/commit/703770c))
+
+### 📖 Documentation
+
+- Clarify frontmatter config schema requirement ([e5df40a](https://github.com/andy820621/nuxt-content-mermaid/commit/e5df40a))
+
+### 🏡 Chore
+
+- **release:** Add pre-release scripts for minor versions (alpha, beta, rc) ([1ee92b2](https://github.com/andy820621/nuxt-content-mermaid/commit/1ee92b2))
+- **release:** V2.1.0-alpha.0 ([9ed785a](https://github.com/andy820621/nuxt-content-mermaid/commit/9ed785a))
+- **release:** Add prerelease scripts for alpha/beta/rc patch versions ([3ce12c6](https://github.com/andy820621/nuxt-content-mermaid/commit/3ce12c6))
+
+### ✅ Tests
+
+- Add addImports to @nuxt/kit mock ([4e5fc89](https://github.com/andy820621/nuxt-content-mermaid/commit/4e5fc89))
+
+#### ⚠️ Breaking Changes
+
+- **theme:** ⚠️  Add useMermaidTheme composable for manual theme control ([3105f7e](https://github.com/andy820621/nuxt-content-mermaid/commit/3105f7e))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.1.0-alpha.0
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.1...v2.1.0-alpha.0)
