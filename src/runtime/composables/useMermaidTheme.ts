@@ -2,19 +2,19 @@ import { useState } from '#app'
 import type { MermaidConfig } from 'mermaid'
 
 /**
- * 簡寫模式主題，用於快速切換配置的 light/dark 主題
- * - 'light': 對應 contentMermaid.theme.light 設定
- * - 'dark': 對應 contentMermaid.theme.dark 設定
- * @see https://mermaid.js.org/ecosystem/integrations.html
+ * Switch between configured dark/light themes
+ * - 'light': corresponds to contentMermaid.theme.light setting
+ * - 'dark': corresponds to contentMermaid.theme.dark setting
  */
 export type SimpleMermaidTheme = 'light' | 'dark'
 
 /**
- * Mermaid 主題類型
- * 可以是：
- * - 簡寫模式: 'light', 'dark' (對應配置的 light/dark 主題)
- * - 官方主題: 'default', 'forest', 'dark', 'neutral', 'base' 等
- * - null: 重置為自動模式
+ * Mermaid theme type
+ * Can be:
+ * - Simple mode: 'light', 'dark' (corresponds to configured light/dark theme)
+ * - Official themes: 'default', 'forest', 'dark', 'neutral', 'base', etc.
+ *   @see https://mermaid.js.org/config/schema-docs/config.html?#theme
+ * - null: Reset to auto mode
  */
 export type MermaidThemeMode = MermaidConfig['theme'] | SimpleMermaidTheme | null
 
