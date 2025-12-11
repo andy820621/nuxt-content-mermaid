@@ -6,6 +6,7 @@ const addPlugin = vi.fn()
 const addComponent = vi.fn()
 const addTypeTemplate = vi.fn()
 const addVitePlugin = vi.fn()
+const addImports = vi.fn()
 const loggerWarn = vi.fn()
 
 vi.mock('@nuxt/kit', () => ({
@@ -17,6 +18,7 @@ vi.mock('@nuxt/kit', () => ({
   addComponent,
   addTypeTemplate,
   addVitePlugin,
+  addImports,
   useLogger: () => ({
     warn: loggerWarn,
   }),
