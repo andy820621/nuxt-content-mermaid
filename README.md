@@ -95,7 +95,6 @@ export default defineNuxtConfig({
       lazy: true,
     },
     theme: {
-      useColorModeTheme: true,
       light: "default",
       dark: "dark",
     },
@@ -126,11 +125,12 @@ export default defineNuxtConfig({
 
 **theme**
 
-| Option                      | Type    | Default     | Description                                                                                               |
-| :-------------------------- | :------ | :---------- | :-------------------------------------------------------------------------------------------------------- |
-| `theme.useColorModeTheme`   | boolean | `true`      | If `@nuxtjs/color-mode` is installed, automatically follow its current theme.                             |
-| `theme.light`               | string  | `'default'` | Mermaid theme to use when color mode is light (and as fallback when color-mode is off).                   |
-| `theme.dark`                | string  | `'dark'`    | Mermaid theme to use when color mode is dark (and as fallback when color-mode is off).                    |
+Color mode integration is automatic when `@nuxtjs/color-mode` is installed; manual themes set via `useMermaidTheme()` take precedence.
+
+| Option            | Type   | Default     | Description                                                                                 |
+| :---------------- | :----- | :---------- | :------------------------------------------------------------------------------------------ |
+| `theme.light`     | string | `'default'` | Mermaid theme to use when color mode is light (and as fallback when color-mode is missing). |
+| `theme.dark`      | string | `'dark'`    | Mermaid theme to use when color mode is dark (and as fallback when color-mode is missing).  |
 
 **components**
 
@@ -157,12 +157,15 @@ export default defineNuxtConfig({
 
 The module determines the active Mermaid theme with the following priority:
 
-1. If `theme.useColorModeTheme: true` _and_ `@nuxtjs/color-mode` is available:  
-   - `dark` → `theme.dark`  
-   - `light` → `theme.light`
-2. Otherwise (color-mode missing or `theme.useColorModeTheme` is `false`):  
-   - Use `loader.init.theme` if provided.  
-   - Else fall back to `theme.light`, then `theme.dark`.
+1. Frontmatter `config.theme` (per-page override)
+2. Manual mode via `useMermaidTheme()` (if set)
+3. `@nuxtjs/color-mode` (auto-detected when installed):
+  - `dark` → `theme.dark`
+  - `light` → `theme.light`
+4. `loader.init.theme` (if provided)
+5. Fallback: `theme.light`, then Mermaid default `'default'`
+
+For advanced manual control (e.g., forcing specific themes, custom toggle logic), please refer to the [Manual Theme Control Guide](./docs/en/MANUAL_THEME_CONTROL.md).
 
 ### Override Per-Page Settings with Frontmatter
 

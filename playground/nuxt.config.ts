@@ -21,7 +21,6 @@ export default defineNuxtConfig({
       // lazy: false, // true/false also { threshold: 1.0 }
     },
     theme: {
-      // useColorModeTheme: false,
       // light: 'default',
       // dark: 'dark',
     },

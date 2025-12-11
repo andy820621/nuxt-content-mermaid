@@ -95,7 +95,6 @@ export default defineNuxtConfig({
       lazy: true,
     },
     theme: {
-      useColorModeTheme: true,
       light: "default",
       dark: "dark",
     },
@@ -126,11 +125,12 @@ export default defineNuxtConfig({
 
 **theme**
 
-| 參數                        | 類型    | 預設值      | 說明                                                                                                    |
-| :-------------------------- | :------ | :---------- | :------------------------------------------------------------------------------------------------------ |
-| `theme.useColorModeTheme`   | boolean | `true`      | 若安裝了 `@nuxtjs/color-mode`，是否自動跟隨其主題。                                                    |
-| `theme.light`               | string  | `'default'` | 當 `colorMode` 為 light 時的主題，也可作為 fallback。                                                   |
-| `theme.dark`                | string  | `'dark'`    | 當 `colorMode` 為 dark 時的主題，也可作為 fallback。                                                    |
+若專案安裝了 `@nuxtjs/color-mode` 會自動偵測並跟隨；透過 `useMermaidTheme()` 設定的手動主題會優先。
+
+| 參數          | 類型   | 預設值      | 說明                                                                              |
+| :------------ | :----- | :---------- | :-------------------------------------------------------------------------------- |
+| `theme.light` | string | `'default'` | 當 color-mode 為 light 時的主題，若 color-mode 不存在也會回退使用。               |
+| `theme.dark`  | string | `'dark'`    | 當 color-mode 為 dark 時的主題，若 color-mode 不存在也會回退使用。                |
 
 **components**
 
@@ -153,16 +153,19 @@ export default defineNuxtConfig({
     - **Debug 關閉**：`mermaid.run` 使用 `suppressErrors: true`，避免單一圖表錯誤中斷其他圖表的渲染。
   - **主控台輸出**：模組會額外輸出渲染佇列的診斷資訊與執行時間統計。
 
-### 主題與顏色模式 (Color Mode)
+### 主題與顏色模式 (Theme & Color Mode)
 
 模組會依據以下優先順序決定主題：
 
-1. 若 `theme.useColorModeTheme: true`，且專案有安裝 `@nuxtjs/color-mode`：  
-   - 偵測為 `dark` → 使用 `theme.dark`  
-   - 偵測為 `light` → 使用 `theme.light`
-2. 否則（color-mode 未安裝或 `theme.useColorModeTheme` 為 `false`）：  
-   - 優先使用 `loader.init.theme`。  
-   - 若未提供，依序回退至 `theme.light`，若沒有設置則會回退至 `theme.dark`。
+1. Frontmatter `config.theme`（單篇覆寫）
+2. `useMermaidTheme()` 設定的手動模式（若有）
+3. `@nuxtjs/color-mode`（安裝時自動偵測）：
+  - `dark` → 使用 `theme.dark`
+  - `light` → 使用 `theme.light`
+4. `loader.init.theme`（若有設定）
+5. 回退：`theme.light`，若無則 Mermaid 預設 `'default'`
+
+更多進階手動控制（如：強制指定特定主題、自訂切換邏輯），請參閱 [手動主題控制指南](./docs/ch/MANUAL_THEME_CONTROL.md)。
 
 ### 以 frontmatter 覆寫單頁設定
 

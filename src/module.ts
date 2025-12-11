@@ -51,8 +51,8 @@ export interface ModuleOptions {
    */
   theme?: {
     /**
-     * Whether to sync Mermaid theme with @nuxtjs/color-mode
-     * @default true
+     * @deprecated The module now automatically detects and syncs with @nuxtjs/color-mode.
+     * This option no longer has any effect and will be removed in a future version.
      */
     useColorModeTheme?: boolean
     light?: MermaidConfig['theme']
@@ -90,7 +90,6 @@ const DEFAULTS = {
     lazy: true,
   },
   theme: {
-    useColorModeTheme: true,
     light: DEFAULT_LIGHT_THEME,
     dark: DEFAULT_DARK_THEME,
   },

@@ -1,9 +1,10 @@
 import { defu } from 'defu'
 import type { MermaidConfig } from 'mermaid'
+import type { MermaidThemeMode } from './composables/useMermaidTheme'
 
 interface ThemeOptions {
-  useColorModeTheme?: boolean
   colorModeValue?: string
+  manualThemeMode?: MermaidThemeMode
   baseTheme?: MermaidConfig['theme']
   lightTheme?: MermaidConfig['theme']
   darkTheme?: MermaidConfig['theme']
@@ -12,22 +13,36 @@ interface ThemeOptions {
 
 export function resolveMermaidTheme(options: ThemeOptions) {
   const {
-    useColorModeTheme,
     colorModeValue,
+    manualThemeMode,
     frontmatterTheme,
     baseTheme,
     lightTheme,
     darkTheme,
   } = options
 
+  // Priority: frontmatter > manual mode > colorMode > base
   if (frontmatterTheme) return frontmatterTheme
 
-  if (useColorModeTheme && colorModeValue) {
-    if (colorModeValue === 'dark' && darkTheme) return darkTheme
-    if (colorModeValue !== 'dark' && lightTheme) return lightTheme
+  // Strict Semantic Resolution: 'dark' and 'light' are reserved strategy keywords （They represent a strategy, not just a value name）
+  if (manualThemeMode) {
+    if (manualThemeMode === 'dark') return darkTheme ?? 'dark'
+    if (manualThemeMode === 'light') return lightTheme ?? 'default'
+
+    return manualThemeMode
   }
 
-  return baseTheme ?? lightTheme ?? darkTheme
+  // Fallback to colorMode integration when available
+  if (colorModeValue) {
+    if (colorModeValue === 'dark') {
+      return darkTheme ?? 'dark'
+    }
+    else {
+      return lightTheme ?? 'default'
+    }
+  }
+
+  return baseTheme ?? lightTheme ?? 'default'
 }
 
 interface MergeOptions extends MermaidConfig {

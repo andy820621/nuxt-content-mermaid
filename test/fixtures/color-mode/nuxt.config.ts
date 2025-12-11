@@ -28,7 +28,6 @@ export default defineNuxtConfig({
       lazy: false,
     },
     theme: {
-      useColorModeTheme: true,
       light: 'default',
       dark: 'dark',
     },

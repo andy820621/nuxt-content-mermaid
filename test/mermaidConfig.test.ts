@@ -33,7 +33,6 @@ describe('mermaid config helpers', () => {
     expect(
       resolveMermaidTheme({
         frontmatterTheme: 'forest',
-        useColorModeTheme: true,
         colorModeValue: 'dark',
         lightTheme: 'neutral',
         darkTheme: 'dark',
@@ -43,7 +42,6 @@ describe('mermaid config helpers', () => {
 
     expect(
       resolveMermaidTheme({
-        useColorModeTheme: true,
         colorModeValue: 'dark',
         darkTheme: 'dark',
         lightTheme: 'default',
@@ -53,7 +51,6 @@ describe('mermaid config helpers', () => {
 
     expect(
       resolveMermaidTheme({
-        useColorModeTheme: true,
         colorModeValue: 'light',
         lightTheme: 'default',
         darkTheme: 'dark',
@@ -63,11 +60,59 @@ describe('mermaid config helpers', () => {
 
     expect(
       resolveMermaidTheme({
-        useColorModeTheme: false,
         baseTheme: 'base',
         lightTheme: 'default',
         darkTheme: 'dark',
       }),
     ).toBe('base')
+  })
+
+  it('applies strict semantic resolution for reserved keywords', () => {
+    // 'dark' strategy: always dark, fallback to Mermaid's 'dark'
+    expect(
+      resolveMermaidTheme({
+        manualThemeMode: 'dark',
+        darkTheme: undefined,
+        lightTheme: 'default',
+      }),
+    ).toBe('dark')
+
+    // 'light' strategy: always light, fallback to Mermaid's 'default'
+    expect(
+      resolveMermaidTheme({
+        manualThemeMode: 'light',
+        darkTheme: 'dark',
+        lightTheme: undefined,
+      }),
+    ).toBe('default')
+
+    // Direct theme name: pass through
+    expect(
+      resolveMermaidTheme({
+        manualThemeMode: 'forest',
+        lightTheme: 'default',
+        darkTheme: 'dark',
+      }),
+    ).toBe('forest')
+  })
+
+  it('applies strict semantic resolution for colorMode', () => {
+    // colorMode 'dark': fallback to Mermaid's 'dark' if no darkTheme
+    expect(
+      resolveMermaidTheme({
+        colorModeValue: 'dark',
+        darkTheme: undefined,
+        lightTheme: 'default',
+      }),
+    ).toBe('dark')
+
+    // colorMode light: fallback to Mermaid's 'default' if no lightTheme
+    expect(
+      resolveMermaidTheme({
+        colorModeValue: 'light',
+        darkTheme: 'dark',
+        lightTheme: undefined,
+      }),
+    ).toBe('default')
   })
 })

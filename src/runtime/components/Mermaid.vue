@@ -16,6 +16,7 @@ import type { MermaidConfig } from 'mermaid'
 import type { ModuleOptions } from '../../module'
 import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
 import { enqueueRender } from '../utils'
+import { useMermaidTheme } from '../composables/useMermaidTheme'
 import Spinner from './Spinner.vue'
 
 const props = defineProps<{
@@ -43,12 +44,12 @@ const lazyThreshold = typeof lazyOption === 'object' && typeof lazyOption.thresh
   : 0.1
 
 const baseMermaidInit = (loaderOptions.init as MermaidConfig | undefined) || {}
-const useColorModeTheme = themeOptions.useColorModeTheme
 const lightTheme = themeOptions.light
 const darkTheme = themeOptions.dark
 
 const colorMode = nuxtApp.$colorMode as { value: string } | undefined
 const { $mermaid } = nuxtApp
+const { currentTheme: manualThemeMode } = useMermaidTheme()
 
 const mermaidContainer = useTemplateRef('mermaidContainer')
 const hasRenderedOnce = ref(false)
@@ -85,8 +86,8 @@ const frontmatterConfig = computed<MermaidConfig | undefined>(() => {
 
 const mermaidTheme = computed(() => {
   return resolveMermaidTheme({
-    useColorModeTheme,
     colorModeValue: colorMode?.value,
+    manualThemeMode: manualThemeMode.value,
     frontmatterTheme: frontmatterConfig.value?.theme,
     baseTheme: baseMermaidInit.theme as MermaidConfig['theme'] | undefined,
     lightTheme,
