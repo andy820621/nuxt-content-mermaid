@@ -5,6 +5,7 @@ import {
   addComponent,
   addTypeTemplate,
   addVitePlugin,
+  addImports,
   useLogger,
 } from '@nuxt/kit'
 import { defu } from 'defu'
@@ -181,6 +182,15 @@ export default defineNuxtModule<ModuleOptions>({
       name: baseMermaidComponentName,
       filePath: resolver.resolve(runtimeDir, 'components/Mermaid.vue'),
     })
+
+    // Auto-import composable for manual theme control
+    addImports([
+      {
+        name: 'useMermaidTheme',
+        as: 'useMermaidTheme',
+        from: resolver.resolve(runtimeDir, 'composables/useMermaidTheme'),
+      },
+    ])
 
     // Add type definitions
     addTypeTemplate({
