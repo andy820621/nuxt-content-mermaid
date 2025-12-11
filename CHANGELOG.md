@@ -1,5 +1,38 @@
 # Changelog
 
+## v2.1.1
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.1...v2.1.1)
+
+### 🚀 Enhancements
+
+- **theme:** ⚠️  Add useMermaidTheme composable for manual theme control ([3105f7e](https://github.com/andy820621/nuxt-content-mermaid/commit/3105f7e))
+
+### 🩹 Fixes
+
+- Auto-import useMermaidTheme composable ([703770c](https://github.com/andy820621/nuxt-content-mermaid/commit/703770c))
+
+### 📖 Documentation
+
+- Clarify frontmatter config schema requirement ([e5df40a](https://github.com/andy820621/nuxt-content-mermaid/commit/e5df40a))
+- Update useMermaidTheme composable documentation ([da25ff4](https://github.com/andy820621/nuxt-content-mermaid/commit/da25ff4))
+
+### 🏡 Chore
+
+- Add changelog configuration file ([afb284f](https://github.com/andy820621/nuxt-content-mermaid/commit/afb284f))
+
+### ✅ Tests
+
+- Add addImports to @nuxt/kit mock ([4e5fc89](https://github.com/andy820621/nuxt-content-mermaid/commit/4e5fc89))
+
+#### ⚠️ Breaking Changes
+
+- **theme:** ⚠️  Add useMermaidTheme composable for manual theme control ([3105f7e](https://github.com/andy820621/nuxt-content-mermaid/commit/3105f7e))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.1.0-alpha.1
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.1...v2.1.0-alpha.1)
