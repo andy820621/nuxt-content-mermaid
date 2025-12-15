@@ -374,6 +374,7 @@ watch(decodedCode, (newCode) => {
     <div
       v-else
       class="mermaid-wrapper"
+      :class="{ 'ncm-is-loading': isLoading && !hasRenderedOnce }"
     >
       <div ref="mermaidContainer">
         <!-- Initially show the slot's <pre><code> for SSR; client-side rendering will replace it with the mermaid SVG -->
@@ -414,17 +415,28 @@ watch(decodedCode, (newCode) => {
 
 <style scoped>
 .mermaid-wrapper {
+  --ncm-loading-min-height: 160px;
+
   position: relative;
   text-align: center;
 }
+.mermaid-wrapper.ncm-is-loading {
+  /* Reserve space so the absolute-positioned spinner can be centered without layout shifts. */
+  min-height: var(--ncm-loading-min-height, 160px);
+}
 .mermaid-wrapper :deep(pre),
 .mermaid-wrapper :deep(code) {
-  opacity: 0;
-  pointer-events: none;
-  user-select: none;
-  margin: 0;
-  max-height: 160px;
+  /* Keep SSR fallback accessible but remove it from layout to avoid height jumps before SVG renders. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 .mermaid-wrapper :deep(svg) {
   display: inline-block;
