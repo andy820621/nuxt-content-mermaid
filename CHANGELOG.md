@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.1.2
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.1.1...v2.1.2)
+
+### 🩹 Fixes
+
+- Stabilize spinner loading experience ([abf7efd](https://github.com/andy820621/nuxt-content-mermaid/commit/abf7efd))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.1.1
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.0.1...v2.1.1)
