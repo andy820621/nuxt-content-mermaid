@@ -111,6 +111,20 @@ describe('module setup', () => {
     const matches = markdownCtx.file.body?.match(/<Mermaid :config="config" code="/g) || []
     expect(matches.length).toBe(2)
 
+    const tildeCtx = createFileCtx(
+      '/test/sample-tilde.md',
+      [
+        '# Title',
+        '~~~mermaid',
+        'A --> B',
+        '~~~',
+        '',
+      ].join('\n'),
+    )
+
+    await beforeParse(tildeCtx)
+    expect(tildeCtx.file.body).toContain('<Mermaid :config="config" code="A%20--%3E%20B"></Mermaid>')
+
     const nonMarkdownCtx = createFileCtx(
       '/test/sample.txt',
       '```mermaid\nA --> B\n```',

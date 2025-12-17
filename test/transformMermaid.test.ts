@@ -47,4 +47,80 @@ describe('transformMermaidCodeBlocks', () => {
     const output = transformMermaidCodeBlocks(body, 'Mermaid')
     expect(output).toBe(body)
   })
+
+  it('transforms mermaid fences with info string attributes', () => {
+    const body = [
+      '# Diagram',
+      '```mermaid {background:#ff0; border:2px solid #f00;}',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    expect(output).toContain('<Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+  })
+
+  it('preserves indentation when transforming mermaid fences', () => {
+    const body = [
+      '- Item',
+      '  ```mermaid',
+      '  graph TD',
+      '  A --> B',
+      '  ```',
+      '',
+    ].join('\n')
+
+    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    expect(output).toContain('  <Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+  })
+
+  it('does not transform mermaid fences inside other fenced code blocks', () => {
+    const body = [
+      '````md',
+      '# Diagram',
+      '',
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '````',
+      '',
+    ].join('\n')
+
+    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    expect(output).toBe(body)
+  })
+
+  it('does not transform mermaid fences inside ~~~ fenced code blocks', () => {
+    const body = [
+      '~~~md',
+      '# Diagram',
+      '',
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '~~~',
+      '',
+    ].join('\n')
+
+    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    expect(output).toBe(body)
+  })
+
+  it('preserves CRLF newlines when transforming', () => {
+    const body = [
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\r\n')
+
+    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    expect(output).toContain('graph%20TD%0D%0A%20%20A%20--%3E%20B')
+    expect(output).not.toMatch(/(^|[^\r])\n/)
+  })
 })
