@@ -1,12 +1,25 @@
 export default defineNuxtConfig({
   modules: ['../src/module', '@nuxt/content', '@nuxtjs/color-mode'],
   devtools: { enabled: true },
-  css: ['~/assets/css/mermaid-page.css'],
+  css: ['~/assets/css/reset.css', '~/assets/css/mermaid-page.css', '~/assets/css/prose.css', '~/assets/css/markdown.css'],
   colorMode: {
     preference: 'system',
     fallback: 'light',
     dataValue: 'theme',
     classSuffix: '',
+  },
+  content: {
+    build: {
+      markdown: {
+        highlight: {
+          theme: {
+            default: 'vitesse-light',
+            dark: 'vitesse-dark',
+            sepia: 'monokai',
+          },
+        },
+      },
+    },
   },
   compatibilityDate: '2025-11-24',
   nitro: { compatibilityDate: '2025-11-24' },
