@@ -1,5 +1,7 @@
 [English](./README.md) | [中文](./README.zh-TW.md)
 
+[![nuxt-content-social-card](https://raw.githubusercontent.com/andy820621/nuxt-content-mermaid/main/src/assets/nuxt-content-mermaid.webp)](https://www.npmjs.com/package/@barzhsieh/nuxt-content-mermaid)
+
 # nuxt-content-mermaid
 
 [![npm version][npm-version-src]][npm-version-href]

@@ -1,4 +1,6 @@
-[English](./README.md) | [中文](./README.zh-TW.md)
+[中文](./README.zh-TW.md) | [English](./README.md) 
+
+[![nuxt-content-social-card](https://raw.githubusercontent.com/andy820621/nuxt-content-mermaid/main/src/assets/nuxt-content-mermaid.webp)](https://www.npmjs.com/package/@barzhsieh/nuxt-content-mermaid)
 
 # nuxt-content-mermaid
 
