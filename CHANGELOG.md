@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.1.3
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.1.2...v2.1.3)
+
+### 🚀 Enhancements
+
+- Enhance mermaid fenced block conversion and support ~~~mermaid ([e0e924b](https://github.com/andy820621/nuxt-content-mermaid/commit/e0e924b))
+
+### 🏡 Chore
+
+- Update docs & add social-card ([5b29358](https://github.com/andy820621/nuxt-content-mermaid/commit/5b29358))
+- **playground:** Improve content layout and syntax highlighting ([cc228c5](https://github.com/andy820621/nuxt-content-mermaid/commit/cc228c5))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.1.2
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.1.1...v2.1.2)
