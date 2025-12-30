@@ -57,7 +57,7 @@ export default defineNuxtConfig({
       margin: 32,
       invokeCloseOn: {
         esc: true,
-        wheel: false,
+        wheel: true,
         swipe: true,
         overlayClick: true,
         closeButtonClick: true,

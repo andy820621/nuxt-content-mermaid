@@ -1,6 +1,8 @@
 import { computed, nextTick, onUnmounted, ref } from 'vue'
 import type { CSSProperties, ComponentPublicInstance, Ref } from 'vue'
 import type { ExpandInvokeCloseOn, ExpandInvokeOpenOn } from '../types/expand'
+import { useMermaidZoom } from './useMermaidZoom'
+import { useEventListener } from './useEventListener'
 
 type ExpandState = 'idle' | 'opening' | 'open' | 'closing'
 
@@ -36,9 +38,20 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   const expandState = ref<ExpandState>('idle')
   const expandMetrics = ref<ExpandMetrics | null>(null)
   const isExpanded = ref(false)
+  const showZoomHint = ref(false)
+  let hasShownZoomHint = false
+  let hintTimeout: ReturnType<typeof setTimeout> | undefined
+
   const shouldRefreshExpand = ref(false)
 
+  // Use zoom transform when expanded
   const isExpandActive = computed(() => expandState.value !== 'idle')
+
+  const zoom = useMermaidZoom({
+    active: isExpandActive,
+    minScale: 0.1,
+    maxScale: 10,
+  })
   const isVisible = computed(() => expandState.value === 'open')
   const allowTargetClick = options.invokeOpenOn?.diagramClick !== false
   const allowCloseByEsc = options.invokeCloseOn?.esc !== false
@@ -49,15 +62,17 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const metrics = expandMetrics.value
     if (!metrics) return {}
 
+    const { transform } = zoom.transformStyle.value
+
     return {
       top: `${metrics.top}px`,
       left: `${metrics.left}px`,
       width: `${metrics.width}px`,
       height: `${metrics.height}px`,
       transform: isExpanded.value
-        ? `translate(${metrics.translateX}px, ${metrics.translateY}px) scale(${metrics.scale})`
+        ? transform
         : 'translate(0px, 0px) scale(1)',
-      transitionDuration: shouldRefreshExpand.value ? '0.01ms' : undefined,
+      transitionDuration: (shouldRefreshExpand.value || zoom.isPointerDown.value) ? '0ms' : undefined,
     }
   })
 
@@ -246,14 +261,15 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   function resetExpand() {
     if (!import.meta.client) return
     clearTimeout(expandTransitionTimeout)
+    clearTimeout(hintTimeout)
     clearResizeTimers()
     clearRefreshRaf()
     clearExpandSvg()
     expandState.value = 'idle'
     isExpanded.value = false
     shouldRefreshExpand.value = false
+    showZoomHint.value = false
     expandMetrics.value = null
-    removeExpandListeners()
     enableBodyScroll()
   }
 
@@ -268,10 +284,20 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     if (!metrics) return
 
     expandMetrics.value = metrics
+    hasShownZoomHint = false // Reset hint flag for new expand
+
+    // Init zoom state
+    zoom.init({
+      scale: metrics.scale,
+      translateX: metrics.translateX,
+      translateY: metrics.translateY,
+      top: metrics.top,
+      left: metrics.left,
+    })
+
     expandState.value = 'opening'
     isExpanded.value = false
     disableBodyScroll()
-    addExpandListeners()
 
     nextTick(() => {
       if (expandState.value !== 'opening') return
@@ -328,23 +354,80 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function handleExpandKeyDown(event: KeyboardEvent) {
-    if (!allowCloseByEsc) return
+    if (!allowCloseByEsc && (event.key === 'Escape' || event.keyCode === 27)) return
+
     if (event.key === 'Escape' || event.keyCode === 27) {
       event.preventDefault()
       event.stopPropagation()
       closeExpand(event)
+      return
+    }
+
+    // Zoom/Pan keyboard shortcuts
+    if (expandState.value !== 'open') return
+    const moveStep = 20 / zoom.scale.value
+
+    switch (event.key) {
+      case '+':
+      case '=':
+        zoom.zoomIn()
+        break
+      case '-':
+      case '_':
+        zoom.zoomOut()
+        break
+      case '0':
+        zoom.reset()
+        break
+      case 'ArrowUp':
+        zoom.translateY.value += moveStep
+        break
+      case 'ArrowDown':
+        zoom.translateY.value -= moveStep
+        break
+      case 'ArrowLeft':
+        zoom.translateX.value += moveStep
+        break
+      case 'ArrowRight':
+        zoom.translateX.value -= moveStep
+        break
     }
   }
 
   function handleExpandWheel(event: WheelEvent) {
+    const isInside = expandTargetWrap.value && expandTargetWrap.value.contains(event.target as Node)
+
+    // Diagram interaction
+    if (isInside) {
+      // Try to zoom/pan first
+      const handled = zoom.handleWheel(event)
+      if (handled) return
+
+      // Not handled - show hint once per expand
+      event.preventDefault()
+      event.stopPropagation()
+      if (!hasShownZoomHint) {
+        hasShownZoomHint = true
+        showZoomHint.value = true
+        hintTimeout = setTimeout(() => {
+          showZoomHint.value = false
+        }, 1500)
+      }
+      return
+    }
+
+    // Overlay interaction
     if (!allowCloseByWheel) return
-    if (event.ctrlKey) return
+    if (event.ctrlKey || event.metaKey) return
     event.preventDefault()
     event.stopPropagation()
     queueMicrotask(() => closeExpand(event))
   }
 
   function handleExpandTouchStart(event: TouchEvent) {
+    // If double touch on diagram?
+    if (zoom.isDragging.value) return
+
     if (!allowCloseBySwipe) return
     if (event.touches.length > 1) {
       touchState.isScaling = true
@@ -357,6 +440,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function handleExpandTouchMove(event: TouchEvent) {
+    if (zoom.isDragging.value || touchState.isScaling) return
+
     if (!allowCloseBySwipe) return
     const browserScale = window.visualViewport?.scale ?? 1
 
@@ -408,6 +493,16 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const metrics = calculateExpandMetrics(svg)
     if (!metrics) return
     expandMetrics.value = metrics
+
+    // Re-init zoom on resize (Fit)
+    zoom.init({
+      scale: metrics.scale,
+      translateX: metrics.translateX,
+      translateY: metrics.translateY,
+      top: metrics.top,
+      left: metrics.left,
+    })
+
     shouldRefreshExpand.value = true
     clearRefreshRaf()
     expandRefreshRaf = requestAnimationFrame(() => {
@@ -427,28 +522,20 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     }, resizeRefreshDelay)
   }
 
-  function addExpandListeners() {
-    window.addEventListener('resize', handleExpandResize, { passive: true })
-    window.addEventListener('orientationchange', handleExpandResize, { passive: true })
-    window.visualViewport?.addEventListener('resize', handleExpandResize, { passive: true })
-    window.addEventListener('wheel', handleExpandWheel, { passive: false })
-    window.addEventListener('touchstart', handleExpandTouchStart, { passive: true })
-    window.addEventListener('touchmove', handleExpandTouchMove, { passive: true })
-    window.addEventListener('touchend', handleExpandTouchEnd, { passive: true })
-    window.addEventListener('touchcancel', handleExpandTouchCancel, { passive: true })
-    document.addEventListener('keydown', handleExpandKeyDown, true)
-  }
+  if (import.meta.client) {
+    const activeWindow = computed(() => isExpandActive.value ? window : null)
+    const activeDocument = computed(() => isExpandActive.value ? document : null)
+    const activeVisualViewport = computed(() => (isExpandActive.value ? window.visualViewport : null))
 
-  function removeExpandListeners() {
-    window.removeEventListener('resize', handleExpandResize)
-    window.removeEventListener('orientationchange', handleExpandResize)
-    window.visualViewport?.removeEventListener('resize', handleExpandResize)
-    window.removeEventListener('wheel', handleExpandWheel)
-    window.removeEventListener('touchstart', handleExpandTouchStart)
-    window.removeEventListener('touchmove', handleExpandTouchMove)
-    window.removeEventListener('touchend', handleExpandTouchEnd)
-    window.removeEventListener('touchcancel', handleExpandTouchCancel)
-    document.removeEventListener('keydown', handleExpandKeyDown, true)
+    useEventListener(activeWindow, 'resize', handleExpandResize, { passive: true })
+    useEventListener(activeWindow, 'orientationchange', handleExpandResize, { passive: true })
+    useEventListener(activeVisualViewport, 'resize', handleExpandResize, { passive: true })
+    useEventListener(activeWindow, 'wheel', handleExpandWheel, { passive: false })
+    useEventListener(activeWindow, 'touchstart', handleExpandTouchStart, { passive: true })
+    useEventListener(activeWindow, 'touchmove', handleExpandTouchMove, { passive: true })
+    useEventListener(activeWindow, 'touchend', handleExpandTouchEnd, { passive: true })
+    useEventListener(activeWindow, 'touchcancel', handleExpandTouchCancel, { passive: true })
+    useEventListener(activeDocument, 'keydown', handleExpandKeyDown, true)
   }
 
   function disableBodyScroll() {
@@ -502,5 +589,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     handleExpandTransitionEnd,
     handleMermaidClick,
     resetExpand,
+    zoom,
+    showZoomHint,
   }
 }

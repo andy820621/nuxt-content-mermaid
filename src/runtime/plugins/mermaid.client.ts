@@ -48,6 +48,8 @@ export default defineNuxtPlugin(() => {
         : !debug,
     }
 
+    // await new Promise(resolve => setTimeout(resolve, 2000))
+
     globalWithLoader.__nuxtMermaidLoader__ = (async () => {
       try {
         const mermaid = await import('mermaid')

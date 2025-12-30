@@ -227,6 +227,8 @@ const {
   handleExpandTransitionEnd,
   handleMermaidClick,
   resetExpand,
+  zoom,
+  showZoomHint,
 } = useMermaidExpand({
   getExpandTarget: getMermaidSvg,
   expandMargin,
@@ -576,7 +578,10 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       v-if="!isEnabled"
       class="mermaid-wrapper"
     >
-      <div ref="mermaidContainer">
+      <div
+        ref="mermaidContainer"
+        class="mermaid"
+      >
         <slot />
       </div>
     </div>
@@ -670,7 +675,10 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         :style="cursorVariables"
         @click="handleMermaidClick"
       >
-        <div ref="mermaidContainer">
+        <div
+          ref="mermaidContainer"
+          class="mermaid"
+        >
           <!-- Initially show the slot's <pre><code> for SSR; client-side rendering will replace it with the mermaid SVG -->
           <slot>
             <pre v-if="decodedCode"><code>{{ decodedCode }}</code></pre>
@@ -716,6 +724,8 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         :allow-close-button="allowCloseButtonClose"
         :target-has-margin="expandMargin > 0"
         :icon-size="iconSize"
+        :zoom="zoom"
+        :show-hint="showZoomHint"
         @close="closeExpand"
         @transitionend="handleExpandTransitionEnd"
       />
@@ -801,9 +811,30 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   --sb-thumb: rgba(0, 0, 0, 0.2);
   --sb-thumb-hover: rgba(0, 0, 0, 0.35);
 }
-:fullscreen .mermaid-wrapper > div {
+.mermaid-wrapper > div {
   width: 100%;
   height: 100%;
+}
+.mermaid-wrapper > div > :deep(svg) {
+  margin: 0 auto;
+}
+.mermaid-wrapper :deep(pre),
+.mermaid-wrapper :deep(code) {
+  /* Hide SSR fallback text before Mermaid renders. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.mermaid:not([data-processed]) {
+  color: transparent;
+  min-height: 100px;
 }
 :fullscreen .mermaid-wrapper :deep(svg) {
   height: 100% !important;
