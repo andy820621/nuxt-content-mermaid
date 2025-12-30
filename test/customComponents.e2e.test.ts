@@ -22,7 +22,7 @@ describe('custom renderer/spinner/error components', async () => {
     // Wait for stubbed mermaid to finish
     await page.waitForSelector('#test-spinner', { state: 'detached', timeout: 5000 })
 
-    const svg = page.locator('#diagram-container svg')
+    const svg = page.locator('#diagram-container svg#mock-svg')
     expect(await svg.isVisible()).toBe(true)
   })
 

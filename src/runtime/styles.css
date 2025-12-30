@@ -1,0 +1,39 @@
+:root {
+  --ncm-code-bg: oklch(0.97 0 0);
+  --ncm-code-bg-hover: color-mix(in oklab, color-mix(in oklab, oklch(0.97 0 0) 97%, #000 3%) 100%, transparent);
+  --ncm-border-color: oklch(0 0 0 / 10%);
+  --ncm-border-width: 1px;
+  --ncm-border-style: solid;
+  --ncm-border: var(--ncm-border-width) var(--ncm-border-style) var(--ncm-border-color);
+  --ncm-border-bottom: var(--ncm-border);
+  --ncm-text: #000;
+  --ncm-text-muted: oklch(0.5 0 0);
+  --ncm-text-xmuted: oklch(0.58 0 0);
+  --ncm-overlay-bg: var(--ncm-code-bg);
+  --ncm-overlay-opacity: 0.95;
+  --ncm-overlay-backdrop: blur(2px);
+  --ncm-expand-target-bg: color-mix(in oklab, var(--ncm-overlay-bg, var(--ncm-code-bg, #fff)) 90%, var(--ncm-code-bg, #fff) 10%);
+
+  --ncm-cursor-expand: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='15 3 21 3 21 9'/%3E%3Cpolyline points='9 21 3 21 3 15'/%3E%3Cline x1='21' y1='3' x2='14' y2='10'/%3E%3Cline x1='3' y1='21' x2='10' y2='14'/%3E%3C/svg%3E") 9 9, zoom-in;
+  --ncm-cursor-collapse: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 14 10 14 10 20'/%3E%3Cpolyline points='20 10 14 10 14 4'/%3E%3Cline x1='14' y1='10' x2='21' y2='3'/%3E%3Cline x1='3' y1='21' x2='10' y2='14'/%3E%3C/svg%3E") 9 9, zoom-out;
+}
+
+html[data-theme="dark"],
+.dark {
+  --ncm-code-bg: oklch(0.165 0 0);
+  --ncm-code-bg-hover: color-mix(in oklab, color-mix(in oklab, oklch(0.165 0 0) 90%, #fff 10%) 100%, transparent);
+  --ncm-border-color: oklch(1 0 0 / 7%);
+  --ncm-border-width: 1px;
+  --ncm-border-style: solid;
+  --ncm-border: var(--ncm-border-width) var(--ncm-border-style) var(--ncm-border-color);
+  --ncm-border-bottom: var(--ncm-border);
+  --ncm-text: oklch(0.922 0 0);
+  --ncm-text-muted: oklch(0.708 0 0);
+  --ncm-text-xmuted: oklch(0.556 0 0);
+  --ncm-overlay-bg: var(--ncm-code-bg);
+  --ncm-overlay-opacity: 0.95;
+  --ncm-overlay-backdrop: blur(2px);
+  --ncm-expand-target-bg: color-mix(in oklab, var(--ncm-overlay-bg, var(--ncm-code-bg, #111)) 90%, var(--ncm-code-bg, #111) 10%);
+  /* --ncm-cursor-expand: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='15 3 21 3 21 9'/%3E%3Cpolyline points='9 21 3 21 3 15'/%3E%3Cline x1='21' y1='3' x2='14' y2='10'/%3E%3Cline x1='3' y1='21' x2='10' y2='14'/%3E%3C/svg%3E") 9 9, zoom-in;
+  --ncm-cursor-collapse: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 14 10 14 10 20'/%3E%3Cpolyline points='20 10 14 10 14 4'/%3E%3Cline x1='14' y1='10' x2='21' y2='3'/%3E%3Cline x1='3' y1='21' x2='10' y2='14'/%3E%3C/svg%3E") 9 9, zoom-out; */
+}

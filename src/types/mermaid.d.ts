@@ -3,6 +3,18 @@ import type { Mermaid, MermaidConfig } from 'mermaid'
 import type { ModuleOptions } from '../module'
 import type { MermaidThemeMode, SimpleMermaidTheme } from '../runtime/composables/useMermaidTheme'
 
+export type MermaidToolbarButtons = {
+  copy?: boolean
+  fullscreen?: boolean
+  expand?: boolean
+}
+
+export type MermaidToolbarOptions = {
+  title?: string
+  fontSize?: string | number
+  buttons?: MermaidToolbarButtons
+}
+
 declare module '#app' {
   interface NuxtApp {
     $mermaid: () => Promise<Mermaid>
@@ -15,6 +27,8 @@ declare module 'vue' {
   interface GlobalComponents {
     Mermaid: DefineComponent<{
       config?: MermaidConfig
+      toolbar?: MermaidToolbarOptions
+      code?: string
     }>
   }
 }

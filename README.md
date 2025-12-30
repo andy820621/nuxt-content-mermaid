@@ -105,6 +105,29 @@ export default defineNuxtConfig({
       spinner: undefined,
       error: undefined,
     },
+    toolbar: {
+      title: "mermaid",
+      fontSize: "14px",
+      buttons: {
+        copy: true,
+        fullscreen: true,
+        expand: true,
+      },
+    },
+    expand: {
+      enabled: true,
+      margin: 0,
+      invokeOpenOn: {
+        diagramClick: true,
+      },
+      invokeCloseOn: {
+        esc: true,
+        wheel: true,
+        swipe: true,
+        overlayClick: true,
+        closeButtonClick: true,
+      },
+    },
   },
 });
 ```
@@ -142,7 +165,76 @@ Color mode integration is automatic when `@nuxtjs/color-mode` is installed; manu
 | `components.spinner`      | `string` | `undefined` | Optional: global loading spinner component name.                         |
 | `components.error`        | `string` | `undefined` | Optional: global error component name when Mermaid rendering fails.      |
 
+**toolbar**
+
+| Option                     | Type               | Default | Description                                 |
+| :------------------------- | :----------------- | :------ | :------------------------------------------ |
+| `toolbar.title`            | `string`           | `'mermaid'` | Default toolbar title for Mermaid blocks.   |
+| `toolbar.fontSize`         | `string \| number` | `'14px'`    | Default toolbar font size.                  |
+| `toolbar.buttons.copy`     | `boolean`          | `true`  | Show copy-source button in the toolbar.     |
+| `toolbar.buttons.fullscreen` | `boolean`        | `true`  | Show fullscreen button in the toolbar.      |
+| `toolbar.buttons.expand`     | `boolean`          | `true`  | Show expand button in the toolbar.            |
+
+**expand**
+
+Control SVG expand interactions. You can also set `expand: false` to disable it, or `expand: true` to use defaults.
+
+| Option                     | Type      | Default | Description                                                                |
+| :------------------------- | :-------- | :------ | :------------------------------------------------------------------------- |
+| `expand.enabled`                    | `boolean` | `true` | Enable or disable expand features entirely.                   |
+| `expand.margin`                     | `number`  | `0`    | Margin (px) around the expanded SVG within the viewport. |
+| `expand.invokeOpenOn.diagramClick`  | `boolean` | `true` | Allow clicking the SVG to open expand overlay.                        |
+| `expand.invokeCloseOn.esc`          | `boolean` | `true` | Allow Escape key to close.                                  |
+| `expand.invokeCloseOn.wheel`        | `boolean` | `true` | Allow mouse wheel to close.                                 |
+| `expand.invokeCloseOn.swipe`        | `boolean` | `true` | Allow swipe gesture to close.                               |
+| `expand.invokeCloseOn.overlayClick` | `boolean` | `true` | Allow clicking the overlay background to close.             |
+| `expand.invokeCloseOn.closeButtonClick`| `boolean`| `true` | Show the overlay close button.                              |
+
+
 > **Note**: All options can be overridden at runtime via `runtimeConfig.public.contentMermaid` (`runtimeConfig.public.mermaidContent` remains supported but deprecated).
+
+## Styling (CSS Variables)
+
+This module ships global CSS variables (from `runtime/styles.css`) so the Mermaid wrapper and expand overlay share the same palette. You can override them in your app:
+
+```css
+:root {
+  --ncm-code-bg: #f3f4f6;
+  --ncm-code-bg-hover: #e5e7eb;
+  --ncm-border: #e5e7eb;
+  --ncm-text: #111827;
+  --ncm-text-muted: #4b5563;
+  --ncm-text-xmuted: #6b7280;
+  --ncm-overlay-bg: rgba(255, 255, 255, 0.98);
+}
+
+html[data-theme="dark"],
+.dark {
+  --ncm-code-bg: #111827;
+  --ncm-code-bg-hover: #1f2937;
+  --ncm-border: #1f2937;
+  --ncm-text: #f9fafb;
+  --ncm-text-muted: #9ca3af;
+  --ncm-text-xmuted: #6b7280;
+  --ncm-overlay-bg: rgba(17, 24, 39, 0.98);
+}
+```
+
+Variables:
+- `--ncm-code-bg`: Mermaid block background.
+- `--ncm-code-bg-hover`: Hover background for toolbar buttons.
+- `--ncm-border-color`: Border color for the block and toolbar.
+- `--ncm-border-width`: Border thickness.
+- `--ncm-border-style`: Border style.
+- `--ncm-border`: Composite shorthand (width, style, color) for borders.
+- `--ncm-border-bottom`: Border style applied to the toolbar bottom.
+- `--ncm-text`: Primary text color.
+- `--ncm-text-muted`: Title and secondary text.
+- `--ncm-text-xmuted`: Toolbar icon and subtle UI text.
+- `--ncm-overlay-bg`: Expand overlay background (defaults to `--ncm-code-bg`).
+- `--ncm-expand-target-bg`: Background color shown behind the expanded SVG when `expand.margin` leaves breathing room.
+- `--ncm-overlay-opacity`: Overlay transparency (thinned when `expand.margin` creates breathing room).
+- `--ncm-overlay-backdrop`: `backdrop-filter` applied to the overlay when it becomes visible.
 
 ## Advanced Usage
 
@@ -231,9 +323,57 @@ The actual priority order when settings take effect is as follows:
 2. **Frontmatter `config`** — merged on top of the module's `loader.init`.
 3. **Module-level `contentMermaid.loader.init`** — Project default settings.
 
+### Mermaid Inline Attributes & YAML Frontmatter
+
+You can control Mermaid blocks in three ways: inline attrs, Mermaid YAML frontmatter, and `%%{init}%%` directives.
+
+#### Inline attrs (fence info)
+
+Use inline attrs on the `mermaid` fence to pass props to the wrapper component or set Mermaid YAML fields (including `toolbar` options like title/fontSize and `toolbar.buttons.*`).
+
+````markdown
+```mermaid {title="Diagram A" toolbar='{"title":"My Diagram","fontSize":"14px"}' config='{"theme":"dark"}'}
+graph TD
+  A --> B
+```
+````
+
+#### Mermaid YAML frontmatter (inside the block)
+
+Place Mermaid’s own YAML frontmatter at the top of the code block to affect SVG rendering (e.g. title, displayMode, config), and you can also provide `toolbar` values for the wrapper component (including `toolbar.buttons.copy: true`).
+
+````markdown
+```mermaid
+---
+title: Sample Flowchart
+displayMode: compact
+config:
+  theme: dark
+toolbar:
+  title: "Sample Diagram"
+  buttons:
+    copy: true
+---
+graph TD
+  A --> B
+```
+````
+
+#### `%%{init}%%` directive (inside the block)
+
+Use Mermaid directives to set render options directly in the diagram definition.
+
+````markdown
+```mermaid
+%%{init: { 'theme': 'forest', 'flowchart': { 'curve': 'step' } }}%%
+graph TD
+  A --> B
+```
+````
+
 ### Custom Rendering Component
 
-If you want full control over rendering (for example to add a border, zoom controls, or other UI), you can provide a custom component via `components.renderer`.
+If you want full control over rendering (for example to add a border, expand controls, or other UI), you can provide a custom component via `components.renderer`.
 
 1. Specify the component name in `nuxt.config.ts`:
 

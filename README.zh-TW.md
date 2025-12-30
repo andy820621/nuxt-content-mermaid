@@ -105,6 +105,29 @@ export default defineNuxtConfig({
       spinner: undefined,
       error: undefined,
     },
+    toolbar: {
+      title: "mermaid",
+      fontSize: "14px",
+      buttons: {
+        copy: true,
+        fullscreen: true,
+        expand: true,
+      },
+    },
+    expand: {
+      enabled: true,
+      margin: 0,
+      invokeOpenOn: {
+        diagramClick: true,
+      },
+      invokeCloseOn: {
+        esc: true,
+        wheel: true,
+        swipe: true,
+        overlayClick: true,
+        closeButtonClick: true,
+      },
+    },
   },
 });
 ```
@@ -142,7 +165,77 @@ export default defineNuxtConfig({
 | `components.spinner`     | `string` | `undefined` | 指定全域的 Loading 元件名稱。                          |
 | `components.error`       | `string` | `undefined` | 指定全域的錯誤顯示元件名稱，渲染失敗時會使用。         |
 
+**toolbar**
+
+| 參數                    | 類型               | 預設值 | 說明                                   |
+| :---------------------- | :----------------- | :----- | :------------------------------------- |
+| `toolbar.title`         | `string`           | `'mermaid'` | Mermaid 工具列預設標題。               |
+| `toolbar.fontSize`      | `string \| number` | `'14px'`    | Mermaid 工具列預設字體大小。           |
+| `toolbar.buttons.copy`  | `boolean`          | `true`  | 顯示工具列複製原始 Mermaid 的按鈕。    |
+| `toolbar.buttons.fullscreen` | `boolean`     | `true`  | 顯示工具列全螢幕按鈕。                 |
+| `toolbar.buttons.expand`  | `boolean`          | `true`  | 顯示工具列放大按鈕。                   |
+
+**expand**
+
+控制 SVG 放大互動行為，也可直接設為 `expand: false` 來停用，或 `expand: true` 使用預設值。
+
+| 參數                      | 類型      | 預設值 | 說明                                                     |
+| :------------------------ | :-------- | :----- | :------------------------------------------------------- |
+| `expand.enabled`                      | `boolean` | `true` | 是否啟用放大功能。                                        |
+| `expand.margin`                       | `number`  | `0`    | 放大後 SVG 在視窗內保留的邊距（px）。                          |
+| `expand.invokeOpenOn.diagramClick`    | `boolean` | `true` | 允許直接點擊 SVG 開啟放大。                                   |
+| `expand.invokeCloseOn.esc`            | `boolean` | `true` | 允許按 ESC 關閉。                                         |
+| `expand.invokeCloseOn.wheel`          | `boolean` | `true` | 允許滑鼠滾輪關閉。                                        |
+| `expand.invokeCloseOn.swipe`          | `boolean` | `true` | 允許滑動手勢關閉。                                        |
+| `expand.invokeCloseOn.overlayClick`   | `boolean` | `true` | 允許點擊 overlay 背景關閉。                              |
+| `expand.invokeCloseOn.closeButtonClick`| `boolean` | `true` | 顯示 overlay 關閉按鈕。                                   |
+
+
 > **Note**: 所有設定皆可透過 `runtimeConfig.public.contentMermaid` 在部署時進行覆寫（`runtimeConfig.public.mermaidContent` 仍支援但已棄用）。
+
+## 樣式自訂（CSS 變數）
+
+模組會提供全域 CSS 變數（來源為 `runtime/styles.css`），讓 Mermaid 區塊與放大 overlay 使用同一套配色。你可以在專案中覆寫：
+
+```css
+:root {
+  --ncm-code-bg: #f3f4f6;
+  --ncm-code-bg-hover: #e5e7eb;
+  --ncm-border: #e5e7eb;
+  --ncm-text: #111827;
+  --ncm-text-muted: #4b5563;
+  --ncm-text-xmuted: #6b7280;
+  --ncm-overlay-bg: rgba(255, 255, 255, 0.98);
+}
+
+html[data-theme="dark"],
+.dark {
+  --ncm-code-bg: #111827;
+  --ncm-code-bg-hover: #1f2937;
+  --ncm-border: #1f2937;
+  --ncm-text: #f9fafb;
+  --ncm-text-muted: #9ca3af;
+  --ncm-text-xmuted: #6b7280;
+  --ncm-overlay-bg: rgba(17, 24, 39, 0.98);
+}
+```
+
+可覆寫的變數：
+可覆寫的變數：
+- `--ncm-code-bg`：Mermaid 區塊背景色
+- `--ncm-code-bg-hover`：工具列按鈕 hover 背景
+- `--ncm-border-color`：區塊與工具列的邊框顏色
+- `--ncm-border-width`：邊框厚度
+- `--ncm-border-style`：邊框樣式
+- `--ncm-border`：邊框 shorthand（寬度、樣式、顏色）
+- `--ncm-border-bottom`：工具列底部的邊框
+- `--ncm-text`：主要文字顏色
+- `--ncm-text-muted`：標題與次要文字
+- `--ncm-text-xmuted`：工具列 icon 與更淡的文字
+- `--ncm-overlay-bg`：放大 overlay 背景（預設跟 `--ncm-code-bg` 一致）
+- `--ncm-expand-target-bg`：當 `expand.margin > 0` 時，放大後留白的 SVG 外框背景，可以與 overlay 做出區隔
+- `--ncm-overlay-opacity`：overlay 的透明度（搭配 margin 留白時可微調濃淡）
+- `--ncm-overlay-backdrop`：顯示 overlay 時加上的 `backdrop-filter`，可自訂 blur/效果
 
 ## Advanced Usage
 
@@ -233,9 +326,59 @@ graph TD
 2. **frontmatter `config`** —— 深度合併在模組的 `loader.init` 之上。  
 3. **模組層級的 `contentMermaid.loader.init`** —— 專案的全域預設。  
 
+### Mermaid Inline attrs 與 YAML Frontmatter
+
+支援三種方式控制 Mermaid Svg 的渲染：inline attrs、Mermaid YAML frontmatter、`%%{init}%%` 指令。
+
+#### Inline attrs（fence info）
+
+在 `mermaid` fence 上使用 inline attrs，傳遞 wrapper props 或設定 Mermaid 的 YAML 欄位（包含 `toolbar` 的 title/fontSize 與 `toolbar.buttons.*`）。
+
+````markdown
+```mermaid {title="Diagram A" toolbar='{"title":"My Diagram","fontSize":"14px"}' config='{"theme":"dark"}'}
+graph TD
+  A --> B
+```
+````
+
+#### Mermaid YAML frontmatter（block 內）
+
+把 Mermaid 的 YAML frontmatter 放在 code block 最前面，用來影響 SVG 輸出（例如 title、displayMode、config），也可以提供 `toolbar` 給 wrapper 元件（包含 `toolbar.buttons.copy: true`）。
+
+````markdown
+```mermaid
+---
+title: Sample Flowchart
+displayMode: compact
+config:
+  theme: dark
+toolbar:
+  title: "Sample Diagram"
+  buttons:
+    copy: true
+    expand: true
+    fullscreen: false
+---
+graph TD
+  A --> B
+```
+````
+
+#### `%%{init}%%` 指令（block 內）
+
+使用 Mermaid directive，直接在圖表定義內設定渲染選項。
+
+````markdown
+```mermaid
+%%{init: { 'theme': 'forest', 'flowchart': { 'curve': 'step' } }}%%
+graph TD
+  A --> B
+```
+````
+
 ### 自訂渲染元件 (Custom Component)
 
-若需完全接管 Mermaid 的渲染行為（例如：加入外框、ZoomIn/Out 功能），可指定 `components.renderer`。
+若需完全接管 Mermaid 的渲染行為（例如：加入外框、Expand/Collapse 功能），可指定 `components.renderer`。
 
 1. 在 `nuxt.config.ts` 中指定元件名稱：
 

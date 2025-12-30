@@ -119,7 +119,7 @@ const noteList = computed(() => page.value?.notes?.filter(Boolean) ?? [])
     </section>
 
     <!-- Content Renderer -->
-    <section class="content-area prose">
+    <section class="content-area">
       <ContentRenderer
         v-if="page"
         :value="page"

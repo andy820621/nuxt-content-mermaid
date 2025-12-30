@@ -59,7 +59,9 @@
   "dependencies": {
     "@nuxt/kit": "catalog:integrations",
     "defu": "catalog:dev",
-    "mermaid": "catalog:integrations"
+    "destr": "catalog:dev",
+    "mermaid": "catalog:integrations",
+    "yaml": "catalog:dev"
   },
   "peerDependencies": {
     "@nuxt/content": ">=3.5.0",

@@ -3,6 +3,12 @@
 ## Normal Chart (should log render time)
 
 ```mermaid
+---
+toolbar:
+  buttons:
+    copy: false
+    fullscreen: true
+---
 graph TD
     A[Start] --> B[Process]
     B --> C[End]

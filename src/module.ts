@@ -15,8 +15,24 @@ import {
   DEFAULT_DARK_THEME,
   DEFAULT_LIGHT_THEME,
   DEFAULT_MERMAID_CONFIG,
+  DEFAULT_TOOLBAR_OPTIONS,
+  DEFAULT_EXPAND_OPTIONS,
   DEFAULT_FRONTMATTER_CONFIG_KEY,
 } from './runtime/constants'
+import type { ExpandOptions } from './runtime/types/expand'
+import {
+  applyMermaidFrontmatterOverrides,
+  extractMermaidInlineOverrides,
+  extractToolbarProps,
+  mergeToolbarProps,
+  parseInlineAttrs,
+  parseMermaidFrontmatter,
+} from './runtime/utils/mermaid-transform'
+import {
+  isNonEmptyRecord,
+  stringifyInlineValue,
+} from './runtime/utils'
+import type { MermaidToolbarOptions } from './types/mermaid'
 
 const SANITIZE_URL_PACKAGE = '@braintree/sanitize-url'
 const MERMAID_FENCE_RE = /^[ \t]*(?:`{3,}|~{3,})[ \t]*mermaid(?:$|[ \t{[])/im
@@ -82,6 +98,17 @@ export interface ModuleOptions {
      */
     error?: string
   }
+  /**
+   * Options related to SVG expand (lightbox) interactions
+   */
+  /**
+   * Expand configuration. `false` disables expand, `true` uses defaults.
+   */
+  expand?: ExpandOptions | boolean
+  /**
+   * Default toolbar settings for Mermaid component
+   */
+  toolbar?: MermaidToolbarOptions
 }
 
 const DEFAULTS = {
@@ -99,6 +126,8 @@ const DEFAULTS = {
     spinner: undefined,
     error: undefined,
   },
+  expand: DEFAULT_EXPAND_OPTIONS,
+  toolbar: DEFAULT_TOOLBAR_OPTIONS,
 } satisfies ModuleOptions
 
 export default defineNuxtModule<ModuleOptions>({
@@ -133,6 +162,9 @@ export default defineNuxtModule<ModuleOptions>({
 
     const resolver = createResolver(import.meta.url)
     const runtimeDir = resolver.resolve('./runtime')
+
+    nuxt.options.css ||= []
+    nuxt.options.css.push(resolver.resolve('./runtime/styles.css'))
 
     const publicRuntimeConfig = nuxt.options.runtimeConfig.public
     const runtimeOverrides = (publicRuntimeConfig.contentMermaid
@@ -291,8 +323,18 @@ export function transformMermaidCodeBlocks(
     return next === '' || /\s/.test(next) || next === '{' || next === '['
   }
 
-  const buildComponentTag = (encoded: string) =>
-    `<${componentName} :config="${frontmatterConfigKey}" code="${encoded}"></${componentName}>`
+  const buildComponentTag = (encoded: string, toolbar?: MermaidToolbarOptions) => {
+    const attrs = [
+      `:config="${frontmatterConfigKey}"`,
+    ]
+
+    if (toolbar && isNonEmptyRecord(toolbar)) {
+      attrs.push(`:toolbar='${stringifyInlineValue(toolbar)}'`)
+    }
+
+    attrs.push(`code="${encoded}"`)
+    return `<${componentName} ${attrs.join(' ')}></${componentName}>`
+  }
 
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!
@@ -356,8 +398,20 @@ export function transformMermaidCodeBlocks(
       continue
     }
 
-    const encoded = encodeURIComponent(code)
-    output.push(`${fence.indent}${buildComponentTag(encoded)}`)
+    const inlineAttrs = parseInlineAttrs(fence.info)
+    const frontmatterInfo = parseMermaidFrontmatter(rawCode, newline)
+    const inlineOverrides = extractMermaidInlineOverrides(inlineAttrs)
+    const mergedCode = inlineOverrides
+      ? applyMermaidFrontmatterOverrides(rawCode, newline, frontmatterInfo, inlineOverrides, fence.indent)
+      : rawCode
+
+    const toolbarProps = mergeToolbarProps(
+      extractToolbarProps(frontmatterInfo?.data),
+      extractToolbarProps(inlineAttrs),
+    )
+
+    const encoded = encodeURIComponent(mergedCode.trim())
+    output.push(`${fence.indent}${buildComponentTag(encoded, toolbarProps)}`)
     index = closingIndex
   }
 

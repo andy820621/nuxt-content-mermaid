@@ -143,7 +143,12 @@ gantt
           Basic Flow
         </h2>
         <div class="card__footer">
-          <Mermaid :code="flowchartCode" />
+          <Mermaid
+            :code="flowchartCode"
+            :toolbar="{
+              buttons: { copy: false },
+            }"
+          />
         </div>
       </div>
 
@@ -156,7 +161,10 @@ gantt
           Interaction
         </h2>
         <div class="card__footer">
-          <Mermaid :code="sequenceCode" />
+          <Mermaid
+            :code="sequenceCode"
+            :toolbar="{ fontSize: '1.2rem', title: 'Custom Toolbar Title with very long text to test wrapping' }"
+          />
         </div>
       </div>
 

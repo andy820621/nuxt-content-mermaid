@@ -31,7 +31,7 @@ export default defineNuxtConfig({
       //   logLevel: 'info',
       //   fontFamily: 'Courier New', // Visual check:
       // },
-      // lazy: false, // true/false also { threshold: 1.0 }
+      // lazy: true, // true/false also { threshold: 1.0 }
     },
     theme: {
       // light: 'default',
@@ -41,6 +41,27 @@ export default defineNuxtConfig({
       // renderer: 'MyMermaid',
       // spinner: 'MySpinner',
       // error: 'MermaidError',
+    },
+    toolbar: {
+      // title: 'Mermaid Diagram',
+      // fontSize: '24px',
+      // buttons: {
+      //   copy: true,
+      //   fullscreen: false,
+      //   expand: true,
+      // },
+    },
+    expand: {
+      enabled: true,
+      invokeOpenOn: { diagramClick: true },
+      margin: 32,
+      invokeCloseOn: {
+        esc: true,
+        wheel: false,
+        swipe: true,
+        overlayClick: true,
+        closeButtonClick: true,
+      },
     },
   },
 })
