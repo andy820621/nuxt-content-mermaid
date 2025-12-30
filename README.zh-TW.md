@@ -190,6 +190,20 @@ export default defineNuxtConfig({
 | `expand.invokeCloseOn.overlayClick`   | `boolean` | `true` | 允許點擊 overlay 背景關閉。                              |
 | `expand.invokeCloseOn.closeButtonClick`| `boolean` | `true` | 顯示 overlay 關閉按鈕。                                   |
 
+**平移與縮放 (Expand Overlay)**
+
+當放大 overlay 開啟時，使用者可平移與縮放圖表：
+
+| 操作 | 桌機 | 行動裝置 |
+|:---|:---|:---|
+| **平移 (Pan)** | `Space` + 拖曳 | 單指拖曳 |
+| **縮放 (Zoom)** | `Ctrl/⌘` + 滾輪 | 雙指捏合 |
+| **鍵盤** | `+`/`-` 縮放、方向鍵平移、`0` 重置 | — |
+
+放大介面會顯示縮放工具列，包含 +/−/Reset 按鈕與百分比顯示。
+
+若未按 `Ctrl/⌘` 直接滾動，會顯示提示訊息「Use Ctrl/⌘ + Scroll to zoom」（每次放大僅顯示一次）。
+
 
 > **Note**: 所有設定皆可透過 `runtimeConfig.public.contentMermaid` 在部署時進行覆寫（`runtimeConfig.public.mermaidContent` 仍支援但已棄用）。
 
@@ -236,6 +250,9 @@ html[data-theme="dark"],
 - `--ncm-expand-target-bg`：當 `expand.margin > 0` 時，放大後留白的 SVG 外框背景，可以與 overlay 做出區隔
 - `--ncm-overlay-opacity`：overlay 的透明度（搭配 margin 留白時可微調濃淡）
 - `--ncm-overlay-backdrop`：顯示 overlay 時加上的 `backdrop-filter`，可自訂 blur/效果
+- `--ncm-hint-bg`：縮放提示訊息背景色（預設 `rgba(0,0,0,0.75)`）
+- `--ncm-hint-text`：縮放提示訊息文字顏色（預設 `#fff`）
+- `--ncm-hint-radius`：縮放提示訊息圓角（預設 `8px`）
 
 ## Advanced Usage
 

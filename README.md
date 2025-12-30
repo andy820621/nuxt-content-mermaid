@@ -190,6 +190,20 @@ Control SVG expand interactions. You can also set `expand: false` to disable it,
 | `expand.invokeCloseOn.overlayClick` | `boolean` | `true` | Allow clicking the overlay background to close.             |
 | `expand.invokeCloseOn.closeButtonClick`| `boolean`| `true` | Show the overlay close button.                              |
 
+**Pan & Zoom (Expand Overlay)**
+
+When the expand overlay is open, users can pan and zoom the diagram:
+
+| Interaction | Desktop | Mobile |
+|:---|:---|:---|
+| **Pan** | `Space` + Drag | 1-finger Drag |
+| **Zoom** | `Ctrl/⌘` + Scroll | 2-finger Pinch |
+| **Keyboard** | `+`/`-` to zoom, Arrow keys to pan, `0` to reset | — |
+
+A zoom toolbar appears in the overlay with +/−/Reset buttons and a percentage display.
+
+When scrolling without `Ctrl/⌘`, a hint toast ("Use Ctrl/⌘ + Scroll to zoom") appears once per expand session.
+
 
 > **Note**: All options can be overridden at runtime via `runtimeConfig.public.contentMermaid` (`runtimeConfig.public.mermaidContent` remains supported but deprecated).
 
@@ -235,6 +249,9 @@ Variables:
 - `--ncm-expand-target-bg`: Background color shown behind the expanded SVG when `expand.margin` leaves breathing room.
 - `--ncm-overlay-opacity`: Overlay transparency (thinned when `expand.margin` creates breathing room).
 - `--ncm-overlay-backdrop`: `backdrop-filter` applied to the overlay when it becomes visible.
+- `--ncm-hint-bg`: Zoom hint toast background (default: `rgba(0,0,0,0.75)`).
+- `--ncm-hint-text`: Zoom hint toast text color (default: `#fff`).
+- `--ncm-hint-radius`: Zoom hint toast border radius (default: `8px`).
 
 ## Advanced Usage
 
