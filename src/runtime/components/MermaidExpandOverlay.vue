@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CSSProperties, ComponentPublicInstance } from 'vue'
 import type { MermaidZoomReturn } from '../composables/useMermaidZoom'
+import MermaidZoomToolbar from './MermaidZoomToolbar.vue'
 
 const props = defineProps<{
   active: boolean
@@ -88,35 +89,15 @@ const handleModalClick = (event: MouseEvent) => {
         />
 
         <!-- Zoom Toolbar -->
-        <div
+        <MermaidZoomToolbar
           v-if="zoom"
-          class="ncm-zoom-toolbar"
-          @mousedown.stop
-          @touchstart.stop
-        >
-          <button
-            class="ncm-zoom-btn"
-            aria-label="Zoom Out"
-            @click.stop="zoom.zoomOut(); ($event.currentTarget as HTMLButtonElement).blur()"
-          >
-            -
-          </button>
-          <span class="ncm-zoom-info">{{ Math.round(zoom.scale.value * 100) }}%</span>
-          <button
-            class="ncm-zoom-btn"
-            aria-label="Zoom In"
-            @click.stop="zoom.zoomIn(); ($event.currentTarget as HTMLButtonElement).blur()"
-          >
-            +
-          </button>
-          <button
-            class="ncm-zoom-btn ncm-zoom-reset"
-            aria-label="Reset Zoom"
-            @click.stop="zoom.reset(); ($event.currentTarget as HTMLButtonElement).blur()"
-          >
-            Reset
-          </button>
-        </div>
+          :scale="zoom.scale.value"
+          :icon-size="iconSize"
+          :icon-scale="0.75"
+          @zoom-out="zoom.zoomOut()"
+          @zoom-in="zoom.zoomIn()"
+          @reset="zoom.reset()"
+        />
 
         <!-- Zoom Hint Toast -->
         <Transition name="ncm-hint-fade">
@@ -230,10 +211,11 @@ const handleModalClick = (event: MouseEvent) => {
   padding: 6px;
   border-radius: 4px;
   border: none;
-  background-color: var(--ncm-code-bg);
-  color: var(--ncm-text-xmuted);
-  border: var(--ncm-border);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid color-mix(in oklab, var(--ncm-text) 8%, transparent);
+  background-color: color-mix(in oklab, var(--ncm-code-bg) 35%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: color-mix(in oklab, var(--ncm-text) 60%, transparent);
   cursor: pointer;
   touch-action: manipulation;
   pointer-events: auto;
@@ -246,57 +228,6 @@ const handleModalClick = (event: MouseEvent) => {
 .ncm-expand-btn:hover {
   color: var(--ncm-text);
   background-color: var(--ncm-code-bg-hover);
-}
-
-/* Zoom Toolbar */
-.ncm-zoom-toolbar {
-  position: absolute;
-  top: 10px;
-  right: 50px; /* Left of close button */
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background-color: var(--ncm-code-bg);
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: var(--ncm-border);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  pointer-events: auto;
-  z-index: 3;
-}
-
-.ncm-zoom-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
-  border: none;
-  background-color: transparent;
-  color: var(--ncm-text-xmuted);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: color 0.2s, background-color 0.2s;
-}
-
-.ncm-zoom-btn:hover {
-  color: var(--ncm-text);
-  background-color: var(--ncm-code-bg-hover);
-}
-
-.ncm-zoom-info {
-  font-size: 12px;
-  color: var(--ncm-text-muted);
-  min-width: 40px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  user-select: none;
-}
-.ncm-zoom-reset {
-    font-size: 12px;
 }
 
 /* Zoom Hint Toast */

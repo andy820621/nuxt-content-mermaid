@@ -12,6 +12,7 @@ export type MermaidToolbarButtons = {
 export type MermaidToolbarOptions = {
   title?: string
   fontSize?: string | number
+  fullscreenToolbarScale?: number
   buttons?: MermaidToolbarButtons
 }
 

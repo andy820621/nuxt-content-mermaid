@@ -21,18 +21,23 @@ import { useMermaidTheme } from '../composables/useMermaidTheme'
 import { useMermaidExpand } from '../composables/useMermaidExpand'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
 import { useFullscreen } from '../composables/useFullscreen'
+import { useMermaidZoom } from '../composables/useMermaidZoom'
+import { useEventListener } from '../composables/useEventListener'
 import { DEFAULT_TOOLBAR_OPTIONS, DEFAULT_EXPAND_OPTIONS } from '../constants'
 import type { ExpandOptions } from '../types/expand'
 import Spinner from './Spinner.vue'
 import IconClipboard from './icons/IconClipboard.vue'
 import IconClipboardHover from './icons/IconClipboardHover.vue'
 import IconClipboardSuccess from './icons/IconClipboardSuccess.vue'
-import IconCollapse from './icons/IconCollapse.vue'
-import IconExpand from './icons/IconExpand.vue'
 import IconFullScreen from './icons/iconFullScreen.vue'
 import IconFullScreenExit from './icons/iconFullScreenExit.vue'
 import MermaidExpandOverlay from './MermaidExpandOverlay.vue'
 import type { MermaidToolbarOptions } from '~/src/types/mermaid'
+import IconExpand from './icons/IconExpand.vue'
+import IconCollapse from './icons/IconCollapse.vue'
+import MermaidZoomToolbar from './MermaidZoomToolbar.vue'
+
+const isMac = import.meta.client ? /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) : false
 
 const props = defineProps<{
   // Using `unknown` to avoid Vue runtime prop type warnings when user's collection schema is misconfigured; actual validation below.
@@ -105,6 +110,7 @@ let observer: IntersectionObserver | null = null
 
 const defaultToolbarTitle = DEFAULT_TOOLBAR_OPTIONS.title ?? 'mermaid'
 const defaultToolbarFontSize = DEFAULT_TOOLBAR_OPTIONS.fontSize ?? '14px'
+const defaultFullscreenToolbarScale = DEFAULT_TOOLBAR_OPTIONS.fullscreenToolbarScale ?? 1.25
 
 const baseToolbarDefaults: MermaidToolbarOptions = DEFAULT_TOOLBAR_OPTIONS
 const runtimeToolbarDefaults = computed<MermaidToolbarOptions>(() => {
@@ -159,6 +165,31 @@ const { isSupported: isFullscreenSupported, isFullscreen, toggle: toggleFullscre
 })
 const showFullscreenButton = computed(() => toolbarButtons.value.fullscreen !== false && isFullscreenSupported.value)
 const fullscreenLabel = computed(() => isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen')
+const fullscreenToolbarScale = computed(() => {
+  const raw = resolvedToolbar.value.fullscreenToolbarScale ?? defaultFullscreenToolbarScale
+  if (typeof raw === 'number' && Number.isFinite(raw))
+    return raw
+  if (typeof raw === 'string') {
+    const parsed = Number.parseFloat(raw)
+    if (Number.isFinite(parsed))
+      return parsed
+  }
+  return defaultFullscreenToolbarScale
+})
+const toolbarFontSizePx = computed(() => {
+  return parseSizeToPx(resolvedToolbar.value.fontSize ?? defaultToolbarFontSize, 14)
+})
+const fullscreenToolbarFontSize = computed(() => {
+  const scaled = toolbarFontSizePx.value * fullscreenToolbarScale.value
+  return `${Math.round(scaled * 100) / 100}px`
+})
+const effectiveToolbarFontSize = computed(() => {
+  return isFullscreen.value ? fullscreenToolbarFontSize.value : toolbarFontSize.value
+})
+const effectiveToolbarFontSizePx = computed(() => {
+  const baseSize = toolbarFontSizePx.value
+  return isFullscreen.value ? baseSize * fullscreenToolbarScale.value : baseSize
+})
 
 const pageConfig = computed<MermaidConfig | undefined>(() => {
   const value = props.config
@@ -211,11 +242,142 @@ const spinnerComponent = computed<Component | string>(() => customSpinner.value 
 
 // Calculate icon size based on toolbar font size (approximately 1.2x the font size)
 const iconSize = computed(() => {
-  const fontSize = resolvedToolbar.value.fontSize ?? defaultToolbarFontSize
-  const pxValue = parseSizeToPx(fontSize, 14)
-  return Math.round(pxValue * 1.2)
+  return Math.round(effectiveToolbarFontSizePx.value * 1.2)
 })
 const isExpandBlocked = computed(() => !isEnabled || !expandEnabled || isLoading.value || hasError.value || isFullscreen.value)
+
+// Fullscreen Pan/Zoom - reuse useMermaidZoom
+const fullscreenZoom = useMermaidZoom({
+  active: isFullscreen,
+  minScale: 0.1,
+  maxScale: 10,
+})
+
+const showFullscreenZoomHint = ref(false)
+const fullscreenHintDurationMs = 3000
+let fullscreenHintTimeout: ReturnType<typeof setTimeout> | undefined
+let hasShownFullscreenZoomHint = false
+
+// Reset zoom state when entering fullscreen
+watch(isFullscreen, (value) => {
+  if (value) {
+    hasShownFullscreenZoomHint = false
+    // Use nextTick to ensure fullscreen layout is applied
+    nextTick(() => {
+      const el = mermaidContainer.value
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        fullscreenZoom.init({
+          scale: 1,
+          translateX: 0,
+          translateY: 0,
+          top: rect.top,
+          left: rect.left,
+        })
+      }
+    })
+  }
+  else {
+    showFullscreenZoomHint.value = false
+    clearTimeout(fullscreenHintTimeout)
+  }
+})
+
+function refreshFullscreenOrigin() {
+  if (!import.meta.client || !isFullscreen.value) return
+  const el = mermaidContainer.value
+  if (!el) return
+  // Space switch can change the viewport coordinate system without resizing.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect()
+      fullscreenZoom.setMetrics({
+        scale: fullscreenZoom.scale.value,
+        translateX: fullscreenZoom.translateX.value,
+        translateY: fullscreenZoom.translateY.value,
+        top: rect.top,
+        left: rect.left,
+      })
+    })
+  })
+}
+
+function handleFullscreenWheel(event: WheelEvent) {
+  if (!isFullscreen.value) return
+
+  const handled = fullscreenZoom.handleWheel(event)
+  if (handled) {
+    if (fullscreenHintTimeout && showFullscreenZoomHint.value) {
+      showFullscreenZoomHint.value = false
+      clearTimeout(fullscreenHintTimeout)
+    }
+    return
+  }
+
+  // Not handled (no Ctrl/Cmd) - show hint once
+  if (!hasShownFullscreenZoomHint) {
+    hasShownFullscreenZoomHint = true
+    showFullscreenZoomHint.value = true
+    clearTimeout(fullscreenHintTimeout)
+    fullscreenHintTimeout = setTimeout(() => {
+      showFullscreenZoomHint.value = false
+    }, fullscreenHintDurationMs)
+  }
+}
+
+function handleFullscreenKeyDown(event: KeyboardEvent) {
+  if (!isFullscreen.value) return
+  if (event.defaultPrevented) return
+
+  const target = event.target as HTMLElement | null
+  if (target) {
+    const tagName = target.tagName
+    if (target.isContentEditable || tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT')
+      return
+  }
+
+  const browserZoomKeys = new Set(['+', '=', '-', '_'])
+  if (event.ctrlKey || event.metaKey) {
+    if (browserZoomKeys.has(event.key))
+      event.preventDefault()
+    return
+  }
+
+  const moveStep = 20 / fullscreenZoom.scale.value
+
+  const keyHandlers: Record<string, () => void> = {
+    '+': () => fullscreenZoom.zoomIn(),
+    '=': () => fullscreenZoom.zoomIn(),
+    '-': () => fullscreenZoom.zoomOut(),
+    '_': () => fullscreenZoom.zoomOut(),
+    '0': () => fullscreenZoom.reset(),
+    'ArrowUp': () => { fullscreenZoom.translateY.value += moveStep },
+    'ArrowDown': () => { fullscreenZoom.translateY.value -= moveStep },
+    'ArrowLeft': () => { fullscreenZoom.translateX.value += moveStep },
+    'ArrowRight': () => { fullscreenZoom.translateX.value -= moveStep },
+  }
+
+  const handler = keyHandlers[event.key]
+  if (handler) {
+    event.preventDefault()
+    handler()
+  }
+}
+
+if (import.meta.client) {
+  const fullscreenDocument = computed(() => isFullscreen.value ? document : null)
+  const fullscreenWindow = computed(() => isFullscreen.value ? window : null)
+  const fullscreenVisualViewport = computed(() => (isFullscreen.value ? window.visualViewport : null))
+
+  useEventListener(fullscreenWindow, 'wheel', handleFullscreenWheel, { passive: false })
+  useEventListener(fullscreenDocument, 'keydown', handleFullscreenKeyDown)
+  useEventListener(fullscreenWindow, 'focus', refreshFullscreenOrigin)
+  useEventListener(fullscreenDocument, 'fullscreenchange', refreshFullscreenOrigin)
+  useEventListener(fullscreenVisualViewport, 'resize', refreshFullscreenOrigin, { passive: true })
+  useEventListener(fullscreenDocument, 'visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshFullscreenOrigin()
+  })
+}
 
 const {
   setExpandTargetWrap,
@@ -601,12 +763,13 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       v-else
       ref="mermaidBlock"
       class="mermaid-block"
+      :style="{ '--ncm-icon-size': `${iconSize}px` }"
     >
       <!-- Toolbar: Title and Actions -->
       <div class="mermaid-toolbar">
         <div
           class="mermaid-title"
-          :style="{ fontSize: toolbarFontSize }"
+          :style="{ fontSize: effectiveToolbarFontSize }"
         >
           <span v-if="toolbarTitle">{{ toolbarTitle }}</span>
         </div>
@@ -664,6 +827,26 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         </div>
       </div>
 
+      <MermaidZoomToolbar
+        v-if="isFullscreen"
+        variant="fullscreen"
+        :scale="fullscreenZoom.scale.value"
+        :icon-size="iconSize"
+        @zoom-out="fullscreenZoom.zoomOut()"
+        @zoom-in="fullscreenZoom.zoomIn()"
+        @reset="fullscreenZoom.reset()"
+      />
+
+      <!-- Fullscreen Zoom Hint -->
+      <Transition name="ncm-hint-fade">
+        <div
+          v-if="showFullscreenZoomHint && isFullscreen"
+          class="ncm-fullscreen-zoom-hint"
+        >
+          {{ isMac ? '⌘' : 'Ctrl' }} + Scroll to zoom
+        </div>
+      </Transition>
+
       <!-- Diagram Container -->
       <div
         class="mermaid-wrapper"
@@ -671,13 +854,24 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
           'ncm-is-loading': isLoading && !hasRenderedOnce,
           'ncm-expand-hidden': isExpandActive,
           'ncm-expand-clickable': expandEnabled && allowOpenDiagramClick && !isFullscreen,
+          'ncm-fullscreen-zoom': isFullscreen,
         }"
         :style="cursorVariables"
         @click="handleMermaidClick"
+        @mousedown="isFullscreen && fullscreenZoom.handleDragStart($event)"
+        @mousemove="isFullscreen && fullscreenZoom.handleDragMove($event)"
+        @touchstart="isFullscreen && fullscreenZoom.handleDragStart($event)"
+        @touchmove="isFullscreen && fullscreenZoom.handleDragMove($event)"
+        @touchend="isFullscreen && fullscreenZoom.handleDragEnd()"
       >
         <div
           ref="mermaidContainer"
           class="mermaid"
+          :style="isFullscreen ? {
+            transform: fullscreenZoom.transformStyle.value.transform,
+            transformOrigin: '0 0',
+            cursor: fullscreenZoom.cursor.value,
+          } : undefined"
         >
           <!-- Initially show the slot's <pre><code> for SSR; client-side rendering will replace it with the mermaid SVG -->
           <slot>
@@ -742,6 +936,9 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   display: flex;
   flex-direction: column;
   margin: 1rem 0;
+  /* Calculate toolbar height based on icon size for dynamic positioning */
+  /* padding (6px top + 6px bottom) + button (4px + icon + 4px) = icon + 20px */
+  --ncm-toolbar-height: calc(var(--ncm-icon-size, 17px) + 20px);
 }
 
 /* Toolbar */
@@ -754,6 +951,8 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   background-color: var(--ncm-code-bg);
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
+  /* Ensure toolbar stays on top in fullscreen */
+  z-index: 20;
 }
 
 .mermaid-title {
@@ -765,7 +964,10 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
+  max-width: 80%;
+}
+:fullscreen .mermaid-title {
+  max-width: 80%;
 }
 
 .mermaid-actions {
@@ -836,6 +1038,18 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   color: transparent;
   min-height: 100px;
 }
+
+/* Fullscreen styles */
+:fullscreen .mermaid-wrapper {
+  overflow: hidden; /* Disable scroll in fullscreen */
+  touch-action: none; /* Important for drag gestures */
+  flex: 1;
+}
+
+:fullscreen .mermaid-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
 :fullscreen .mermaid-wrapper :deep(svg) {
   height: 100% !important;
   width: 100% !important;
@@ -883,8 +1097,47 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   opacity: 0;
   pointer-events: none;
 }
-.mermaid-wrapper.ncm-expand-clickable {
+.mermaid-wrapper.ncm-expand-clickable :deep(svg) {
   cursor: var(--ncm-cursor-expand);
+}
+
+/* Fullscreen Zoom Toolbar and Hint */
+.ncm-fullscreen-zoom-hint {
+  display: none;
+}
+
+:fullscreen .ncm-fullscreen-zoom-hint {
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 12px 24px;
+  background-color: var(--ncm-hint-bg, rgba(0, 0, 0, 0.75));
+  color: var(--ncm-hint-text, #fff);
+  border-radius: var(--ncm-hint-radius, 8px);
+  font-size: 20px;
+  font-weight: 500;
+  pointer-events: none;
+  user-select: none;
+  z-index: 20;
+  white-space: nowrap;
+}
+
+.ncm-hint-fade-enter-active,
+.ncm-hint-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.ncm-hint-fade-enter-from,
+.ncm-hint-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ncm-hint-fade-enter-active,
+  .ncm-hint-fade-leave-active {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .mermaid-error-default {

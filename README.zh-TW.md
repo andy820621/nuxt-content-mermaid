@@ -108,6 +108,7 @@ export default defineNuxtConfig({
     toolbar: {
       title: "mermaid",
       fontSize: "14px",
+      fullscreenToolbarScale: 1.25,
       buttons: {
         copy: true,
         fullscreen: true,
@@ -171,6 +172,7 @@ export default defineNuxtConfig({
 | :---------------------- | :----------------- | :----- | :------------------------------------- |
 | `toolbar.title`         | `string`           | `'mermaid'` | Mermaid 工具列預設標題。               |
 | `toolbar.fontSize`      | `string \| number` | `'14px'`    | Mermaid 工具列預設字體大小。           |
+| `toolbar.fullscreenToolbarScale` | `number`    | `1.25`      | fullscreen 時工具列字體/圖示的放大倍率。 |
 | `toolbar.buttons.copy`  | `boolean`          | `true`  | 顯示工具列複製原始 Mermaid 的按鈕。    |
 | `toolbar.buttons.fullscreen` | `boolean`     | `true`  | 顯示工具列全螢幕按鈕。                 |
 | `toolbar.buttons.expand`  | `boolean`          | `true`  | 顯示工具列放大按鈕。                   |

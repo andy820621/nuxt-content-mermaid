@@ -27,6 +27,7 @@ config:
 toolbar:
   title: "Sample Diagram"
   fontSize: 24
+  fullscreenToolbarScale: 1.5
 ---
 %%{init: { 'theme': 'dark', 'flowchart': { 'curve': 'step' } }}%%
 graph LR

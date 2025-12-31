@@ -354,12 +354,19 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function handleExpandKeyDown(event: KeyboardEvent) {
-    if (!allowCloseByEsc && (event.key === 'Escape' || event.keyCode === 27)) return
+    if (!allowCloseByEsc && event.key === 'Escape') return
 
-    if (event.key === 'Escape' || event.keyCode === 27) {
+    if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
       closeExpand(event)
+      return
+    }
+
+    const browserZoomKeys = new Set(['+', '=', '-', '_'])
+    if (event.ctrlKey || event.metaKey) {
+      if (browserZoomKeys.has(event.key))
+        event.preventDefault()
       return
     }
 

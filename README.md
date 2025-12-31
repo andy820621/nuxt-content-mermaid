@@ -108,6 +108,7 @@ export default defineNuxtConfig({
     toolbar: {
       title: "mermaid",
       fontSize: "14px",
+      fullscreenToolbarScale: 1.25,
       buttons: {
         copy: true,
         fullscreen: true,
@@ -171,6 +172,7 @@ Color mode integration is automatic when `@nuxtjs/color-mode` is installed; manu
 | :------------------------- | :----------------- | :------ | :------------------------------------------ |
 | `toolbar.title`            | `string`           | `'mermaid'` | Default toolbar title for Mermaid blocks.   |
 | `toolbar.fontSize`         | `string \| number` | `'14px'`    | Default toolbar font size.                  |
+| `toolbar.fullscreenToolbarScale` | `number`     | `1.25`      | Scale factor for toolbar font/icon size in fullscreen. |
 | `toolbar.buttons.copy`     | `boolean`          | `true`  | Show copy-source button in the toolbar.     |
 | `toolbar.buttons.fullscreen` | `boolean`        | `true`  | Show fullscreen button in the toolbar.      |
 | `toolbar.buttons.expand`     | `boolean`          | `true`  | Show expand button in the toolbar.            |

@@ -14,6 +14,7 @@ export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
 export const DEFAULT_TOOLBAR_OPTIONS: MermaidToolbarOptions = {
   title: 'mermaid',
   fontSize: '14px',
+  fullscreenToolbarScale: 1.25,
   buttons: {
     copy: true,
     fullscreen: true,
