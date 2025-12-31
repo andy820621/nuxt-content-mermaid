@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.2.0
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.1.3...v2.2.0)
+
+### 🚀 Enhancements
+
+- Add Mermaid toolbar with expand/fullscreen/copy and inline config support ([a5b573d](https://github.com/andy820621/nuxt-content-mermaid/commit/a5b573d))
+- **expand:** Add pan/zoom support for expand overlay ([abe470b](https://github.com/andy820621/nuxt-content-mermaid/commit/abe470b))
+- **fullscreen:** Add fullscreen pan/zoom support for Mermaid ([fb2af3d](https://github.com/andy820621/nuxt-content-mermaid/commit/fb2af3d))
+
+### 📖 Documentation
+
+- Add pan & zoom interaction details and hint toast CSS variables to README ([a1b45f2](https://github.com/andy820621/nuxt-content-mermaid/commit/a1b45f2)), ([12c1f7a](https://github.com/andy820621/nuxt-content-mermaid/commit/12c1f7a))
+
+### ✅ Tests
+
+- Add zoom/expand unit tests and toolbar e2e coverage ([235aee0](https://github.com/andy820621/nuxt-content-mermaid/commit/235aee0))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.1.3
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.1.2...v2.1.3)
