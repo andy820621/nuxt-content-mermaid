@@ -6,7 +6,7 @@ import { setup, createPage, url } from '@nuxt/test-utils/e2e'
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/expand-toolbar')
 
 const parsePercent = (value: string | null) => {
-  if (!value) return NaN
+  if (!value) return Number.NaN
   return Number.parseInt(value.replace('%', '').trim(), 10)
 }
 
@@ -53,7 +53,9 @@ describe('expand/fullscreen toolbars', async () => {
         try {
           Object.defineProperty(target, key, { value, writable: true, configurable: true })
         }
-        catch {}
+        catch {
+          // ignore
+        }
       }
 
       defineWritable(document, 'fullScreen', false)
@@ -63,7 +65,7 @@ describe('expand/fullscreen toolbars', async () => {
         ;(document as { fullscreenElement?: Element | null }).fullscreenElement = null
         document.dispatchEvent(new Event('fullscreenchange'))
       })
-      defineWritable(HTMLElement.prototype, 'requestFullscreen', async function () {
+      defineWritable(HTMLElement.prototype, 'requestFullscreen', async function (this: HTMLElement) {
         ;(document as { fullScreen?: boolean }).fullScreen = true
         ;(document as { fullscreenElement?: Element | null }).fullscreenElement = this
         document.dispatchEvent(new Event('fullscreenchange'))
