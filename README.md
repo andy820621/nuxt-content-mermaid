@@ -192,9 +192,9 @@ Control SVG expand interactions. You can also set `expand: false` to disable it,
 | `expand.invokeCloseOn.overlayClick` | `boolean` | `true` | Allow clicking the overlay background to close.             |
 | `expand.invokeCloseOn.closeButtonClick`| `boolean`| `true` | Show the overlay close button.                              |
 
-**Pan & Zoom (Expand Overlay)**
+**Pan & Zoom (Expand Overlay / Fullscreen)**
 
-When the expand overlay is open, users can pan and zoom the diagram:
+When fullscreen or expand mode is active, users can pan and zoom the diagram:
 
 | Interaction | Desktop | Mobile |
 |:---|:---|:---|
@@ -202,9 +202,9 @@ When the expand overlay is open, users can pan and zoom the diagram:
 | **Zoom** | `Ctrl/⌘` + Scroll | 2-finger Pinch |
 | **Keyboard** | `+`/`-` to zoom, Arrow keys to pan, `0` to reset | — |
 
-A zoom toolbar appears in the overlay with +/−/Reset buttons and a percentage display.
+A zoom toolbar appears with +/−/Reset buttons and a percentage display.
 
-When scrolling without `Ctrl/⌘`, a hint toast ("Use Ctrl/⌘ + Scroll to zoom") appears once per expand session.
+Use `toolbar.fullscreenToolbarScale` to scale the fullscreen toolbar and zoom controls.
 
 
 > **Note**: All options can be overridden at runtime via `runtimeConfig.public.contentMermaid` (`runtimeConfig.public.mermaidContent` remains supported but deprecated).

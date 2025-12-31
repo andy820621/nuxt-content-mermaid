@@ -192,9 +192,9 @@ export default defineNuxtConfig({
 | `expand.invokeCloseOn.overlayClick`   | `boolean` | `true` | 允許點擊 overlay 背景關閉。                              |
 | `expand.invokeCloseOn.closeButtonClick`| `boolean` | `true` | 顯示 overlay 關閉按鈕。                                   |
 
-**平移與縮放 (Expand Overlay)**
+**平移與縮放 (Expand Overlay / Fullscreen)**
 
-當放大 overlay 開啟時，使用者可平移與縮放圖表：
+當放大 Fullscreen 或是 Expand 模式時，使用者可平移與縮放圖表：
 
 | 操作 | 桌機 | 行動裝置 |
 |:---|:---|:---|
@@ -204,7 +204,7 @@ export default defineNuxtConfig({
 
 放大介面會顯示縮放工具列，包含 +/−/Reset 按鈕與百分比顯示。
 
-若未按 `Ctrl/⌘` 直接滾動，會顯示提示訊息「Use Ctrl/⌘ + Scroll to zoom」（每次放大僅顯示一次）。
+可透過 `toolbar.fullscreenToolbarScale` 調整 Fullscreen 工具列與縮放控制的尺寸。
 
 
 > **Note**: 所有設定皆可透過 `runtimeConfig.public.contentMermaid` 在部署時進行覆寫（`runtimeConfig.public.mermaidContent` 仍支援但已棄用）。
