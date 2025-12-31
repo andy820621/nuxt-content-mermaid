@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.2.1
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.0...v2.2.1)
+
+### 🎨 Styles
+
+- Use :where() for root and dark theme selectors in styles.css ([7c33d98](https://github.com/andy820621/nuxt-content-mermaid/commit/7c33d98))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.2.0
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.1.3...v2.2.0)
