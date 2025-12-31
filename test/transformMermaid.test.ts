@@ -105,6 +105,27 @@ describe('transformMermaidCodeBlocks', () => {
     })
   })
 
+  it('keeps fullscreenToolbarScale from YAML toolbar config', () => {
+    const body = [
+      '```mermaid',
+      '---',
+      'toolbar:',
+      '  title: Mermaid 2',
+      '  fullscreenToolbarScale: 1.5',
+      '---',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    expect(extractJsonProp(output, ':toolbar')).toEqual({
+      title: 'Mermaid 2',
+      fullscreenToolbarScale: 1.5,
+    })
+  })
+
   it('falls back to raw code when mermaid YAML frontmatter is invalid', () => {
     const body = [
       '```mermaid',

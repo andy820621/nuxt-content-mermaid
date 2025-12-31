@@ -1,8 +1,9 @@
-import { computed, nextTick, onUnmounted, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { CSSProperties, ComponentPublicInstance, Ref } from 'vue'
 import type { ExpandInvokeCloseOn, ExpandInvokeOpenOn } from '../types/expand'
 import { useMermaidZoom } from './useMermaidZoom'
 import { useEventListener } from './useEventListener'
+import { tryOnScopeDispose } from './shared/tryOnScopeDispose'
 
 type ExpandState = 'idle' | 'opening' | 'open' | 'closing'
 
@@ -27,6 +28,9 @@ interface UseMermaidExpandOptions {
 const swipeToCloseThreshold = 10
 
 export function useMermaidExpand(options: UseMermaidExpandOptions) {
+  const isClient = typeof import.meta.client === 'boolean'
+    ? import.meta.client
+    : typeof window !== 'undefined' && typeof document !== 'undefined'
   const expandTargetWrap = ref<HTMLDivElement | null>(null)
   const setExpandTargetWrap = (el: Element | ComponentPublicInstance | null) => {
     if (el && 'nodeType' in el) {
@@ -259,7 +263,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function resetExpand() {
-    if (!import.meta.client) return
+    if (!isClient) return
     clearTimeout(expandTransitionTimeout)
     clearTimeout(hintTimeout)
     clearResizeTimers()
@@ -274,7 +278,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function openExpand(_event?: Event) {
-    if (!import.meta.client || isExpandActive.value) return
+    if (!isClient || isExpandActive.value) return
     if (options.isBlocked?.value) return
 
     const svg = options.getExpandTarget()
@@ -315,7 +319,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function closeExpand(_event?: Event) {
-    if (!import.meta.client || !isExpandActive.value) return
+    if (!isClient || !isExpandActive.value) return
     if (expandState.value === 'opening' && !expandTargetWrap.value) {
       resetExpand()
       return
@@ -529,7 +533,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     }, resizeRefreshDelay)
   }
 
-  if (import.meta.client) {
+  if (isClient) {
     const activeWindow = computed(() => isExpandActive.value ? window : null)
     const activeDocument = computed(() => isExpandActive.value ? document : null)
     const activeVisualViewport = computed(() => (isExpandActive.value ? window.visualViewport : null))
@@ -581,8 +585,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     openExpand(event)
   }
 
-  onUnmounted(() => {
-    if (import.meta.client) resetExpand()
+  tryOnScopeDispose(() => {
+    if (isClient) resetExpand()
   })
 
   return {
