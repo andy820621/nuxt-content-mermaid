@@ -169,7 +169,7 @@ describe('useMermaidExpand', () => {
     } as unknown as WheelEvent
 
     wheel?.(event as unknown as Event)
-    await new Promise(resolve => queueMicrotask(resolve))
+    await new Promise<void>(resolve => queueMicrotask(resolve))
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
     expect(event.stopPropagation).toHaveBeenCalledTimes(1)
