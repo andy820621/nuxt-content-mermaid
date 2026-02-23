@@ -73,6 +73,7 @@ describe('module setup', () => {
     expect(addPlugin).not.toHaveBeenCalled()
     expect(addComponent).not.toHaveBeenCalled()
     expect(addTypeTemplate).not.toHaveBeenCalled()
+    expect(addVitePlugin).not.toHaveBeenCalled()
     expect(Object.keys(hooks)).toHaveLength(0)
   })
 
@@ -86,7 +87,35 @@ describe('module setup', () => {
     expect(addPlugin).toHaveBeenCalled()
     expect(addComponent).toHaveBeenCalled()
     expect(addTypeTemplate).toHaveBeenCalled()
+    expect(addVitePlugin).toHaveBeenCalledTimes(1)
     expect(hooks['content:file:beforeParse']).toHaveLength(1)
+
+    const createOptimizeDepsPlugin = addVitePlugin.mock.calls[0]?.[0] as
+      (() => { configEnvironment?: (name: string, config: Record<string, unknown>) => void })
+      | undefined
+    if (!createOptimizeDepsPlugin)
+      throw new Error('optimizeDeps plugin not registered')
+
+    const optimizeDepsPlugin = createOptimizeDepsPlugin()
+    const clientConfig: Record<string, unknown> = {}
+
+    optimizeDepsPlugin.configEnvironment?.('client', clientConfig)
+    expect(clientConfig.optimizeDeps).toBeDefined()
+    expect((clientConfig.optimizeDeps as { include?: string[] }).include).toEqual(
+      expect.arrayContaining([
+        '@barzhsieh/nuxt-content-mermaid > mermaid',
+        '@barzhsieh/nuxt-content-mermaid > @braintree/sanitize-url',
+        '@barzhsieh/nuxt-content-mermaid > dayjs',
+        '@barzhsieh/nuxt-content-mermaid > dayjs/plugin/isoWeek.js',
+        '@barzhsieh/nuxt-content-mermaid > dayjs/plugin/customParseFormat.js',
+        '@barzhsieh/nuxt-content-mermaid > dayjs/plugin/advancedFormat.js',
+        '@barzhsieh/nuxt-content-mermaid > dayjs/plugin/duration.js',
+      ]),
+    )
+
+    const serverConfig: Record<string, unknown> = {}
+    optimizeDepsPlugin.configEnvironment?.('server', serverConfig)
+    expect(serverConfig.optimizeDeps).toBeUndefined()
 
     const beforeParse = hooks['content:file:beforeParse']?.[0]
     if (!beforeParse)
