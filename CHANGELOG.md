@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.2.2
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.1...v2.2.2)
+
+### 🩹 Fixes
+
+- Pre-bundle mermaid CJS deps for pnpm strict mode ([50d258f](https://github.com/andy820621/nuxt-content-mermaid/commit/50d258f))
+- Add default export ([960e7ee](https://github.com/andy820621/nuxt-content-mermaid/commit/960e7ee))
+- Include missing dayjs duration plugin in optimizeDeps ([b47d3fa](https://github.com/andy820621/nuxt-content-mermaid/commit/b47d3fa))
+
+### 🏡 Chore
+
+- Update dependencies ([607fd20](https://github.com/andy820621/nuxt-content-mermaid/commit/607fd20))
+
+### ✅ Tests
+
+- Verify mermaid optimizeDeps injection in module setup ([d190633](https://github.com/andy820621/nuxt-content-mermaid/commit/d190633))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.2.1
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.0...v2.2.1)
