@@ -56,6 +56,7 @@ const MERMAID_OPTIMIZE_DEPS = [
   'dayjs/plugin/isoWeek.js',
   'dayjs/plugin/customParseFormat.js',
   'dayjs/plugin/advancedFormat.js',
+  'dayjs/plugin/duration.js',
 ]
 
 const MERMAID_FENCE_RE = /^[ \t]*(?:`{3,}|~{3,})[ \t]*mermaid(?:$|[ \t{[])/im
@@ -155,7 +156,7 @@ const DEFAULTS = {
 
 export default defineNuxtModule<ModuleOptions>({
   meta: {
-    name: '@barzhsieh/nuxt-content-mermaid',
+    name: MODULE_NAME,
     configKey: 'contentMermaid',
     compatibility: {
       nuxt: '^3.20.1 || ^4.1.0',
