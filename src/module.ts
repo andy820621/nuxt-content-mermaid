@@ -34,7 +34,30 @@ import {
 } from './runtime/utils'
 import type { MermaidToolbarOptions } from './types/mermaid'
 
-const SANITIZE_URL_PACKAGE = '@braintree/sanitize-url'
+const MODULE_NAME = '@barzhsieh/nuxt-content-mermaid'
+
+/**
+ * CJS packages that mermaid externally imports in its ESM chunks (`mermaid.core.mjs`).
+ * Vite must pre-bundle these so CJS → ESM interop works in the dev server.
+ *
+ * `dayjs` is CJS-only (UMD, no `type`/`module`/`exports` fields in its package.json).
+ * `@braintree/sanitize-url` is another CJS external of mermaid.
+ * mermaid's Gantt-diagram chunk additionally imports several dayjs plugins.
+ *
+ * Under pnpm strict mode, these packages are NOT hoisted to the consumer project's
+ * `node_modules/`. Vite's `optimizeDeps.include` requires bare specifiers to be
+ * resolvable from the project root. We use the Vite nested-dependency syntax
+ * (`parent > child`) so Vite resolves them via this module's own node_modules.
+ */
+const MERMAID_OPTIMIZE_DEPS = [
+  'mermaid',
+  '@braintree/sanitize-url',
+  'dayjs',
+  'dayjs/plugin/isoWeek.js',
+  'dayjs/plugin/customParseFormat.js',
+  'dayjs/plugin/advancedFormat.js',
+]
+
 const MERMAID_FENCE_RE = /^[ \t]*(?:`{3,}|~{3,})[ \t]*mermaid(?:$|[ \t{[])/im
 
 export interface ModuleOptions {
@@ -191,14 +214,22 @@ export default defineNuxtModule<ModuleOptions>({
     const isEnabled = runtimeMermaidConfig.enabled !== false
     if (!isEnabled) return
 
-    // Ensure Vite pre-bundles sanitize-url so named exports work when mermaid lazily imports it in dev
+    // Ensure Vite pre-bundles mermaid and its CJS dependencies so ESM interop works in dev.
+    // mermaid's ESM build (`mermaid.core.mjs`) externalizes CJS deps like `dayjs` and
+    // `@braintree/sanitize-url`. Without pre-bundling, Vite serves the raw CJS files via /@fs/
+    // and the browser cannot resolve default/named imports from CJS modules.
+    //
+    // Under pnpm strict mode these are not hoisted, so we use nested-dependency syntax
+    // (`<this-module> > <dep>`) to let Vite resolve through our own node_modules.
     addVitePlugin(() => ({
       name: 'nuxt-content-mermaid:optimize-deps',
       configEnvironment(name, config) {
         if (name === 'client') {
           config.optimizeDeps ||= {}
           config.optimizeDeps.include ||= []
-          config.optimizeDeps.include.push(SANITIZE_URL_PACKAGE)
+          config.optimizeDeps.include.push(
+            ...MERMAID_OPTIMIZE_DEPS.map(dep => `${MODULE_NAME} > ${dep}`),
+          )
         }
       },
     }))
