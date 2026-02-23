@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.2.3
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.2...v2.2.3)
+
+### 🩹 Fixes
+
+- Use relative import path and fix TS 5.9 type errors ([ff62dc8](https://github.com/andy820621/nuxt-content-mermaid/commit/ff62dc8))
+
+### ❤️ Contributors
+
+- BarZ <andy820621@gmail.com>
+
 ## v2.2.2
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.1...v2.2.2)
