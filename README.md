@@ -14,6 +14,27 @@
 A Nuxt module designed for integrating [**Mermaid**](https://mermaid.js.org/) with [**Nuxt Content v3**](https://content.nuxt.com/docs/getting-started).
 It automatically converts `mermaid` code blocks in Markdown into responsive chart components, and supports lazy loading and dark/light theme switching.
 
+<details>
+<summary>Table of Contents</summary>
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Quick Setup](#quick-setup)
+- [Configuration](#configuration)
+- [Styling (CSS Variables)](#styling-css-variables)
+- [Advanced Usage](#advanced-usage)
+  - [Debug mode](#debug-mode)
+  - [Theme & Color Mode](#theme--color-mode)
+  - [Override Per-Page Settings with Frontmatter](#override-per-page-settings-with-frontmatter)
+  - [Mermaid Inline Attributes & YAML Frontmatter](#mermaid-inline-attributes--yaml-frontmatter)
+  - [Custom Rendering Component](#custom-rendering-component)
+  - [Wrapper Example](#wrapper-example)
+  - [Error Handling](#error-handling)
+- [Contribution](#contribution)
+- [License](#license)
+
+</details>
+
 ## Features
 
 - **Automatic conversion**: Parses Markdown code blocks and replaces them with a `<Mermaid>` rendering component.
@@ -51,6 +72,27 @@ npm install -D @barzhsieh/nuxt-content-mermaid
 # yarn
 yarn add -D @barzhsieh/nuxt-content-mermaid
 ```
+
+> [!NOTE]
+> **`better-sqlite3`** — `@nuxt/content` v3+ requires `better-sqlite3` at runtime. If it is not already in your project, Nuxt will prompt you to install it on first launch. You can also install it ahead of time:
+>
+> ```bash
+> # pnpm
+> pnpm add better-sqlite3
+> # npm
+> npm install better-sqlite3
+> ```
+>
+> **pnpm v10+** — pnpm v10 blocks native build scripts by default. After installing, run `pnpm approve-builds` to allow packages like `better-sqlite3`, `esbuild`, and `@parcel/watcher` to compile. Alternatively, add the following to your `package.json`:
+>
+> ```jsonc
+> // package.json
+> {
+>   "pnpm": {
+>     "onlyBuiltDependencies": ["@parcel/watcher", "better-sqlite3", "esbuild"]
+>   }
+> }
+> ```
 
 ### 2. Configure `nuxt.config.ts`
 
@@ -533,14 +575,21 @@ export default defineNuxtConfig({
 ```
 ## Contribution
 
+Contributions are welcome! Feel free to open an [issue](https://github.com/andy820621/nuxt-content-mermaid/issues) or submit a pull request.
+
+- Commit messages should follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat: add spinner option`, `fix: handle dark mode toggle`).
+- PRs should include a summary of changes and test results.
+
 <details>
 <summary>Local Development Commands</summary>
 
 ```bash
-pnpm install
-pnpm dev:prepare
-pnpm dev       # Run playground
-pnpm test      # Run tests
+pnpm install        # Install dependencies
+pnpm dev:prepare    # Build module stubs & prepare playground
+pnpm dev            # Start playground
+pnpm test           # Run tests
+pnpm lint           # Run ESLint
+pnpm test:types     # Type checking
 ```
 
 </details>

@@ -14,7 +14,28 @@
 專為 [**Nuxt Content v3**](https://content.nuxt.com/docs/getting-started) 整合 [**Mermaid**](https://mermaid.js.org/) 的模組。
 能自動將 Markdown 中的 \`\`\`mermaid 區塊轉換為響應式的圖表元件，並支援 Lazy Loading 與深色模式切換。
 
-## Features
+<details>
+<summary>目錄</summary>
+
+- [功能特色](#功能特色)
+- [使用前提](#使用前提)
+- [快速開始](#快速開始)
+- [設定](#設定)
+- [樣式自訂（CSS 變數）](#樣式自訂css-變數)
+- [進階用法](#進階用法)
+  - [Debug 模式](#debug-模式)
+  - [主題與顏色模式](#主題與顏色模式-theme--color-mode)
+  - [以 frontmatter 覆寫單頁設定](#以-frontmatter-覆寫單頁設定)
+  - [Mermaid Inline attrs 與 YAML Frontmatter](#mermaid-inline-attrs-與-yaml-frontmatter)
+  - [自訂渲染元件](#自訂渲染元件-custom-component)
+  - [元件使用方式](#元件使用方式)
+  - [錯誤處理](#錯誤處理)
+- [貢獻](#貢獻)
+- [授權](#授權)
+
+</details>
+
+## 功能特色
 
 - **自動轉換**：解析 Markdown 代碼區塊並替換為 `<Mermaid>` 渲染元件。
 - **效能優化**：支援 Lazy Loading，僅在元件掛載時載入 Mermaid 核心與資源。
@@ -27,7 +48,7 @@
 - `nuxt@^3.20.1 || ^4.1.0`
 - `@nuxt/content@>=3.5.0`
 
-## Quick Setup
+## 快速開始
 
 ### 1. 安裝模組
 
@@ -51,6 +72,27 @@ npm install -D @barzhsieh/nuxt-content-mermaid
 # yarn
 yarn add -D @barzhsieh/nuxt-content-mermaid
 ```
+
+> [!NOTE]
+> **`better-sqlite3`** — `@nuxt/content` v3+ 需要 `better-sqlite3` 才能運作。若你的專案尚未安裝，Nuxt 會在首次啟動時提示安裝。你也可以預先安裝：
+>
+> ```bash
+> # pnpm
+> pnpm add better-sqlite3
+> # npm
+> npm install better-sqlite3
+> ```
+>
+> **pnpm v10+** — pnpm v10 預設會封鎖原生套件的 build scripts。安裝後請執行 `pnpm approve-builds`，允許 `better-sqlite3`、`esbuild`、`@parcel/watcher` 等套件編譯。或者在 `package.json` 中加入以下設定：
+>
+> ```jsonc
+> // package.json
+> {
+>   "pnpm": {
+>     "onlyBuiltDependencies": ["@parcel/watcher", "better-sqlite3", "esbuild"]
+>   }
+> }
+> ```
 
 ### 2. 配置 `nuxt.config.ts`
 
@@ -79,7 +121,7 @@ graph LR
 
 模組會自動將其轉換為 SVG 圖表。
 
-## Configuration
+## 設定
 
 你可以透過 `contentMermaid` 選項進行全域設定。  
 （`mermaidContent` 仍會被接受以維持相容，但已棄用，未來版本會移除。）
@@ -237,7 +279,6 @@ html[data-theme="dark"],
 ```
 
 可覆寫的變數：
-可覆寫的變數：
 - `--ncm-code-bg`：Mermaid 區塊背景色
 - `--ncm-code-bg-hover`：工具列按鈕 hover 背景
 - `--ncm-border-color`：區塊與工具列的邊框顏色
@@ -256,7 +297,7 @@ html[data-theme="dark"],
 - `--ncm-hint-text`：縮放提示訊息文字顏色（預設 `#fff`）
 - `--ncm-hint-radius`：縮放提示訊息圓角（預設 `8px`）
 
-## Advanced Usage
+## 進階用法
 
 ### Debug 模式
 
@@ -536,21 +577,28 @@ export default defineNuxtConfig({
 })
 ```
 
-## Contribution
+## 貢獻
+
+歡迎提交 Issue 回報問題或建議新功能！也歡迎直接發 Pull Request。
+
+- Commit 訊息請遵循 [Conventional Commits](https://www.conventionalcommits.org/) 格式（例如 `feat: add spinner option`、`fix: handle dark mode toggle`）。
+- PR 請附上變更摘要與測試結果。
 
 <details>
-<summary>Local Development Commands</summary>
+<summary>開發指令</summary>
 
 ```bash
-pnpm install
-pnpm dev:prepare
-pnpm dev       # Run playground
-pnpm test      # Run tests
+pnpm install        # 安裝依賴
+pnpm dev:prepare    # 建置模組 stub 並準備 playground
+pnpm dev            # 啟動 playground
+pnpm test           # 執行測試
+pnpm lint           # 執行 ESLint
+pnpm test:types     # 型別檢查
 ```
 
 </details>
 
-## License
+## 授權
 
 [MIT License](./LICENSE)
 
