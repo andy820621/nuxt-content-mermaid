@@ -16,6 +16,10 @@
     "type": "git",
     "url": "git+https://github.com/andy820621/nuxt-content-mermaid.git"
   },
+  "funding": {
+    "type": "individual",
+    "url": "https://ko-fi.com/barzhsieh"
+  },
   "license": "MIT",
   "type": "module",
   "exports": {

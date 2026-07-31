@@ -30,6 +30,7 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
   - [Custom Rendering Component](#custom-rendering-component)
   - [Wrapper Example](#wrapper-example)
   - [Error Handling](#error-handling)
+- [Support](#support)
 - [Contribution](#contribution)
 - [License](#license)
 
@@ -573,6 +574,11 @@ export default defineNuxtConfig({
   },
 })
 ```
+
+## Support
+
+If this module is useful to you, you can [support my open-source work on Ko-fi](https://ko-fi.com/barzhsieh). Your support helps fund maintenance, compatibility updates, testing, and documentation.
+
 ## Contribution
 
 Contributions are welcome! Feel free to open an [issue](https://github.com/andy820621/nuxt-content-mermaid/issues) or submit a pull request.
