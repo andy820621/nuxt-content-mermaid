@@ -47,8 +47,6 @@ const MERMAID_OPTIMIZE_DEPS = [
   'dayjs/plugin/duration.js',
 ]
 
-const MERMAID_CANDIDATE_RE = /mermaid/i
-
 export interface ModuleOptions {
   /**
    * Whether to enable the entire Mermaid process
@@ -269,7 +267,6 @@ export {}
       const { file } = ctx
 
       if (!file.id?.endsWith('.md')) return
-      if (!MERMAID_CANDIDATE_RE.test(file.body)) return
 
       file.body = transformMarkdownDiagrams(file.body)
     })

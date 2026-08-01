@@ -8,6 +8,7 @@ const addTypeTemplate = vi.fn()
 const addVitePlugin = vi.fn()
 const addImports = vi.fn()
 const loggerWarn = vi.fn()
+const transformMarkdownDiagrams = vi.fn<(body: string) => string>()
 
 vi.mock('@nuxt/kit', () => ({
   defineNuxtModule: (config: unknown) => config,
@@ -22,6 +23,10 @@ vi.mock('@nuxt/kit', () => ({
   useLogger: () => ({
     warn: loggerWarn,
   }),
+}))
+
+vi.mock('../src/markdown-diagram-transform', () => ({
+  transformMarkdownDiagrams,
 }))
 
 interface NuxtStub {
@@ -77,7 +82,7 @@ describe('module setup', () => {
     expect(Object.keys(hooks)).toHaveLength(0)
   })
 
-  it('registers hooks and transforms only markdown files with content', async () => {
+  it('registers module hooks', async () => {
     const mod = await import('../src/module')
     const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
     const { nuxt, hooks } = createNuxtStub()
@@ -116,66 +121,69 @@ describe('module setup', () => {
     const serverConfig: Record<string, unknown> = {}
     optimizeDepsPlugin.configEnvironment?.('server', serverConfig)
     expect(serverConfig.optimizeDeps).toBeUndefined()
+  })
+
+  it('delegates every Markdown body and writes back the exact transform result', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
+    const body = '# Original document'
+    const transformedBody = '<!-- transform sentinel -->'
+
+    transformMarkdownDiagrams.mockReturnValue(transformedBody)
+
+    await moduleDef.setup?.({}, nuxt)
 
     const beforeParse = hooks['content:file:beforeParse']?.[0]
     if (!beforeParse)
       throw new Error('content:file:beforeParse hook not registered')
 
-    const markdownCtx = createFileCtx(
-      '/test/sample.md',
-      [
-        '# Title',
-        '```mermaid',
-        'A --> B',
-        '```',
-        '',
-        '```mermaid',
-        'B --> C',
-        '```',
-      ].join('\n'),
-    )
+    const markdownCtx = createFileCtx('/test/sample.md', body)
 
     await beforeParse(markdownCtx)
 
-    const matches = markdownCtx.file.body?.match(/<Mermaid :config="config" code="/g) || []
-    expect(matches.length).toBe(2)
+    expect(transformMarkdownDiagrams).toHaveBeenCalledOnce()
+    expect(transformMarkdownDiagrams).toHaveBeenCalledWith(body)
+    expect(markdownCtx.file.body).toBe(transformedBody)
+  })
 
-    const tildeCtx = createFileCtx(
-      '/test/sample-tilde.md',
-      [
-        '# Title',
-        '~~~mermaid',
-        'A --> B',
-        '~~~',
-        '',
-      ].join('\n'),
-    )
+  it('leaves non-Markdown bodies untouched without delegating', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
+    const body = 'opaque source'
 
-    await beforeParse(tildeCtx)
-    expect(tildeCtx.file.body).toContain('<Mermaid :config="config" code="A%20--%3E%20B"></Mermaid>')
+    await moduleDef.setup?.({}, nuxt)
 
-    const unicodeWhitespaceCtx = createFileCtx(
-      '/test/sample-unicode-whitespace.md',
-      '```\u00A0mermaid\nA --> B\n```',
-    )
+    const beforeParse = hooks['content:file:beforeParse']?.[0]
+    if (!beforeParse)
+      throw new Error('content:file:beforeParse hook not registered')
 
-    await beforeParse(unicodeWhitespaceCtx)
-    expect(unicodeWhitespaceCtx.file.body).toContain('<Mermaid :config="config" code="A%20--%3E%20B"></Mermaid>')
+    const sourceCtx = createFileCtx('/test/source.txt', body)
 
-    const nonMarkdownCtx = createFileCtx(
-      '/test/sample.txt',
-      '```mermaid\nA --> B\n```',
-    )
+    await beforeParse(sourceCtx)
 
-    await beforeParse(nonMarkdownCtx)
-    expect(nonMarkdownCtx.file.body).toBe('```mermaid\nA --> B\n```')
+    expect(transformMarkdownDiagrams).not.toHaveBeenCalled()
+    expect(sourceCtx.file.body).toBe(body)
+  })
 
-    const emptyDiagramCtx = createFileCtx(
-      '/test/empty.md',
-      '```mermaid\n   \n```',
-    )
+  it('propagates unexpected transform failures', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
 
-    await beforeParse(emptyDiagramCtx)
-    expect(emptyDiagramCtx.file.body).toBe('```mermaid\n   \n```')
+    transformMarkdownDiagrams.mockImplementation(() => {
+      throw new Error('unexpected transform failure')
+    })
+
+    await moduleDef.setup?.({}, nuxt)
+
+    const beforeParse = hooks['content:file:beforeParse']?.[0]
+    if (!beforeParse)
+      throw new Error('content:file:beforeParse hook not registered')
+
+    const markdownCtx = createFileCtx('/test/sample.md', '# Original document')
+
+    expect(() => beforeParse(markdownCtx)).toThrow()
   })
 })
