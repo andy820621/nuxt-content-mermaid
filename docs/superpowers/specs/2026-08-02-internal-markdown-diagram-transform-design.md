@@ -2,7 +2,7 @@
 
 ## Context
 
-Issue #8 is the first preparatory slice of Issue #7. Today the Nuxt module entry owns the Markdown fence scanner and passes fixed Markdown Diagram Protocol values into `transformMermaidCodeBlocks`, while diagram metadata helpers live under runtime utilities. This makes the Package User Markdown path depend on a shallow, caller-configurable transform shape even though production has only one valid component identity and Page Mermaid Config binding.
+Issue #8 is the first preparatory slice of Issue #7. Today the Nuxt module entry owns the Markdown fence scanner and passes fixed Markdown Diagram Protocol values into `transformMermaidCodeBlocks`, while diagram metadata helpers live under runtime utilities. This makes the Package User Markdown path depend on a shallow transform shape that exposes fixed protocol values as parameters even though production has only one valid component identity and Page Mermaid Config binding.
 
 ## Scope
 

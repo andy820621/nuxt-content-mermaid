@@ -109,7 +109,7 @@ Run `python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/moduleS
 
 - [ ] **Step 3: Delegate to the internal seam**
 
-Import `transformMarkdownDiagrams` in `src/module.ts`, remove the scanner implementation from the module entry, and make both the Content hook and the retained `transformMermaidCodeBlocks` export delegate to it. Keep the named export present while ignoring historical protocol-value arguments so callers cannot vary module-owned constants.
+Import `transformMarkdownDiagrams` in `src/module.ts`, remove the scanner implementation from the module entry, and make both the Content hook and the retained `transformMermaidCodeBlocks` export delegate to it. Keep the named export present while ignoring historical protocol-value arguments so those parameters cannot vary module-owned constants.
 
 - [ ] **Step 4: Update the design document with any implementation-level clarification**
 

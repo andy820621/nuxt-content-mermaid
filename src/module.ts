@@ -47,7 +47,7 @@ const MERMAID_OPTIMIZE_DEPS = [
   'dayjs/plugin/duration.js',
 ]
 
-const MERMAID_FENCE_RE = /^[ \t]*(?:`{3,}|~{3,})[ \t]*mermaid(?:$|[ \t{[])/im
+const MERMAID_CANDIDATE_RE = /mermaid/i
 
 export interface ModuleOptions {
   /**
@@ -269,7 +269,7 @@ export {}
       const { file } = ctx
 
       if (!file.id?.endsWith('.md')) return
-      if (!MERMAID_FENCE_RE.test(file.body)) return
+      if (!MERMAID_CANDIDATE_RE.test(file.body)) return
 
       file.body = transformMarkdownDiagrams(file.body)
     })

@@ -154,6 +154,14 @@ describe('module setup', () => {
     await beforeParse(tildeCtx)
     expect(tildeCtx.file.body).toContain('<Mermaid :config="config" code="A%20--%3E%20B"></Mermaid>')
 
+    const unicodeWhitespaceCtx = createFileCtx(
+      '/test/sample-unicode-whitespace.md',
+      '```\u00A0mermaid\nA --> B\n```',
+    )
+
+    await beforeParse(unicodeWhitespaceCtx)
+    expect(unicodeWhitespaceCtx.file.body).toContain('<Mermaid :config="config" code="A%20--%3E%20B"></Mermaid>')
+
     const nonMarkdownCtx = createFileCtx(
       '/test/sample.txt',
       '```mermaid\nA --> B\n```',

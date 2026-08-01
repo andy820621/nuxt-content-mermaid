@@ -15,6 +15,15 @@ import {
 const MERMAID_COMPONENT_NAME = 'Mermaid'
 const PAGE_MERMAID_CONFIG_BINDING = 'config'
 
+function isClosingFence(line: string, markerChar: '`' | '~', markerLength: number) {
+  const trimmed = line.trim()
+  if (trimmed.length < markerLength) return false
+  for (const char of trimmed) {
+    if (char !== markerChar) return false
+  }
+  return true
+}
+
 export function transformMarkdownDiagrams(body: string) {
   const newline = body.includes('\r\n') ? '\r\n' : '\n'
   const lines = body.split(newline)
@@ -24,16 +33,6 @@ export function transformMarkdownDiagrams(body: string) {
   let inFence = false
   let fenceChar: '`' | '~' | null = null
   let fenceLength = 0
-
-  const isClosingFence = (line: string) => {
-    if (!fenceChar) return false
-    const trimmed = line.trim()
-    if (trimmed.length < fenceLength) return false
-    for (const char of trimmed) {
-      if (char !== fenceChar) return false
-    }
-    return true
-  }
 
   const isFenceMarkerChar = (char: string | undefined): char is '`' | '~' =>
     char === '`' || char === '~'
@@ -93,7 +92,7 @@ export function transformMarkdownDiagrams(body: string) {
 
     if (inFence) {
       output.push(line)
-      if (isClosingFence(line)) {
+      if (fenceChar && isClosingFence(line, fenceChar, fenceLength)) {
         inFence = false
         fenceChar = null
         fenceLength = 0
@@ -120,16 +119,7 @@ export function transformMarkdownDiagrams(body: string) {
     // Find the matching closing fence (same char, at least same length).
     let closingIndex = -1
     for (let j = index + 1; j < lines.length; j++) {
-      const trimmed = lines[j]!.trim()
-      if (trimmed.length < fence.markerLength) continue
-      let isFence = true
-      for (const char of trimmed) {
-        if (char !== fence.markerChar) {
-          isFence = false
-          break
-        }
-      }
-      if (isFence) {
+      if (isClosingFence(lines[j]!, fence.markerChar, fence.markerLength)) {
         closingIndex = j
         break
       }
