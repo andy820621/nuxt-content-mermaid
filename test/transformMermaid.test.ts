@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
-import { transformMermaidCodeBlocks } from '../src/module'
+import { transformMarkdownDiagrams } from '../src/markdown-diagram-transform'
 
-describe('transformMermaidCodeBlocks', () => {
+describe('transformMarkdownDiagrams', () => {
   const fixtureDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/transform')
 
   const loadFixture = (name: string) => {
@@ -44,14 +44,14 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
 
     expect(output).toContain('<Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
   })
 
   it('transforms multiple mermaid blocks in a single document', () => {
     const body = loadFixture('multiple-blocks.md')
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
 
     const matches = output.match(/<Mermaid :config="config" code="/g) || []
     expect(matches.length).toBe(2)
@@ -66,8 +66,77 @@ describe('transformMermaidCodeBlocks', () => {
       '```',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(output).toBe(body)
+  })
+
+  it('preserves non-target Markdown exactly', () => {
+    const body = [
+      '# Document',
+      '',
+      'Text with `inline code` and trailing spaces.  ',
+      '',
+      '```typescript',
+      'const diagram = "mermaid"',
+      '```',
+      '',
+    ].join('\n')
+
+    expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
+  it('does not recognize language names that only start with mermaid', () => {
+    const body = [
+      '```mermaidjs',
+      'graph TD',
+      '  A --> B',
+      '```',
+    ].join('\n')
+
+    expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
+  it('leaves unclosed mermaid fences untouched', () => {
+    const body = [
+      '# Diagram',
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+    ].join('\n')
+
+    expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
+  it('matches closing fences by marker character and minimum length', () => {
+    const body = [
+      '````mermaid',
+      'graph TD',
+      '```',
+      '  A --> B',
+      '~~~~',
+      '  B --> C',
+      '`````',
+    ].join('\n')
+
+    const output = transformMarkdownDiagrams(body)
+
+    expect(extractDecodedCode(output)).toBe([
+      'graph TD',
+      '```',
+      '  A --> B',
+      '~~~~',
+      '  B --> C',
+    ].join('\n'))
+  })
+
+  it('propagates unexpected transformation failures', () => {
+    const body = [
+      '```mermaid',
+      '\uD800',
+      '```',
+    ].join('\n')
+
+    expect(() => transformMarkdownDiagrams(body)).toThrow()
   })
 
   it('transforms mermaid fences with info string attributes', () => {
@@ -80,7 +149,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(output).toContain('<Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
   })
 
@@ -98,7 +167,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(extractJsonProp(output, ':toolbar')).toEqual({
       title: 'Mermaid 1',
       fontSize: '24px',
@@ -119,7 +188,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(extractJsonProp(output, ':toolbar')).toEqual({
       title: 'Mermaid 2',
       fullscreenToolbarScale: 1.5,
@@ -138,7 +207,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     const decoded = extractDecodedCode(output)
 
     expect(decoded).toBe([
@@ -166,7 +235,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(output).not.toContain(':toolbar=')
   })
 
@@ -179,7 +248,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(extractJsonProp(output, ':toolbar')).toEqual({
       title: 'Safe Title',
     })
@@ -195,7 +264,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(extractJsonProp(output, ':toolbar')).toEqual({
       fontSize: '16',
     })
@@ -220,7 +289,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
 
     expect(extractJsonProp(output, ':toolbar')).toEqual({
       title: 'YAML Toolbar',
@@ -264,7 +333,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     const decoded = extractDecodedCode(output)
 
     expect(decoded.startsWith('---\n')).toBe(true)
@@ -298,7 +367,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(output).toContain('  <Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
   })
 
@@ -315,7 +384,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(output).toBe(body)
   })
 
@@ -332,7 +401,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(output).toBe(body)
   })
 
@@ -345,7 +414,7 @@ describe('transformMermaidCodeBlocks', () => {
       '',
     ].join('\r\n')
 
-    const output = transformMermaidCodeBlocks(body, 'Mermaid')
+    const output = transformMarkdownDiagrams(body)
     expect(output).toContain('graph%20TD%0D%0A%20%20A%20--%3E%20B')
     expect(output).not.toMatch(/(^|[^\r])\n/)
   })
