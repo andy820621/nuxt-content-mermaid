@@ -131,18 +131,5 @@ export function toArray<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value]
 }
 
-export function escapeHtmlAttribute(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/'/g, '&#39;')
-}
-
-export function stringifyInlineValue(value: Record<string, unknown>) {
-  return escapeHtmlAttribute(JSON.stringify(value))
-}
-
 export * from './is'
 export * from './vue'
-export * from './mermaid-transform'

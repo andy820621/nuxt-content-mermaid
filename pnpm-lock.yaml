@@ -52,6 +52,9 @@ catalogs:
     '@nuxt/schema':
       specifier: 4.3.1
       version: 4.3.1
+    '@nuxtjs/mdc':
+      specifier: ^0.20.1
+      version: 0.20.1
     mermaid:
       specifier: ^11.12.3
       version: 11.12.3
@@ -111,6 +114,9 @@ importers:
       '@nuxtjs/color-mode':
         specifier: catalog:dev
         version: 4.0.0(magicast@0.5.2)
+      '@nuxtjs/mdc':
+        specifier: catalog:integrations
+        version: 0.20.1(magicast@0.5.2)
       '@types/node':
         specifier: catalog:types
         version: 25.3.0
@@ -153,6 +159,8 @@ importers:
         version: 4.3.1(@parcel/watcher@2.5.1)(@types/node@25.3.0)(@vue/compiler-sfc@3.5.28)(better-sqlite3@12.4.6)(cac@6.7.14)(db0@0.3.4(better-sqlite3@12.4.6))(eslint@10.0.1(jiti@2.6.1))(ioredis@5.9.3)(magicast@0.5.1)(optionator@0.9.4)(rollup@4.59.0)(terser@5.44.1)(typescript@5.9.3)(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(terser@5.44.1)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
 
   test/fixtures/basic: {}
+
+  test/fixtures/built-in-renderer: {}
 
   test/fixtures/color-mode: {}
 
