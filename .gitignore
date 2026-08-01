@@ -55,3 +55,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 TODOLIST
+
+# Skills
+skills-lock.json
+vendor/agent-skills
+.agents/skills
