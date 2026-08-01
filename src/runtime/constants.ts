@@ -2,6 +2,7 @@ import type { MermaidConfig } from 'mermaid'
 import type { MermaidToolbarOptions } from '../types/mermaid'
 import type { ExpandOptions } from './types/expand'
 
+export const MERMAID_LOG_PREFIX = '[nuxt-content-mermaid]'
 export const DEFAULT_LIGHT_THEME: MermaidConfig['theme'] = 'default'
 export const DEFAULT_DARK_THEME: MermaidConfig['theme'] = 'dark'
 export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
