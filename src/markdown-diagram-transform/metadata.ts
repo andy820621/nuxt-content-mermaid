@@ -1,7 +1,7 @@
 import { defu } from 'defu'
 import destr from 'destr'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
-import { isNonEmptyRecord, isRecord } from './is'
+import { isNonEmptyRecord, isRecord } from '../runtime/utils/is'
 
 // Prevent prototype pollution via inline attribute paths.
 const UNSAFE_INLINE_KEYS = new Set(['__proto__', 'prototype', 'constructor'])

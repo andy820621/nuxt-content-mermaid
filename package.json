@@ -79,6 +79,7 @@
     "@nuxt/module-builder": "catalog:dev",
     "@nuxt/schema": "catalog:integrations",
     "@nuxt/test-utils": "catalog:test",
+    "@nuxtjs/mdc": "catalog:integrations",
     "@nuxtjs/color-mode": "catalog:dev",
     "@types/node": "catalog:types",
     "changelogen": "catalog:dev",

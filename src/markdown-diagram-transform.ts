@@ -6,14 +6,19 @@ import {
   mergeToolbarProps,
   parseInlineAttrs,
   parseMermaidFrontmatter,
-} from './runtime/utils/mermaid-transform'
-import {
-  isNonEmptyRecord,
-  stringifyInlineValue,
-} from './runtime/utils'
+} from './markdown-diagram-transform/metadata'
+import { isNonEmptyRecord } from './runtime/utils/is'
 
 const MERMAID_COMPONENT_NAME = 'Mermaid'
 const PAGE_MERMAID_CONFIG_BINDING = 'config'
+
+function stringifyInlineValue(value: Record<string, unknown>) {
+  return JSON.stringify(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/'/g, '&#39;')
+}
 
 function isClosingFence(line: string, markerChar: '`' | '~', markerLength: number) {
   const trimmed = line.trim()

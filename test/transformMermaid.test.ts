@@ -314,6 +314,54 @@ describe('transformMarkdownDiagrams', () => {
     })
   })
 
+  it('preserves metadata precedence while filtering unsafe inline paths', () => {
+    const body = [
+      '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="18px" toolbar.constructor.polluted=true config=\'{"theme":"forest"}\'}',
+      '---',
+      'title: YAML Title',
+      'displayMode: standard',
+      'toolbar:',
+      '  title: YAML Toolbar',
+      '  buttons:',
+      '    copy: false',
+      'config:',
+      '  flowchart:',
+      '    htmlLabels: false',
+      '---',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    const output = transformMarkdownDiagrams(body)
+
+    expect(extractJsonProp(output, ':toolbar')).toEqual({
+      title: 'YAML Toolbar',
+      fontSize: '18px',
+      buttons: {
+        copy: false,
+      },
+    })
+    expect(extractFrontmatter(extractDecodedCode(output))).toEqual({
+      title: 'Inline Title',
+      displayMode: 'compact',
+      toolbar: {
+        title: 'YAML Toolbar',
+        fontSize: '18px',
+        buttons: {
+          copy: false,
+        },
+      },
+      config: {
+        theme: 'forest',
+        flowchart: {
+          htmlLabels: false,
+        },
+      },
+    })
+  })
+
   it('moves frontmatter above mermaid directives before rendering', () => {
     const body = [
       '```mermaid {title="Mermaid 2" toolbar=\'{"title":"Inline","fontSize":"16px"}\' config=\'{"theme":"dark"}\'}',
