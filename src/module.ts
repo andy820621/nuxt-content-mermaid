@@ -272,11 +272,3 @@ export {}
     })
   },
 })
-
-export function transformMermaidCodeBlocks(
-  body: string,
-  _componentName: string,
-  _frontmatterConfigKey?: string,
-) {
-  return transformMarkdownDiagrams(body)
-}
