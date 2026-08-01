@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
+import { parseMarkdown } from '@nuxtjs/mdc/runtime'
+import type { MDCElement } from '@nuxtjs/mdc'
 import { transformMarkdownDiagrams } from '../src/markdown-diagram-transform'
 
 describe('transformMarkdownDiagrams', () => {
@@ -13,11 +15,16 @@ describe('transformMarkdownDiagrams', () => {
     return readFileSync(url, 'utf-8')
   }
 
-  const extractJsonProp = (output: string, prop: string) => {
-    const escaped = prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const match = output.match(new RegExp(`${escaped}='([^']+)'`))
-    if (!match) return null
-    return JSON.parse(match[1] || '{}') as Record<string, unknown>
+  const extractToolbarProp = async (output: string) => {
+    const parsed = await parseMarkdown(output, { highlight: false })
+    const component = parsed.body.children.find(
+      (node): node is MDCElement => node.type === 'element' && node.tag.toLowerCase() === 'mermaid',
+    )
+    const toolbar = component?.props?.[':toolbar']
+
+    return typeof toolbar === 'string'
+      ? JSON.parse(toolbar) as Record<string, unknown>
+      : null
   }
 
   const extractDecodedCode = (output: string) => {
@@ -153,7 +160,7 @@ describe('transformMarkdownDiagrams', () => {
     expect(output).toContain('<Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
   })
 
-  it('extracts toolbar props from mermaid YAML frontmatter', () => {
+  it('extracts toolbar props from mermaid YAML frontmatter', async () => {
     const body = [
       '```mermaid',
       '---',
@@ -168,13 +175,13 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(extractJsonProp(output, ':toolbar')).toEqual({
+    expect(await extractToolbarProp(output)).toEqual({
       title: 'Mermaid 1',
       fontSize: '24px',
     })
   })
 
-  it('keeps fullscreenToolbarScale from YAML toolbar config', () => {
+  it('keeps fullscreenToolbarScale from YAML toolbar config', async () => {
     const body = [
       '```mermaid',
       '---',
@@ -189,13 +196,13 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(extractJsonProp(output, ':toolbar')).toEqual({
+    expect(await extractToolbarProp(output)).toEqual({
       title: 'Mermaid 2',
       fullscreenToolbarScale: 1.5,
     })
   })
 
-  it('falls back to raw code when mermaid YAML frontmatter is invalid', () => {
+  it('falls back to raw code when mermaid YAML frontmatter is invalid', async () => {
     const body = [
       '```mermaid',
       '---',
@@ -217,10 +224,10 @@ describe('transformMarkdownDiagrams', () => {
       'graph TD',
       '  A --> B',
     ].join('\n'))
-    expect(output).not.toContain(':toolbar=')
+    expect(await extractToolbarProp(output)).toBeNull()
   })
 
-  it('does not map YAML title to toolbar title', () => {
+  it('does not map YAML title to toolbar title', async () => {
     const body = [
       '```mermaid',
       '---',
@@ -236,10 +243,10 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(output).not.toContain(':toolbar=')
+    expect(await extractToolbarProp(output)).toBeNull()
   })
 
-  it('ignores unsafe inline attrs like __proto__ in toolbar overrides', () => {
+  it('ignores unsafe inline attrs like __proto__ in toolbar overrides', async () => {
     const body = [
       '```mermaid {toolbar.__proto__="polluted" toolbar.title="Safe Title"}',
       'graph TD',
@@ -249,13 +256,13 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(extractJsonProp(output, ':toolbar')).toEqual({
+    expect(await extractToolbarProp(output)).toEqual({
       title: 'Safe Title',
     })
     expect(({} as { polluted?: unknown }).polluted).toBeUndefined()
   })
 
-  it('preserves numeric string fontSize in toolbar overrides', () => {
+  it('preserves numeric string fontSize in toolbar overrides', async () => {
     const body = [
       '```mermaid {toolbar.fontSize="16"}',
       'graph TD',
@@ -265,12 +272,12 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(extractJsonProp(output, ':toolbar')).toEqual({
+    expect(await extractToolbarProp(output)).toEqual({
       fontSize: '16',
     })
   })
 
-  it('merges YAML and inline props before passing to Mermaid', () => {
+  it('merges YAML and inline props before passing to Mermaid', async () => {
     const body = [
       '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="24px" config=\'{"theme":"forest","flowchart":{"curve":"step"}}\'}',
       '---',
@@ -291,7 +298,7 @@ describe('transformMarkdownDiagrams', () => {
 
     const output = transformMarkdownDiagrams(body)
 
-    expect(extractJsonProp(output, ':toolbar')).toEqual({
+    expect(await extractToolbarProp(output)).toEqual({
       title: 'YAML Toolbar',
       fontSize: '24px',
     })
@@ -314,7 +321,7 @@ describe('transformMarkdownDiagrams', () => {
     })
   })
 
-  it('preserves metadata precedence while filtering unsafe inline paths', () => {
+  it('preserves metadata precedence while filtering unsafe inline paths', async () => {
     const body = [
       '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="18px" toolbar.constructor.polluted=true config=\'{"theme":"forest"}\'}',
       '---',
@@ -336,7 +343,7 @@ describe('transformMarkdownDiagrams', () => {
 
     const output = transformMarkdownDiagrams(body)
 
-    expect(extractJsonProp(output, ':toolbar')).toEqual({
+    expect(await extractToolbarProp(output)).toEqual({
       title: 'YAML Toolbar',
       fontSize: '18px',
       buttons: {

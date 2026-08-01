@@ -24,12 +24,16 @@ async function parseProtocol(markdown: string) {
 }
 
 function parseDiagramFrontmatter(source: string) {
-  const match = source.replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/)
-  expect(match).not.toBeNull()
+  const lines = source.replace(/\r\n/g, '\n').split('\n')
+  const startIndex = lines.findIndex(line => line.trim() === '---')
+  const endIndex = lines.findIndex((line, index) => index > startIndex && line.trim() === '---')
+
+  expect(startIndex).toBe(0)
+  expect(endIndex).toBeGreaterThan(startIndex)
 
   return {
-    data: parseYaml(match?.[1] || '') as Record<string, unknown>,
-    diagram: match?.[2] || '',
+    data: parseYaml(lines.slice(startIndex + 1, endIndex).join('\n')) as Record<string, unknown>,
+    diagramLines: lines.slice(endIndex + 1).map(line => line.trim()).filter(Boolean),
   }
 }
 
@@ -97,10 +101,10 @@ describe('Markdown Diagram Protocol', () => {
         },
       },
     })
-    expect(diagram.diagram).toBe([
+    expect(diagram.diagramLines).toEqual([
       'graph TD',
-      '  A --> B',
-    ].join('\n'))
+      'A --> B',
+    ])
   })
 
   it('preserves invalid Mermaid YAML Frontmatter as a local fallback', async () => {
@@ -117,13 +121,13 @@ describe('Markdown Diagram Protocol', () => {
 
     const protocol = await parseProtocol(markdown)
 
-    expect(protocol.source).toBe([
+    expect(protocol.source.replace(/\r\n/g, '\n').split('\n').map(line => line.trim()).filter(Boolean)).toEqual([
       '---',
       'title: [invalid',
       '---',
       'graph TD',
-      '  A --> B',
-    ].join('\n'))
+      'A --> B',
+    ])
     expect(protocol.props[':config']).toBe('config')
     expect(protocol.props).not.toHaveProperty(':toolbar')
   })

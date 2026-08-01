@@ -12,7 +12,7 @@ import { isNonEmptyRecord } from './runtime/utils/is'
 const MERMAID_COMPONENT_NAME = 'Mermaid'
 const PAGE_MERMAID_CONFIG_BINDING = 'config'
 
-function stringifyInlineValue(value: Record<string, unknown>) {
+function serializeInlineAttributeRecord(value: Record<string, unknown>) {
   return JSON.stringify(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -85,7 +85,7 @@ export function transformMarkdownDiagrams(body: string) {
     ]
 
     if (toolbar && isNonEmptyRecord(toolbar)) {
-      attrs.push(`:toolbar='${stringifyInlineValue(toolbar)}'`)
+      attrs.push(`:toolbar='${serializeInlineAttributeRecord(toolbar)}'`)
     }
 
     attrs.push(`code="${encoded}"`)
