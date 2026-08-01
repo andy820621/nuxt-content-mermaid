@@ -16,7 +16,8 @@ import type { Component, ComputedRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { ModuleOptions } from '../../module'
 import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
-import { enqueueRender, parseSizeToPx, isRecord } from '../utils'
+import { createMermaidRenderer } from '../mermaid-rendering'
+import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
 import { useMermaidExpand } from '../composables/useMermaidExpand'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
@@ -236,6 +237,8 @@ const configuredSpinnerName = computed(() => componentOptions.spinner?.trim() ||
 const customSpinner = shallowRef<Component | null>(null)
 const configuredMermaidImplName = computed(() => componentOptions.renderer?.trim() || '')
 const customMermaidImpl = shallowRef<Component | null>(null)
+// Keep Built-in setup paused until async Custom Renderer resolution decides who owns rendering.
+const isCustomMermaidResolutionPending = ref(!!configuredMermaidImplName.value)
 const configuredErrorName = computed(() => componentOptions.error?.trim() || '')
 const errorComponent = shallowRef<Component | null>(null)
 const spinnerComponent = computed<Component | string>(() => customSpinner.value || Spinner)
@@ -405,6 +408,29 @@ const {
   },
 })
 
+let requestBuiltInRender: ReturnType<typeof createMermaidRenderer> | undefined
+
+function getBuiltInRenderRequest() {
+  requestBuiltInRender ??= createMermaidRenderer({
+    loadMermaid: $mermaid,
+    readRenderData: () => ({
+      source: mermaidDefinition.value,
+      config: effectiveMermaidInit.value,
+      target: mermaidContainer.value,
+    }),
+    prepare: () => {
+      if (import.meta.client && isExpandActive.value)
+        resetExpand()
+
+      hasError.value = false
+      errorContent.value = null
+    },
+    debug,
+  })
+
+  return requestBuiltInRender
+}
+
 const showExpandToolbarButton = computed(() => {
   if (!expandEnabled) return false
   if (toolbarButtons.value.expand === false) return false
@@ -467,27 +493,41 @@ if (import.meta.client && isEnabled) {
     nameRef: ComputedRef<string>,
     targetRef: { value: Component | null },
     label: 'spinner' | 'mermaid' | 'error',
+    onResolved?: (component: Component | null) => void,
   ) {
     watch(
       nameRef,
       async (name) => {
         if (!name) {
           targetRef.value = null
+          onResolved?.(null)
           return
         }
 
-        targetRef.value = await resolveAppComponent(
+        const component = await resolveAppComponent(
           name,
           appComponents,
           label,
         )
+        targetRef.value = component
+        onResolved?.(component)
       },
       { immediate: true },
     )
   }
 
   watchCustomAppComponent(configuredSpinnerName, customSpinner, 'spinner')
-  watchCustomAppComponent(configuredMermaidImplName, customMermaidImpl, 'mermaid')
+  watchCustomAppComponent(
+    configuredMermaidImplName,
+    customMermaidImpl,
+    'mermaid',
+    (component) => {
+      isCustomMermaidResolutionPending.value = false
+      // A configured name that cannot resolve falls back to Built-in setup after refs settle.
+      if (!component && configuredMermaidImplName.value)
+        nextTick(() => setupMermaidContainer())
+    },
+  )
   watchCustomAppComponent(configuredErrorName, errorComponent, 'error')
 }
 
@@ -549,65 +589,25 @@ function getMermaidSvg(): SVGSVGElement | null {
 }
 
 async function renderMermaid() {
-  if (!mermaidContainer.value || !mermaidDefinition.value) return
-
-  // Show spinner while waiting in queue
   isLoading.value = true
 
-  const performRender = async () => {
-    // Check if component is still mounted
-    if (!mermaidContainer.value) return
+  const outcome = await getBuiltInRenderRequest()()
 
-    if (import.meta.client && isExpandActive.value) {
-      resetExpand()
-    }
-
-    hasError.value = false
-    errorContent.value = null
-
-    const startTime = performance.now()
-
-    try {
-      const mermaid = await $mermaid()
-      // Re-initialize with current config (theme changes, frontmatter overrides, etc.)
-      mermaid.initialize(effectiveMermaidInit.value)
-      mermaidContainer.value.removeAttribute('data-processed')
-      mermaidContainer.value.textContent = mermaidDefinition.value
-      await nextTick()
-
-      await mermaid.run({
-        nodes: [mermaidContainer.value],
-        suppressErrors: !debug,
-      })
-
-      hasRenderedOnce.value = true
-
-      const svg = getMermaidSvg()
-      if (svg) ensureViewBox(svg)
-
-      if (debug) {
-        const endTime = performance.now()
-        console.log(`[nuxt-content-mermaid] ⏱️  Rendered in ${(endTime - startTime).toFixed(2)}ms`)
-      }
-    }
-    catch (error) {
-      console.error('[nuxt-content-mermaid]', error)
-      hasError.value = true
-      errorContent.value = error
-
-      if (mermaidContainer.value)
-        mermaidContainer.value.innerHTML = ''
-    }
-    finally {
-      isLoading.value = false
-    }
+  if (outcome.status === 'success') {
+    hasRenderedOnce.value = true
+  }
+  else if (outcome.status === 'failure') {
+    console.error('[nuxt-content-mermaid]', outcome.error)
+    hasError.value = true
+    errorContent.value = outcome.error
   }
 
-  // Chain the render request
-  await enqueueRender(performRender, debug)
+  isLoading.value = false
 }
 
 function setupMermaidContainer() {
+  if (isCustomMermaidResolutionPending.value || customMermaidImpl.value) return
+
   const container = mermaidContainer.value
   if (!container) return
 
@@ -715,20 +715,6 @@ watch(decodedCode, (newCode) => {
   mermaidDefinition.value = newCode
   if (hasRenderedOnce.value) renderMermaid()
 })
-
-function ensureViewBox(svg: SVGSVGElement) {
-  if (svg.hasAttribute('viewBox'))
-    return
-
-  try {
-    const bbox = (svg as SVGGraphicsElement).getBBox()
-    if (bbox.width > 0 && bbox.height > 0)
-      svg.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`)
-  }
-  catch {
-    // Ignore if BBox cannot be calculated
-  }
-}
 
 // Dynamic Cursor Generation
 const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)

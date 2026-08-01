@@ -27,6 +27,12 @@ export interface MermaidRendererDependencies {
 export function createMermaidRenderer(
   dependencies: MermaidRendererDependencies,
 ): () => Promise<MermaidRenderOutcome> {
+  if (dependencies.debug) {
+    console.log(MERMAID_LOG_PREFIX, {
+      event: 'renderer:create',
+    })
+  }
+
   return () => {
     queueSize++
     if (dependencies.debug) {

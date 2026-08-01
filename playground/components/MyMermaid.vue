@@ -2,7 +2,7 @@
 import { useNuxtApp } from '#app'
 import { ref, onMounted, nextTick, useTemplateRef } from 'vue'
 import type { Component } from 'vue'
-import { enqueueRender } from '../utils/renderQueue'
+import { serializeCustomMermaidRender } from '../utils/customMermaidRender'
 
 defineProps<{
   spinner?: Component | string
@@ -16,7 +16,7 @@ async function renderMermaid() {
   if (!mermaidContainer.value) return
   isLoading.value = true
 
-  const performRender = async () => {
+  await serializeCustomMermaidRender(async () => {
     if (!mermaidContainer.value) return
 
     try {
@@ -47,9 +47,7 @@ async function renderMermaid() {
     finally {
       isLoading.value = false
     }
-  }
-
-  await enqueueRender(performRender)
+  })
 }
 
 onMounted(() => {

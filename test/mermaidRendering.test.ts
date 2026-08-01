@@ -343,6 +343,7 @@ describe('createMermaidRenderer', () => {
     if (outcome.status === 'failure')
       expect(outcome.error).toBe(thrownValue)
     expect(diagnosticEvents).toEqual(expect.arrayContaining([
+      'renderer:create',
       'queue:enqueue',
       'queue:start',
       'attempt:duration',
