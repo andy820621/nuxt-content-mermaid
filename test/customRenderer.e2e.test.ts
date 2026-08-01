@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { setup, createPage, url } from '@nuxt/test-utils/e2e'
+import { installDiagnosticCapture, readDiagnosticEvents } from './helpers/diagnosticCapture'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/custom-renderer')
 
@@ -13,6 +14,7 @@ describe('custom renderer option', async () => {
 
   it('renders via custom renderer and uses custom spinner', { timeout: 20000 }, async () => {
     const page = await createPage()
+    await installDiagnosticCapture(page)
     await page.goto(url('/'))
 
     // Reset any previous run records (other fixtures may have set them)
@@ -33,5 +35,13 @@ describe('custom renderer option', async () => {
     // Custom renderer does not output built-in SVG from mermaid.run
     const svg = page.locator('#diagram-container svg')
     expect(await svg.count()).toBe(0)
+
+    const builtInRunCount = await page.evaluate(() => {
+      return (window as Window & { __builtInMermaidRunCount__?: number }).__builtInMermaidRunCount__ || 0
+    })
+    expect(builtInRunCount).toBe(0)
+
+    const diagnosticEvents = await readDiagnosticEvents(page)
+    expect(diagnosticEvents).not.toContain('renderer:create')
   })
 })

@@ -23,8 +23,8 @@ export default defineNuxtConfig({
       lazy: false,
     },
     components: {
-      renderer: 'TestRenderer',
       spinner: 'TestSpinner',
+      error: 'TestError',
     },
   },
 })
