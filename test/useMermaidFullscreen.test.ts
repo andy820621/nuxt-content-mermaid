@@ -237,10 +237,14 @@ describe('useMermaidFullscreen', () => {
         stopPropagation: vi.fn(),
       }
       const key = { key: 'ArrowDown', ctrlKey: false, metaKey: false, preventDefault: vi.fn() }
+      const space = { code: 'Space', repeat: false, preventDefault: vi.fn() }
       browser.windowTarget.dispatch('wheel', wheel)
       browser.documentTarget.dispatch('keydown', key)
+      browser.documentTarget.dispatch('keydown', space)
       expect(mounted.fullscreen.showZoomHint.value).toBe(false)
       expect(key.preventDefault).not.toHaveBeenCalled()
+      expect(space.preventDefault).not.toHaveBeenCalled()
+      expect(document.body.style.userSelect).toBe('text')
       await replacementEnd
     }
     else {

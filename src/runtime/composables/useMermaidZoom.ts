@@ -184,6 +184,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     })
 
     useEventListener(activeDocument, 'keydown', (e: KeyboardEvent) => {
+      if (!active.value) return
       if (e.code === 'Space') {
         if (e.repeat) return
         // Prevent default to stop scrolling when in modal
@@ -195,6 +196,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     })
 
     useEventListener(activeDocument, 'keyup', (e: KeyboardEvent) => {
+      if (!active.value) return
       if (e.code === 'Space') {
         e.preventDefault()
         isSpacePressed.value = false
@@ -205,14 +207,17 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
 
     // Global pointer up to catch releases outside the overlay
     useEventListener(activeWindow, 'pointerup', () => {
+      if (!active.value) return
       endInteraction()
     })
 
     useEventListener(activeWindow, 'pointercancel', () => {
+      if (!active.value) return
       endInteraction()
     })
 
     useEventListener(activeWindow, 'blur', () => {
+      if (!active.value) return
       if (isSpacePressed.value) {
         isSpacePressed.value = false
         unlockUserSelect()
@@ -224,6 +229,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   // --- Event Handlers ---
 
   function handleWheel(event: WheelEvent): boolean {
+    if (!active.value) return false
     // Only Zoom if Ctrl/Meta is pressed
     if (!event.ctrlKey && !event.metaKey) return false
 
@@ -253,6 +259,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   }
 
   function handleDragStart(event: MouseEvent | TouchEvent) {
+    if (!active.value) return
     const isTouch = 'touches' in event
 
     // Reset interaction state at the start of any potential gesture
@@ -294,6 +301,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   }
 
   function handleDragMove(event: MouseEvent | TouchEvent) {
+    if (!active.value) return
     if (!isPointerDown.value) return
 
     const isTouch = 'touches' in event
@@ -348,6 +356,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   }
 
   function handleDragEnd() {
+    if (!active.value) return
     isPointerDown.value = false
     lastPinchDist = -1
 
