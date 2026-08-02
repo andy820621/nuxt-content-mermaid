@@ -662,7 +662,6 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     resetZoom: zoom.reset,
     cursor: computed(() => zoom.cursor.value),
     isDragging: computed(() => zoom.isDragging.value),
-    isSpacePressed: computed(() => zoom.isSpacePressed.value),
     scale: computed(() => zoom.scale.value),
     isOverlayClosable: computed(() => allowOverlayClose && !zoom.isSpacePressed.value),
     showZoomHint,

@@ -144,9 +144,34 @@ describe('built-in renderer integration', async () => {
     await page.locator('#primary [aria-label="Expand diagram"]').click()
     await page.locator('.ncm-expand-modal').waitFor({ state: 'visible', timeout: 5000 })
 
+    const activeInteraction = await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true }))
+      const modal = document.querySelector('.ncm-expand-modal')
+      modal?.dispatchEvent(new MouseEvent('mousedown', { clientX: 10, clientY: 10, bubbles: true, cancelable: true }))
+      const target = document.querySelector('.ncm-expand-target')
+      target?.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }))
+      return document.body.style.userSelect
+    })
+    expect(activeInteraction).toBe('none')
+    await page.locator('.ncm-zoom-hint').waitFor({ state: 'visible', timeout: 2000 })
+
     await releaseNext(page)
     await waitForRuns(page, 5)
     await page.locator('.ncm-expand-modal').waitFor({ state: 'detached', timeout: 5000 })
+    expect(await page.locator('.ncm-zoom-hint, .ncm-expand-target svg').count()).toBe(0)
+    expect(await page.evaluate(() => {
+      const wheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+      const key = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+      window.dispatchEvent(wheel)
+      document.dispatchEvent(key)
+      return {
+        wheel: wheel.defaultPrevented,
+        key: key.defaultPrevented,
+        overflow: document.body.style.overflow,
+        width: document.body.style.width,
+        userSelect: document.body.style.userSelect,
+      }
+    })).toEqual({ wheel: false, key: false, overflow: '', width: '', userSelect: '' })
     await releaseNext(page)
     await page.locator('#primary svg[data-run-id="5"]').waitFor({ state: 'visible', timeout: 5000 })
   })
