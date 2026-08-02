@@ -82,4 +82,52 @@ describe('module configuration resolver', () => {
     result.runtimeOptions.toolbar!.title = 'package-owned result'
     expect(overrides.toolbar.title).toBe('application input')
   })
+
+  it('replaces Mermaid-owned arrays and falsy values without backfilling null or zero', () => {
+    const result = resolveModuleConfiguration({
+      nuxtResolvedOptions: {
+        loader: {
+          init: {
+            unknownMermaidExtension: {
+              values: ['Nuxt option'],
+              nullable: 'Nuxt option',
+              count: 1,
+              enabled: true,
+            },
+          },
+        },
+      },
+      runtimeOverrides: {
+        loader: {
+          init: {
+            unknownMermaidExtension: {
+              values: [],
+              nullable: null,
+              count: 0,
+              enabled: false,
+            },
+          },
+        },
+      },
+    })
+
+    expect(result.runtimeOptions.loader?.init).toMatchObject({
+      unknownMermaidExtension: {
+        values: [],
+        nullable: null,
+        count: 0,
+        enabled: false,
+      },
+    })
+  })
+
+  it('rejects a non-boolean activation value', () => {
+    expect(() => resolveModuleConfiguration({
+      nuxtResolvedOptions: { enabled: 'false' },
+      runtimeOverrides: {},
+    })).toThrowError(expect.objectContaining({
+      name: 'ContentMermaidConfigurationError',
+      code: 'CONTENT_MERMAID_CONFIGURATION_ERROR',
+    }))
+  })
 })

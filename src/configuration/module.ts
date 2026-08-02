@@ -7,13 +7,10 @@ import {
   type ConfigurationValidationPhase,
 } from './core'
 import {
-  DEFAULT_DARK_THEME,
   DEFAULT_EXPAND_OPTIONS,
-  DEFAULT_LIGHT_THEME,
-  DEFAULT_MERMAID_CONFIG,
-  DEFAULT_TOOLBAR_OPTIONS,
+  DEFAULT_RUNTIME_OPTIONS,
 } from '../runtime/constants'
-import type { JsonObject, JsonValue, RuntimeMermaidConfig, RuntimeOptions } from '../types/config'
+import type { JsonObject, JsonValue, RuntimeOptions } from '../types/config'
 
 export interface ModuleConfigurationInput {
   readonly nuxtResolvedOptions: unknown
@@ -25,24 +22,7 @@ export interface ResolvedModuleConfiguration {
   readonly runtimeOptions: RuntimeOptions
 }
 
-const PACKAGE_RUNTIME_DEFAULTS = {
-  loader: {
-    init: DEFAULT_MERMAID_CONFIG as RuntimeMermaidConfig,
-    lazy: true,
-  },
-  theme: {
-    light: DEFAULT_LIGHT_THEME,
-    dark: DEFAULT_DARK_THEME,
-  },
-  components: {},
-  expand: DEFAULT_EXPAND_OPTIONS,
-  toolbar: DEFAULT_TOOLBAR_OPTIONS,
-} satisfies RuntimeOptions
-
-const PACKAGE_MODULE_DEFAULTS = {
-  enabled: true,
-  ...PACKAGE_RUNTIME_DEFAULTS,
-}
+const DEFAULT_MODULE_ACTIVATION = true
 
 const NUXT_OPTIONS_PHASE = {
   name: 'Nuxt-Resolved Module Options',
@@ -270,7 +250,7 @@ function runtimeLayerWithoutActivation(value: JsonObject): JsonObject {
 
 function resolveModuleActivation(nuxtResolvedOptions: JsonObject): boolean {
   const enabled = descriptorValue(nuxtResolvedOptions, 'enabled')
-  return enabled === undefined ? PACKAGE_MODULE_DEFAULTS.enabled : enabled as boolean
+  return enabled === undefined ? DEFAULT_MODULE_ACTIVATION : enabled as boolean
 }
 
 function resolveExpandOptions(layers: readonly JsonObject[]): JsonObject {
@@ -299,7 +279,7 @@ function resolveRuntimeTransport(
   runtimeOverrides: JsonObject,
 ): RuntimeOptions {
   const runtimeOptions = mergeByPresence([
-    PACKAGE_RUNTIME_DEFAULTS,
+    DEFAULT_RUNTIME_OPTIONS,
     runtimeLayerWithoutActivation(nuxtResolvedOptions),
     runtimeOverrides,
   ])

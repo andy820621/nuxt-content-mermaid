@@ -154,6 +154,25 @@ describe('module setup', () => {
     expect(Object.keys(hooks)).toHaveLength(0)
   })
 
+  it('rejects a non-enumerable canonical runtime override before integration is installed', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
+
+    Object.defineProperty(nuxt.options.runtimeConfig.public, 'contentMermaid', {
+      enumerable: false,
+      value: { debug: true },
+    })
+
+    expect(() => moduleDef.setup?.({}, nuxt)).toThrowError(expect.objectContaining({
+      name: 'ContentMermaidConfigurationError',
+      code: 'CONTENT_MERMAID_CONFIGURATION_ERROR',
+    }))
+    expect(nuxt.options.css).toBeUndefined()
+    expect(addPlugin).not.toHaveBeenCalled()
+    expect(Object.keys(hooks)).toHaveLength(0)
+  })
+
   it('registers module hooks', async () => {
     const mod = await import('../src/module')
     const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }

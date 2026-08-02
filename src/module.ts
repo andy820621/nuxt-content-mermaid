@@ -76,6 +76,13 @@ function readRuntimeOverrides(publicRuntimeConfig: object): unknown {
       'accessor',
     )
   }
+  if (!descriptor.enumerable) {
+    throwMigrationError(
+      ['runtimeConfig', 'public', 'contentMermaid'],
+      'an enumerable data property',
+      'non-enumerable-property',
+    )
+  }
   return descriptor.value
 }
 
