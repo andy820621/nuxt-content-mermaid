@@ -1,6 +1,6 @@
 import { defineNuxtPlugin, useRuntimeConfig } from '#app'
 import type { Mermaid, MermaidConfig } from 'mermaid'
-import type { ModuleOptions } from '../../module'
+import type { RuntimeOptions } from '../../types/config'
 import { DEFAULT_MERMAID_CONFIG } from '../constants'
 
 declare global {
@@ -13,21 +13,7 @@ const globalWithLoader = globalThis as typeof globalThis & {
 
 export default defineNuxtPlugin(() => {
   const runtimeConfig = useRuntimeConfig()
-  const mermaidConfig = (runtimeConfig.public?.contentMermaid
-    ?? runtimeConfig.public?.mermaidContent
-    ?? {}) as ModuleOptions
-
-  if (mermaidConfig?.enabled === false) {
-    return {
-      provide: {
-        mermaid: async () => {
-          throw new Error(
-            '[nuxt-content-mermaid] Mermaid is disabled via config.',
-          )
-        },
-      },
-    }
-  }
+  const mermaidConfig = (runtimeConfig.public?.contentMermaid ?? {}) as RuntimeOptions
 
   const loadMermaid = async (): Promise<Mermaid> => {
     if (globalWithLoader.__nuxtMermaidLoader__)
