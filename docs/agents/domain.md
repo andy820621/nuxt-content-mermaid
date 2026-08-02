@@ -13,3 +13,9 @@ Use the canonical terms defined in `CONTEXT.md` in issues, specs, refactor propo
 ## ADRs
 
 Respect relevant ADRs. If proposed work contradicts one, surface the conflict explicitly instead of silently overriding it.
+
+## Specifications
+
+Use `docs/specs/` for durable, integrated architecture and product contracts that span multiple ADRs. Specifications describe the accepted system boundary and verification scope; ADRs remain the source of individual decisions and rationale.
+
+Execution plans, blocking edges, and implementation progress belong in the configured issue tracker. Do not add workflow-specific plan directories or task checklists to the permanent documentation tree.
