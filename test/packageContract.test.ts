@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('package root runtime contract', () => {
@@ -7,13 +6,5 @@ describe('package root runtime contract', () => {
 
     expect(packageModule.default).toBeDefined()
     expect('transformMermaidCodeBlocks' in packageModule).toBe(false)
-  })
-
-  it('publishes the v3 configuration type contract', () => {
-    const declaration = readFileSync(new URL('../dist/module.d.mts', import.meta.url), 'utf8')
-
-    expect(declaration).toContain('interface RuntimeOptions')
-    expect(declaration).toContain('pageConfig')
-    expect(declaration).not.toContain('mermaidContent')
   })
 })

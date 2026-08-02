@@ -1,10 +1,15 @@
-import type { NuxtConfig } from '@nuxt/schema'
+import type { NuxtConfig, PublicRuntimeConfig } from '@nuxt/schema'
 import type {
   MermaidComponentProps,
   ModuleOptions,
   RuntimeMermaidConfig,
   RuntimeOptions,
 } from '@barzhsieh/nuxt-content-mermaid'
+
+type IsUnknown<T> = unknown extends T
+  ? keyof T extends never ? true : false
+  : false
+type Expect<T extends true> = T
 
 const runtimeConfig = {
   debug: true,
@@ -20,6 +25,10 @@ const moduleConfig = {
   enabled: false,
   ...runtimeConfig,
 } satisfies ModuleOptions
+
+const publicRuntimeConfig = {
+  contentMermaid: runtimeConfig,
+} satisfies PublicRuntimeConfig
 
 const pageProps = {
   pageConfig: { theme: 'forest' },
@@ -55,12 +64,21 @@ const invalidPageProps: MermaidComponentProps = { pageConfig: { sequence: { acto
 const invalidComponentProps: MermaidComponentProps = { pageConfig: {}, config: {} }
 
 declare const nuxtConfig: NuxtConfig
+declare const resolvedPublicRuntimeConfig: PublicRuntimeConfig
 
 // @ts-expect-error 3.0 removes the legacy Nuxt configuration alias
 void nuxtConfig.mermaidContent
 
+// @ts-expect-error module activation is absent from public runtime configuration
+void resolvedPublicRuntimeConfig.contentMermaid?.enabled
+
+type LegacyPublicRuntimeAliasIsUnclaimed = Expect<
+  IsUnknown<PublicRuntimeConfig['mermaidContent']>
+>
+
 void [
   moduleConfig,
+  publicRuntimeConfig,
   pageProps,
   directProps,
   invalidRuntimeFunction,
@@ -72,3 +90,5 @@ void [
   invalidPageProps,
   invalidComponentProps,
 ]
+
+export type { LegacyPublicRuntimeAliasIsUnclaimed }

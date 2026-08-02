@@ -58,6 +58,7 @@
     "release": "pnpm run release:patch",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:package-contract": "pnpm prepack && vue-tsc -p test/package-contract/tsconfig.json --noEmit",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit"
   },
