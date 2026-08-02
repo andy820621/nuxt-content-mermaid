@@ -19,12 +19,8 @@ const mermaidStub = {
   initialize: (config: Record<string, unknown>) => {
     calls.push(config)
   },
-  run: async ({ nodes }: { nodes?: HTMLElement[] } = {}) => {
+  render: async (_renderId: string, source: string) => {
     await new Promise(resolve => setTimeout(resolve, 200))
-    const container = nodes?.[0]
-    if (!container) return
-
-    const source = container.textContent || ''
     const shouldThrow = source.includes('__FORCE_ERROR__')
       || ((globalThis as GlobalMermaidStub).__forceMermaidError === true)
     runs.push({ source, threw: shouldThrow })
@@ -33,7 +29,10 @@ const mermaidStub = {
       throw new Error('Broken diagram')
     }
 
-    container.innerHTML = '<svg id="mock-svg"></svg>'
+    return {
+      diagramType: 'flowchart',
+      svg: '<svg id="mock-svg"></svg>',
+    }
   },
 }
 

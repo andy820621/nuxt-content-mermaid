@@ -13,7 +13,7 @@ type BrowserPage = Awaited<ReturnType<typeof createPage>>
 async function waitForPending(page: BrowserPage, expected: number) {
   await page.waitForFunction((count: number) => {
     return (window as MermaidTestWindow).__mermaidControl__?.pending === count
-  }, expected)
+  }, expected, { timeout: 5000 })
 }
 
 async function releaseNext(page: BrowserPage) {
@@ -25,7 +25,7 @@ async function releaseNext(page: BrowserPage) {
 async function waitForRuns(page: BrowserPage, expected: number) {
   await page.waitForFunction((count: number) => {
     return (window as MermaidTestWindow).__mermaidControl__?.runs.length === count
-  }, expected)
+  }, expected, { timeout: 5000 })
 }
 
 async function waitForDiagnosticCount(page: BrowserPage, event: string, expected: number) {
@@ -35,7 +35,29 @@ async function waitForDiagnosticCount(page: BrowserPage, event: string, expected
       return events.filter(value => value === eventName).length >= count
     },
     { eventName: event, count: expected },
+    { timeout: 5000 },
   )
+}
+
+async function installFullscreenStub(page: BrowserPage) {
+  await page.addInitScript(() => {
+    const defineWritable = (target: object, key: string, value: unknown) => {
+      Object.defineProperty(target, key, { value, writable: true, configurable: true })
+    }
+
+    defineWritable(document, 'fullScreen', false)
+    defineWritable(document, 'fullscreenElement', null)
+    defineWritable(document, 'exitFullscreen', async () => {
+      ;(document as { fullScreen?: boolean }).fullScreen = false
+      ;(document as { fullscreenElement?: Element | null }).fullscreenElement = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    defineWritable(HTMLElement.prototype, 'requestFullscreen', async function (this: HTMLElement) {
+      ;(document as { fullScreen?: boolean }).fullScreen = true
+      ;(document as { fullscreenElement?: Element | null }).fullscreenElement = this
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+  })
 }
 
 async function renderInitialDiagram(page: BrowserPage) {
@@ -68,8 +90,9 @@ describe('built-in renderer integration', async () => {
     ]))
   })
 
-  it('keeps an existing error while recovery waits and clears it at attempt start', { timeout: 20000 }, async () => {
+  it('preserves the Committed Diagram through failure and pending recovery', { timeout: 20000 }, async () => {
     const page = await createPage()
+    await installDiagnosticCapture(page)
     await renderInitialDiagram(page)
 
     await page.locator('#primary-fail').click()
@@ -80,17 +103,21 @@ describe('built-in renderer integration', async () => {
     await error.waitFor({ state: 'visible', timeout: 5000 })
     expect(await error.getAttribute('data-same-error')).toBe('true')
     expect(await page.getByTestId('built-in-error-message').textContent()).toBe('Broken diagram')
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
 
-    await page.locator('#blocker-mount').click()
-    await waitForRuns(page, 3)
     await page.locator('#primary-recover').click()
-    expect(await error.isVisible()).toBe(true)
+    await waitForRuns(page, 3)
+    await page.locator('#primary-queue').click()
+    await waitForDiagnosticCount(page, 'queue:enqueue', 4)
 
     await releaseNext(page)
     await waitForRuns(page, 4)
-    await error.waitFor({ state: 'detached', timeout: 5000 })
     await waitForPending(page, 1)
+    expect(await error.isVisible()).toBe(true)
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
+
     await releaseNext(page)
+    await error.waitFor({ state: 'detached', timeout: 5000 })
     await page.locator('#primary svg[data-run-id="4"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
@@ -120,59 +147,120 @@ describe('built-in renderer integration', async () => {
     expect(await page.locator('#skipped [data-testid="built-in-error"]').count()).toBe(0)
   })
 
-  it('preserves first-completion-wins loading with multiple pending requests', { timeout: 20000 }, async () => {
+  it('commits strict SVG and sandbox iframe output from cleaned staging hosts', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    await page.locator('#strict-mount').click()
+    await waitForRuns(page, 2)
+    await releaseNext(page)
+    await page.locator('#strict .mermaid > svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+
+    await page.locator('#sandbox-mount').click()
+    await waitForRuns(page, 3)
+    await releaseNext(page)
+    await page.locator('#sandbox .mermaid > iframe[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+
+    const staging = await page.evaluate(() => {
+      const control = (window as MermaidTestWindow).__mermaidControl__
+      return {
+        runs: control?.runs,
+        allRootsRemoved: control?.stagingRoots.every(root => !root.isConnected),
+      }
+    })
+
+    expect(staging.runs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 2,
+        securityLevel: 'strict',
+        stagingConnected: true,
+        stagingHidden: true,
+        stagingInert: true,
+        stagingOutsideLiveSubtree: true,
+      }),
+      expect.objectContaining({
+        id: 3,
+        securityLevel: 'sandbox',
+        stagingConnected: true,
+        stagingHidden: true,
+        stagingInert: true,
+        stagingOutsideLiveSubtree: true,
+      }),
+    ]))
+    expect(staging.allRootsRemoved).toBe(true)
+  })
+
+  it('keeps presentation state until only the latest generation commits', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installDiagnosticCapture(page)
     await renderInitialDiagram(page)
 
-    await page.locator('#blocker-mount').click()
-    await waitForRuns(page, 2)
-    await releaseNext(page)
-    await page.locator('#blocker svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
-
-    await page.locator('#primary-queue').click()
-    await waitForRuns(page, 3)
-    await page.locator('#blocker-update').click()
-    await page.locator('#primary-queue').click()
-    await waitForDiagnosticCount(page, 'queue:enqueue', 5)
-
-    await releaseNext(page)
-    await waitForRuns(page, 4)
-    await waitForPending(page, 1)
-    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())))
-
     await page.locator('#primary [aria-label="Expand diagram"]').click()
     await page.locator('.ncm-expand-modal').waitFor({ state: 'visible', timeout: 5000 })
 
-    const activeInteraction = await page.evaluate(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true }))
-      const modal = document.querySelector('.ncm-expand-modal')
-      modal?.dispatchEvent(new MouseEvent('mousedown', { clientX: 10, clientY: 10, bubbles: true, cancelable: true }))
-      const target = document.querySelector('.ncm-expand-target')
-      target?.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }))
-      return document.body.style.userSelect
-    })
-    expect(activeInteraction).toBe('none')
-    await page.locator('.ncm-zoom-hint').waitFor({ state: 'visible', timeout: 2000 })
+    await page.locator('#primary-queue').evaluate((button: HTMLButtonElement) => button.click())
+    await waitForRuns(page, 2)
+    await page.locator('#primary-queue').evaluate((button: HTMLButtonElement) => button.click())
+    await waitForDiagnosticCount(page, 'queue:enqueue', 3)
 
     await releaseNext(page)
-    await waitForRuns(page, 5)
-    await page.locator('.ncm-expand-modal').waitFor({ state: 'detached', timeout: 5000 })
-    expect(await page.locator('.ncm-zoom-hint, .ncm-expand-target svg').count()).toBe(0)
-    expect(await page.evaluate(() => {
-      const wheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
-      const key = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
-      window.dispatchEvent(wheel)
-      document.dispatchEvent(key)
-      return {
-        wheel: wheel.defaultPrevented,
-        key: key.defaultPrevented,
-        overflow: document.body.style.overflow,
-        width: document.body.style.width,
-        userSelect: document.body.style.userSelect,
-      }
-    })).toEqual({ wheel: false, key: false, overflow: '', width: '', userSelect: '' })
+    await waitForRuns(page, 3)
+    await waitForPending(page, 1)
+    await page.locator('.ncm-expand-modal').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
+
     await releaseNext(page)
-    await page.locator('#primary svg[data-run-id="5"]').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('.ncm-expand-modal').waitFor({ state: 'detached', timeout: 5000 })
+    await page.locator('#primary svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
+  it('keeps the latest loading gate while a stale attempt finishes', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installDiagnosticCapture(page)
+    await renderInitialDiagram(page)
+
+    await page.locator('#primary-queue').click()
+    await waitForRuns(page, 2)
+    await page.locator('#primary-queue').click()
+    await waitForDiagnosticCount(page, 'queue:enqueue', 3)
+
+    await releaseNext(page)
+    await waitForRuns(page, 3)
+    await waitForPending(page, 1)
+    await page.locator('#primary [aria-label="Expand diagram"]').click()
+    expect(await page.locator('.ncm-expand-modal').count()).toBe(0)
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
+
+    await releaseNext(page)
+    await page.locator('#primary svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('#primary [aria-label="Expand diagram"]').click()
+    await page.locator('.ncm-expand-modal').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
+  it('keeps fullscreen presentation until the latest generation commits', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installDiagnosticCapture(page)
+    await installFullscreenStub(page)
+    await renderInitialDiagram(page)
+
+    await page.locator('#primary [aria-label="Enter fullscreen"]').click()
+    await page.locator('#primary .ncm-zoom-toolbar--fullscreen').waitFor({ state: 'visible', timeout: 5000 })
+
+    await page.locator('#primary-queue').evaluate((button: HTMLButtonElement) => button.click())
+    await waitForRuns(page, 2)
+    await page.locator('#primary-queue').evaluate((button: HTMLButtonElement) => button.click())
+    await waitForDiagnosticCount(page, 'queue:enqueue', 3)
+
+    await releaseNext(page)
+    await waitForRuns(page, 3)
+    await waitForPending(page, 1)
+    await page.locator('#primary .ncm-zoom-toolbar--fullscreen').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
+
+    await releaseNext(page)
+    await page.locator('#primary .ncm-zoom-toolbar--fullscreen').waitFor({ state: 'detached', timeout: 5000 })
+    expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
+    await page.locator('#primary svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 })

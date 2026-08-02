@@ -12,15 +12,14 @@ if (typeof window !== 'undefined') {
 
 const mermaidStub = {
   initialize: () => {},
-  run: async ({ nodes }: { nodes?: HTMLElement[] } = {}) => {
-    const container = nodes?.[0]
-    if (!container) return
-
-    const source = container.textContent || ''
+  render: async (_renderId: string, source: string) => {
     runs.push({ source })
 
     const id = source.includes('SECONDARY') ? 'mock-svg-secondary' : 'mock-svg'
-    container.innerHTML = `<svg id="${id}" width="600" height="400"></svg>`
+    return {
+      diagramType: 'flowchart',
+      svg: `<svg id="${id}" width="600" height="400"></svg>`,
+    }
   },
 }
 

@@ -1,6 +1,19 @@
+import type { MermaidConfig } from 'mermaid'
+
+export interface MermaidRun {
+  source: string
+  id: number
+  securityLevel: MermaidConfig['securityLevel']
+  stagingConnected: boolean
+  stagingHidden: boolean
+  stagingInert: boolean
+  stagingOutsideLiveSubtree: boolean
+}
+
 export interface MermaidControl {
   pending: number
-  runs: Array<{ source: string, id: number }>
+  runs: MermaidRun[]
+  stagingRoots: HTMLElement[]
   lastError?: Error
   releaseNext: () => void
 }

@@ -273,7 +273,7 @@ function getBuiltInRenderRequest() {
       config: effectiveMermaidInit.value,
       target: mermaidContainer.value,
     }),
-    prepare: () => {
+    beforeCommit: () => {
       if (import.meta.client) {
         expandOverlay.value?.endForDiagramReplacement()
         void fullscreenPresentation.value?.endForDiagramReplacement()
@@ -450,6 +450,9 @@ async function renderMermaid() {
 
   const outcome = await getBuiltInRenderRequest()()
 
+  if (outcome.status === 'stale')
+    return
+
   if (outcome.status === 'success') {
     hasRenderedOnce.value = true
   }
@@ -549,6 +552,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  requestBuiltInRender?.invalidate()
   if (observer) observer.disconnect()
   if (copyResetTimer) clearTimeout(copyResetTimer)
 })

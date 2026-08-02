@@ -22,7 +22,10 @@ const mermaidStub = {
   initialize: (config: MermaidInitConfig) => {
     calls.push(config)
   },
-  run: async () => {},
+  render: async () => ({
+    diagramType: 'flowchart',
+    svg: '<svg width="600" height="400"></svg>',
+  }),
 }
 
 export default mermaidStub
