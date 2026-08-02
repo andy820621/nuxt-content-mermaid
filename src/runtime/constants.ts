@@ -5,6 +5,7 @@ import type { ExpandOptions } from './types/expand'
 export const MERMAID_LOG_PREFIX = '[nuxt-content-mermaid]'
 export const DEFAULT_LIGHT_THEME: MermaidConfig['theme'] = 'default'
 export const DEFAULT_DARK_THEME: MermaidConfig['theme'] = 'dark'
+export const FULLSCREEN_ZOOM_HINT_DURATION_MS = 3000
 export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
   startOnLoad: false,
   theme: 'default',
