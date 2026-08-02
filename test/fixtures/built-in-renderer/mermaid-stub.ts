@@ -2,11 +2,13 @@ import type { MermaidConfig } from 'mermaid'
 import type { MermaidControl, MermaidTestWindow } from './types'
 
 const pendingResolvers: Array<() => void> = []
+const initializedConfigs = new WeakSet<object>()
 let currentSecurityLevel: MermaidConfig['securityLevel']
 const control: MermaidControl = {
   pending: 0,
   runs: [],
   stagingRoots: [],
+  reusedInitializationConfig: false,
   releaseNext() {
     pendingResolvers.shift()?.()
   },
@@ -17,6 +19,9 @@ if (typeof window !== 'undefined')
 
 const mermaidStub = {
   initialize: (config: MermaidConfig) => {
+    if (initializedConfigs.has(config))
+      control.reusedInitializationConfig = true
+    initializedConfigs.add(config)
     currentSecurityLevel = config.securityLevel
   },
   render: async (_renderId: string, source: string, stagingTarget?: Element) => {

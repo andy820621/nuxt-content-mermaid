@@ -9,8 +9,11 @@ import {
 import {
   DEFAULT_EXPAND_OPTIONS,
   DEFAULT_RUNTIME_OPTIONS,
+  DEFAULT_TOOLBAR_OPTIONS,
 } from '../runtime/constants'
 import type { JsonObject, JsonValue, RuntimeOptions } from '../types/config'
+import type { MermaidToolbarOptions } from '../types/mermaid'
+import type { ExpandOptions } from '../runtime/types/expand'
 
 export interface ModuleConfigurationInput {
   readonly nuxtResolvedOptions: unknown
@@ -144,7 +147,7 @@ function assertObjectProperty(
   return nested
 }
 
-function validateRuntimeOptions(value: JsonObject, phase: ConfigurationValidationPhase): void {
+export function validateRuntimeOptions(value: JsonObject, phase: ConfigurationValidationPhase): void {
   assertKnownKeys(value, RUNTIME_OPTION_KEYS, phase)
   assertBooleanProperty(value, 'debug', phase, [])
 
@@ -153,6 +156,12 @@ function validateRuntimeOptions(value: JsonObject, phase: ConfigurationValidatio
     const init = assertObjectProperty(loader, 'init', phase, ['loader'])
     if (init) {
       assertStringProperty(init, 'theme', phase, ['loader', 'init'])
+      if (hasOwn(init, 'logLevel')) {
+        const logLevel = descriptorValue(init, 'logLevel')
+        if (typeof logLevel !== 'string' && typeof logLevel !== 'number') {
+          throwConfigurationIssue(phase, ['loader', 'init', 'logLevel'], 'INVALID_VALUE', 'a string or number', typeof logLevel)
+        }
+      }
       assertBooleanProperty(init, 'suppressErrorRendering', phase, ['loader', 'init'])
     }
 
@@ -238,6 +247,13 @@ function validateRawLayer(value: unknown, phase: ConfigurationValidationPhase, m
   return value
 }
 
+export function validateRuntimeOptionsInput(
+  value: unknown,
+  phase: ConfigurationValidationPhase,
+): JsonObject {
+  return validateRawLayer(value, phase, false)
+}
+
 function runtimeLayerWithoutActivation(value: JsonObject): JsonObject {
   const result: JsonObject = {}
   for (const key of Object.keys(Object.getOwnPropertyDescriptors(value))) {
@@ -253,13 +269,13 @@ function resolveModuleActivation(nuxtResolvedOptions: JsonObject): boolean {
   return enabled === undefined ? DEFAULT_MODULE_ACTIVATION : enabled as boolean
 }
 
-function resolveExpandOptions(layers: readonly JsonObject[]): JsonObject {
+export function resolveExpandOptions(
+  layers: readonly (RuntimeOptions['expand'] | undefined)[],
+): ExpandOptions {
   let resolved = cloneOwnedData(DEFAULT_EXPAND_OPTIONS as unknown as JsonObject)
 
-  for (const layer of layers) {
-    if (!hasOwn(layer, 'expand')) continue
-
-    const expand = descriptorValue(layer, 'expand')
+  for (const expand of layers) {
+    if (expand === undefined) continue
     if (typeof expand === 'boolean') {
       resolved = mergeByPresence([
         DEFAULT_EXPAND_OPTIONS as unknown as JsonObject,
@@ -271,7 +287,16 @@ function resolveExpandOptions(layers: readonly JsonObject[]): JsonObject {
     resolved = mergeByPresence([resolved, expand as JsonObject])
   }
 
-  return resolved
+  return cloneOwnedData(resolved) as unknown as ExpandOptions
+}
+
+export function resolveToolbarOptions(
+  layers: readonly (RuntimeOptions['toolbar'] | undefined)[],
+): MermaidToolbarOptions {
+  return mergeByPresence([
+    DEFAULT_TOOLBAR_OPTIONS as unknown as JsonObject,
+    ...layers.filter((layer): layer is MermaidToolbarOptions => layer !== undefined),
+  ]) as unknown as MermaidToolbarOptions
 }
 
 function resolveRuntimeTransport(
@@ -283,7 +308,22 @@ function resolveRuntimeTransport(
     runtimeLayerWithoutActivation(nuxtResolvedOptions),
     runtimeOverrides,
   ])
-  runtimeOptions.expand = resolveExpandOptions([nuxtResolvedOptions, runtimeOverrides])
+  runtimeOptions.expand = resolveExpandOptions([
+    hasOwn(nuxtResolvedOptions, 'expand')
+      ? descriptorValue(nuxtResolvedOptions, 'expand') as RuntimeOptions['expand']
+      : undefined,
+    hasOwn(runtimeOverrides, 'expand')
+      ? descriptorValue(runtimeOverrides, 'expand') as RuntimeOptions['expand']
+      : undefined,
+  ]) as unknown as JsonValue
+  runtimeOptions.toolbar = resolveToolbarOptions([
+    hasOwn(nuxtResolvedOptions, 'toolbar')
+      ? descriptorValue(nuxtResolvedOptions, 'toolbar') as RuntimeOptions['toolbar']
+      : undefined,
+    hasOwn(runtimeOverrides, 'toolbar')
+      ? descriptorValue(runtimeOverrides, 'toolbar') as RuntimeOptions['toolbar']
+      : undefined,
+  ]) as unknown as JsonValue
 
   validateRuntimeOptions(runtimeOptions, RUNTIME_TRANSPORT_PHASE)
   return cloneOwnedData(runtimeOptions) as RuntimeOptions

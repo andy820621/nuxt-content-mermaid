@@ -90,6 +90,20 @@ describe('built-in renderer integration', async () => {
     ]))
   })
 
+  it('materializes a fresh Mermaid configuration for every render attempt', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    await page.locator('#primary-queue').click()
+    await waitForRuns(page, 2)
+    await releaseNext(page)
+    await page.locator('#primary svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.reusedInitializationConfig
+    })).toBe(false)
+  })
+
   it('preserves the Committed Diagram through failure and pending recovery', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installDiagnosticCapture(page)

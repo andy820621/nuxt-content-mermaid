@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useNuxtApp, useRuntimeConfig } from '#app'
+import { useNuxtApp } from '#app'
 import {
   ref,
   onMounted,
@@ -14,13 +14,12 @@ import {
 import { defu } from 'defu'
 import type { Component, ComputedRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
-import type { RuntimeOptions } from '../../types/config'
 import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
+import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
-import { DEFAULT_TOOLBAR_OPTIONS, DEFAULT_EXPAND_OPTIONS } from '../constants'
 import type { ExpandOptions } from '../types/expand'
 import Spinner from './Spinner.vue'
 import IconClipboard from './icons/IconClipboard.vue'
@@ -42,25 +41,15 @@ const props = defineProps<{
 }>()
 
 const nuxtApp = useNuxtApp()
-const runtimeConfig = useRuntimeConfig()
-const contentMermaidOptions = (runtimeConfig.public?.contentMermaid || {}) as RuntimeOptions
+const contentMermaidOptions = getRuntimeMermaidSnapshot(nuxtApp)
 const isEnabled = true
 const debug = contentMermaidOptions.debug || false
 const loaderOptions = contentMermaidOptions.loader || {}
 const themeOptions = contentMermaidOptions.theme || {}
 const componentOptions = contentMermaidOptions.components || {}
-function resolveExpandOptions(expand: RuntimeOptions['expand']): ExpandOptions {
-  if (expand === false)
-    return { ...DEFAULT_EXPAND_OPTIONS, enabled: false }
-
-  if (expand === true || !expand || typeof expand !== 'object')
-    return DEFAULT_EXPAND_OPTIONS
-
-  return defu({}, expand as ExpandOptions, DEFAULT_EXPAND_OPTIONS)
-}
 
 // Expand options and flags
-const expandOptions = resolveExpandOptions(contentMermaidOptions.expand)
+const expandOptions = contentMermaidOptions.expand as unknown as ExpandOptions
 const expandEnabled = expandOptions.enabled !== false
 const expandOpenOptions = expandOptions.invokeOpenOn || {}
 const allowOpenDiagramClick = expandOpenOptions.diagramClick !== false
@@ -109,17 +98,13 @@ const decodedCode = computed(() => props.code ? decodeURIComponent(props.code) :
 const mermaidDefinition = ref(decodedCode.value)
 let observer: IntersectionObserver | null = null
 
-const defaultToolbarTitle = DEFAULT_TOOLBAR_OPTIONS.title ?? 'mermaid'
-const defaultToolbarFontSize = DEFAULT_TOOLBAR_OPTIONS.fontSize ?? '14px'
-const defaultFullscreenToolbarScale = DEFAULT_TOOLBAR_OPTIONS.fullscreenToolbarScale ?? 1.25
+const runtimeToolbarDefaults = contentMermaidOptions.toolbar
+const defaultToolbarTitle = runtimeToolbarDefaults?.title ?? 'mermaid'
+const defaultToolbarFontSize = runtimeToolbarDefaults?.fontSize ?? '14px'
+const defaultFullscreenToolbarScale = runtimeToolbarDefaults?.fullscreenToolbarScale ?? 1.25
 
-const baseToolbarDefaults: MermaidToolbarOptions = DEFAULT_TOOLBAR_OPTIONS
-const runtimeToolbarDefaults = computed<MermaidToolbarOptions>(() => {
-  const toolbar = contentMermaidOptions.toolbar
-  return toolbar && typeof toolbar === 'object' ? toolbar : {}
-})
 const resolvedToolbar = computed<MermaidToolbarOptions>(() => {
-  return defu({}, props.toolbar ?? {}, runtimeToolbarDefaults.value, baseToolbarDefaults)
+  return defu({}, props.toolbar ?? {}, runtimeToolbarDefaults ?? {})
 })
 
 const toolbarButtons = computed<NonNullable<MermaidToolbarOptions['buttons']>>(() => {
@@ -222,13 +207,13 @@ const mermaidTheme = computed(() => {
   })
 })
 
-const effectiveMermaidInit = computed<MermaidConfig>(() => {
+function materializeEffectiveMermaidInit(): MermaidConfig {
   return mergeMermaidConfig({
     baseConfig: baseMermaidInit,
     overrideConfig: pageConfig.value,
     theme: mermaidTheme.value,
   })
-})
+}
 
 const configuredSpinnerName = computed(() => componentOptions.spinner?.trim() || '')
 const customSpinner = shallowRef<Component | null>(null)
@@ -267,7 +252,7 @@ function getBuiltInRenderRequest() {
     loadMermaid: $mermaid,
     readRenderData: () => ({
       source: mermaidDefinition.value,
-      config: effectiveMermaidInit.value,
+      config: materializeEffectiveMermaidInit(),
       target: mermaidContainer.value,
     }),
     beforeCommit: () => {

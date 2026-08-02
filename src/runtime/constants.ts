@@ -12,7 +12,6 @@ export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
   theme: 'default',
   fontFamily: 'Arial, sans-serif, 微軟正黑體',
   securityLevel: 'strict',
-  logLevel: 'error',
 }
 export const DEFAULT_TOOLBAR_OPTIONS: MermaidToolbarOptions = {
   title: 'mermaid',
@@ -40,6 +39,7 @@ export const DEFAULT_EXPAND_OPTIONS: ExpandOptions = {
 }
 
 export const DEFAULT_RUNTIME_OPTIONS = {
+  debug: false,
   loader: {
     init: DEFAULT_MERMAID_CONFIG as RuntimeMermaidConfig,
     lazy: true,

@@ -250,7 +250,7 @@ A zoom toolbar appears with +/−/Reset buttons and a percentage display.
 Use `toolbar.fullscreenToolbarScale` to scale the fullscreen toolbar and zoom controls.
 
 
-> **Note**: All options can be overridden at runtime via `runtimeConfig.public.contentMermaid` (`runtimeConfig.public.mermaidContent` remains supported but deprecated).
+> **Note**: `runtimeConfig.public.contentMermaid` is resolved once during each Nuxt application initialization. Mutating it afterward does not update the established runtime snapshot. The legacy `runtimeConfig.public.mermaidContent` key is not supported in v3.
 
 ## Styling (CSS Variables)
 

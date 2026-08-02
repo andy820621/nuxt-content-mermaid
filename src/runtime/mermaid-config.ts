@@ -51,6 +51,51 @@ interface MergeOptions extends MermaidConfig {
   theme?: MermaidConfig['theme']
 }
 
+function materializeStructuralData(
+  value: unknown,
+  memo: WeakMap<object, unknown>,
+): unknown {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
+    return value
+  if (typeof value === 'function')
+    return value
+
+  const existing = memo.get(value)
+  if (existing !== undefined)
+    return existing
+
+  if (Array.isArray(value)) {
+    const clone: unknown[] = []
+    memo.set(value, clone)
+    for (const item of value)
+      clone.push(materializeStructuralData(item, memo))
+    return clone
+  }
+
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null)
+    return value
+
+  const clone = Object.create(prototype) as Record<PropertyKey, unknown>
+  memo.set(value, clone)
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor?.enumerable || !('value' in descriptor))
+      continue
+    Object.defineProperty(clone, key, {
+      configurable: true,
+      enumerable: true,
+      value: materializeStructuralData(descriptor.value, memo),
+      writable: true,
+    })
+  }
+  return clone
+}
+
+function materializeMermaidConfigWorkingCopy(config: MermaidConfig): MermaidConfig {
+  return materializeStructuralData(config, new WeakMap()) as MermaidConfig
+}
+
 export function mergeMermaidConfig(options: MergeOptions): MermaidConfig {
   const {
     baseConfig,
@@ -66,9 +111,9 @@ export function mergeMermaidConfig(options: MergeOptions): MermaidConfig {
     baseConfig || {},
   ) as MermaidConfig
 
-  return {
+  return materializeMermaidConfigWorkingCopy({
     startOnLoad: false,
     ...merged,
     theme: theme ?? merged.theme,
-  }
+  })
 }

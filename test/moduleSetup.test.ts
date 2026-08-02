@@ -181,6 +181,19 @@ describe('module setup', () => {
     await moduleDef.setup?.({}, nuxt)
 
     expect(addPlugin).toHaveBeenCalled()
+    expect(addPlugin).toHaveBeenCalledTimes(2)
+    const registeredPlugins = addPlugin.mock.calls
+      .map(([plugin]) => plugin)
+      .reverse()
+    expect(registeredPlugins).toEqual([
+      {
+        src: expect.stringContaining('runtime/plugins/runtime-config'),
+      },
+      {
+        src: expect.stringContaining('runtime/plugins/mermaid.client'),
+        mode: 'client',
+      },
+    ])
     expect(addComponent).toHaveBeenCalled()
     expect(addTypeTemplate).toHaveBeenCalled()
     expect(addVitePlugin).toHaveBeenCalledTimes(1)

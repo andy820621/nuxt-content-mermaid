@@ -1,55 +1,33 @@
-import { defineNuxtPlugin, useRuntimeConfig } from '#app'
+import { defineNuxtPlugin } from '#app'
 import type { Mermaid, MermaidConfig } from 'mermaid'
-import type { RuntimeOptions } from '../../types/config'
-import { DEFAULT_MERMAID_CONFIG } from '../constants'
+import { cloneOwnedData } from '../../configuration/core'
+import type { JsonObject } from '../../types/config'
+import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 
-declare global {
-  var __nuxtMermaidLoader__: Promise<Mermaid> | undefined
-}
-
-const globalWithLoader = globalThis as typeof globalThis & {
-  __nuxtMermaidLoader__?: Promise<Mermaid>
-}
-
-export default defineNuxtPlugin(() => {
-  const runtimeConfig = useRuntimeConfig()
-  const mermaidConfig = (runtimeConfig.public?.contentMermaid ?? {}) as RuntimeOptions
+export default defineNuxtPlugin((nuxtApp) => {
+  const snapshot = getRuntimeMermaidSnapshot(nuxtApp)
+  let mermaidLoader: Promise<Mermaid> | undefined
 
   const loadMermaid = async (): Promise<Mermaid> => {
-    if (globalWithLoader.__nuxtMermaidLoader__)
-      return globalWithLoader.__nuxtMermaidLoader__
+    if (mermaidLoader) return mermaidLoader
 
-    const debug = mermaidConfig?.debug || false
-    const userInit = mermaidConfig?.loader?.init || {}
-    const hasUserLogLevel = Object.prototype.hasOwnProperty.call(userInit, 'logLevel')
-    const hasUserSuppressErrorRendering
-      = Object.prototype.hasOwnProperty.call(userInit, 'suppressErrorRendering')
-
-    const initOptions: MermaidConfig = {
-      ...DEFAULT_MERMAID_CONFIG,
-      ...userInit,
-      logLevel: hasUserLogLevel ? userInit.logLevel : (debug ? 1 : 5),
-      suppressErrorRendering: hasUserSuppressErrorRendering
-        ? userInit.suppressErrorRendering
-        : !debug,
-    }
-
-    // await new Promise(resolve => setTimeout(resolve, 2000))
-
-    globalWithLoader.__nuxtMermaidLoader__ = (async () => {
+    mermaidLoader = (async () => {
       try {
         const mermaid = await import('mermaid')
         const mermaidInstance = (mermaid.default ?? mermaid) as Mermaid
+        const initOptions = cloneOwnedData(
+          (snapshot.loader?.init ?? {}) as unknown as JsonObject,
+        ) as MermaidConfig
         mermaidInstance.initialize(initOptions)
         return mermaidInstance
       }
       catch (error) {
-        globalWithLoader.__nuxtMermaidLoader__ = undefined
+        mermaidLoader = undefined
         throw error
       }
     })()
 
-    return globalWithLoader.__nuxtMermaidLoader__
+    return mermaidLoader
   }
 
   return {

@@ -29,6 +29,32 @@ describe('mermaid config helpers', () => {
     expect(result.startOnLoad).toBe(false)
   })
 
+  it('materializes detached nested structural data for every invocation', () => {
+    const baseConfig = Object.freeze({
+      flowchart: Object.freeze({
+        htmlLabels: true,
+        curve: 'basis',
+      }),
+      secure: Object.freeze(['securityLevel']),
+    }) as unknown as MermaidConfig
+
+    const first = mergeMermaidConfig({ baseConfig })
+    const second = mergeMermaidConfig({ baseConfig })
+
+    expect(first.flowchart).not.toBe(baseConfig.flowchart)
+    expect(first.flowchart).not.toBe(second.flowchart)
+    expect(first.secure).not.toBe(baseConfig.secure)
+    expect(first.secure).not.toBe(second.secure)
+
+    first.flowchart!.htmlLabels = false
+    first.secure!.push('theme')
+
+    expect(baseConfig.flowchart?.htmlLabels).toBe(true)
+    expect(baseConfig.secure).toEqual(['securityLevel'])
+    expect(second.flowchart?.htmlLabels).toBe(true)
+    expect(second.secure).toEqual(['securityLevel'])
+  })
+
   it('selects theme with correct priority', () => {
     expect(
       resolveMermaidTheme({
