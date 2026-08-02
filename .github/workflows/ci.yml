@@ -45,6 +45,9 @@ jobs:
       - name: Playground prepare
         run: npm run dev:prepare
 
+      - name: Package contract
+        run: npm run test:package-contract
+
       - name: Install Playwright browsers
         run: npx playwright install
 

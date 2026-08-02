@@ -1,6 +1,6 @@
 import type { DefineComponent } from 'vue'
-import type { Mermaid, MermaidConfig } from 'mermaid'
-import type { ModuleOptions } from '../module'
+import type { Mermaid } from 'mermaid'
+import type { MermaidComponentProps, ModuleOptions, RuntimeOptions } from './config'
 import type { MermaidThemeMode, SimpleMermaidTheme } from '../runtime/composables/useMermaidTheme'
 
 export type MermaidToolbarButtons = {
@@ -26,37 +26,21 @@ declare module 'vue' {
     $mermaid: () => Promise<Mermaid>
   }
   interface GlobalComponents {
-    Mermaid: DefineComponent<{
-      config?: MermaidConfig
-      toolbar?: MermaidToolbarOptions
-      code?: string
-    }>
+    Mermaid: DefineComponent<MermaidComponentProps>
   }
 }
 
 declare module 'nuxt/schema' {
   interface NuxtConfig {
     contentMermaid?: ModuleOptions
-    /**
-     * @deprecated Use `contentMermaid`
-     */
-    mermaidContent?: ModuleOptions
   }
 
   interface NuxtOptions {
     contentMermaid?: ModuleOptions
-    /**
-     * @deprecated Use `contentMermaid`
-     */
-    mermaidContent?: ModuleOptions
   }
 
   interface PublicRuntimeConfig {
-    contentMermaid?: Partial<ModuleOptions>
-    /**
-     * @deprecated Use `contentMermaid`
-     */
-    mermaidContent?: Partial<ModuleOptions>
+    contentMermaid?: RuntimeOptions
   }
 }
 
