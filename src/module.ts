@@ -168,12 +168,13 @@ export {}
     })
 
     // Transform mermaid fenced code blocks in Markdown
-    nuxt.hook('content:file:beforeParse', (ctx: FileBeforeParseHook) => {
+    // @nuxt/content augments this hook only in consuming applications.
+    nuxt.hook('content:file:beforeParse' as never, ((ctx: FileBeforeParseHook) => {
       const { file } = ctx
 
       if (!file.id?.endsWith('.md')) return
 
       file.body = transformMarkdownDiagrams(file.body)
-    })
+    }) as never)
   },
 })

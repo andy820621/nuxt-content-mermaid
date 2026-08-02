@@ -85,7 +85,8 @@ function assertPlainObject(
   value: JsonValue,
   phase: ConfigurationValidationPhase,
 ): asserts value is JsonObject {
-  if (value === null || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) {
+  const prototype = value !== null && typeof value === 'object' ? Object.getPrototypeOf(value) : undefined
+  if (value === null || Array.isArray(value) || (prototype !== Object.prototype && prototype !== null)) {
     throwConfigurationIssue(phase, [], 'NON_PLAIN_OBJECT', 'a plain object', 'non-plain-object')
   }
 }
@@ -273,14 +274,17 @@ function resolveModuleActivation(nuxtResolvedOptions: JsonObject): boolean {
 }
 
 function resolveExpandOptions(layers: readonly JsonObject[]): JsonObject {
-  let resolved = cloneOwnedData(DEFAULT_EXPAND_OPTIONS) as JsonObject
+  let resolved = cloneOwnedData(DEFAULT_EXPAND_OPTIONS as unknown as JsonObject)
 
   for (const layer of layers) {
     if (!hasOwn(layer, 'expand')) continue
 
     const expand = descriptorValue(layer, 'expand')
     if (typeof expand === 'boolean') {
-      resolved = mergeByPresence([DEFAULT_EXPAND_OPTIONS, { enabled: expand }])
+      resolved = mergeByPresence([
+        DEFAULT_EXPAND_OPTIONS as unknown as JsonObject,
+        { enabled: expand },
+      ])
       continue
     }
 
