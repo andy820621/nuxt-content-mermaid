@@ -40,6 +40,7 @@ export const DEFAULT_EXPAND_OPTIONS: ExpandOptions = {
 }
 
 export const DEFAULT_RUNTIME_OPTIONS = {
+  debug: false,
   loader: {
     init: DEFAULT_MERMAID_CONFIG as RuntimeMermaidConfig,
     lazy: true,

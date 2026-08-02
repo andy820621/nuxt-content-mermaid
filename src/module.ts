@@ -133,10 +133,14 @@ export default defineNuxtModule<ModuleOptions>({
       },
     }))
 
-    // Inject client plugin
+    // Nuxt Kit prepends plugins, so register the loader first to place the
+    // Universal Runtime Adapter ahead of it in the final plugin array.
     addPlugin({
       src: resolver.resolve(runtimeDir, 'plugins/mermaid.client'),
       mode: 'client',
+    })
+    addPlugin({
+      src: resolver.resolve(runtimeDir, 'plugins/runtime-config'),
     })
 
     // Register built-in Mermaid wrapper, can be overridden at runtime
