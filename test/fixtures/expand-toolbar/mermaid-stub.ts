@@ -19,7 +19,8 @@ const mermaidStub = {
     const source = container.textContent || ''
     runs.push({ source })
 
-    container.innerHTML = '<svg id="mock-svg" width="600" height="400"></svg>'
+    const id = source.includes('SECONDARY') ? 'mock-svg-secondary' : 'mock-svg'
+    container.innerHTML = `<svg id="${id}" width="600" height="400"></svg>`
   },
 }
 

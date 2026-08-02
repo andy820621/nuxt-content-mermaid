@@ -20,9 +20,7 @@ import { createMermaidRenderer } from '../mermaid-rendering'
 import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
-import { useFullscreen } from '../composables/useFullscreen'
-import { useMermaidZoom } from '../composables/useMermaidZoom'
-import { useEventListener } from '../composables/useEventListener'
+import { useMermaidFullscreen } from '../composables/useMermaidFullscreen'
 import { DEFAULT_TOOLBAR_OPTIONS, DEFAULT_EXPAND_OPTIONS } from '../constants'
 import type { ExpandOptions } from '../types/expand'
 import Spinner from './Spinner.vue'
@@ -88,7 +86,24 @@ const { $mermaid } = nuxtApp
 const { currentTheme: manualThemeMode } = useMermaidTheme()
 
 const mermaidBlock = useTemplateRef('mermaidBlock')
+const mermaidWrapper = useTemplateRef('mermaidWrapper')
 const mermaidContainer = useTemplateRef('mermaidContainer')
+const {
+  isSupported: isFullscreenSupported,
+  isActive: isFullscreen,
+  targetStyle: fullscreenTargetStyle,
+  scale: fullscreenScale,
+  showZoomHint: showFullscreenZoomHint,
+  toggle: toggleFullscreen,
+  endForDiagramReplacement: endFullscreenForDiagramReplacement,
+  zoomIn: zoomFullscreenIn,
+  zoomOut: zoomFullscreenOut,
+  resetZoom: resetFullscreenZoom,
+} = useMermaidFullscreen({
+  getFullscreenTarget: () => mermaidBlock.value,
+  getViewportTarget: () => mermaidWrapper.value,
+  getRenderTarget: () => mermaidContainer.value,
+})
 const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
 const hasError = ref(false)
@@ -150,9 +165,6 @@ const copyIcon = computed(() => {
   if (copyState.value === 'copied') return IconClipboardSuccess
   if (isCopyHovered.value && hasCopySource.value) return IconClipboardHover
   return IconClipboard
-})
-const { isSupported: isFullscreenSupported, isFullscreen, toggle: toggleFullscreen } = useFullscreen(mermaidBlock, {
-  autoExit: true,
 })
 const showFullscreenButton = computed(() => toolbarButtons.value.fullscreen !== false && isFullscreenSupported.value)
 const fullscreenLabel = computed(() => isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen')
@@ -239,139 +251,6 @@ const iconSize = computed(() => {
 })
 const isExpandBlocked = computed(() => !isEnabled || !expandEnabled || isLoading.value || hasError.value || isFullscreen.value)
 
-// Fullscreen Pan/Zoom - reuse useMermaidZoom
-const fullscreenZoom = useMermaidZoom({
-  active: isFullscreen,
-  minScale: 0.1,
-  maxScale: 10,
-})
-
-const showFullscreenZoomHint = ref(false)
-const fullscreenHintDurationMs = 3000
-let fullscreenHintTimeout: ReturnType<typeof setTimeout> | undefined
-let hasShownFullscreenZoomHint = false
-
-// Reset zoom state when entering fullscreen
-watch(isFullscreen, (value) => {
-  if (value) {
-    hasShownFullscreenZoomHint = false
-    // Use nextTick to ensure fullscreen layout is applied
-    nextTick(() => {
-      const el = mermaidContainer.value
-      if (el) {
-        const rect = el.getBoundingClientRect()
-        fullscreenZoom.init({
-          scale: 1,
-          translateX: 0,
-          translateY: 0,
-          top: rect.top,
-          left: rect.left,
-        })
-      }
-    })
-  }
-  else {
-    showFullscreenZoomHint.value = false
-    clearTimeout(fullscreenHintTimeout)
-  }
-})
-
-function refreshFullscreenOrigin() {
-  if (!import.meta.client || !isFullscreen.value) return
-  const el = mermaidContainer.value
-  if (!el) return
-  // Space switch can change the viewport coordinate system without resizing.
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      const rect = el.getBoundingClientRect()
-      fullscreenZoom.setMetrics({
-        scale: fullscreenZoom.scale.value,
-        translateX: fullscreenZoom.translateX.value,
-        translateY: fullscreenZoom.translateY.value,
-        top: rect.top,
-        left: rect.left,
-      })
-    })
-  })
-}
-
-function handleFullscreenWheel(event: WheelEvent) {
-  if (!isFullscreen.value) return
-
-  const handled = fullscreenZoom.handleWheel(event)
-  if (handled) {
-    if (fullscreenHintTimeout && showFullscreenZoomHint.value) {
-      showFullscreenZoomHint.value = false
-      clearTimeout(fullscreenHintTimeout)
-    }
-    return
-  }
-
-  // Not handled (no Ctrl/Cmd) - show hint once
-  if (!hasShownFullscreenZoomHint) {
-    hasShownFullscreenZoomHint = true
-    showFullscreenZoomHint.value = true
-    clearTimeout(fullscreenHintTimeout)
-    fullscreenHintTimeout = setTimeout(() => {
-      showFullscreenZoomHint.value = false
-    }, fullscreenHintDurationMs)
-  }
-}
-
-function handleFullscreenKeyDown(event: KeyboardEvent) {
-  if (!isFullscreen.value) return
-  if (event.defaultPrevented) return
-
-  const target = event.target as HTMLElement | null
-  if (target) {
-    const tagName = target.tagName
-    if (target.isContentEditable || tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT')
-      return
-  }
-
-  const browserZoomKeys = new Set(['+', '=', '-', '_'])
-  if (event.ctrlKey || event.metaKey) {
-    if (browserZoomKeys.has(event.key))
-      event.preventDefault()
-    return
-  }
-
-  const moveStep = 20 / fullscreenZoom.scale.value
-
-  const keyHandlers: Record<string, () => void> = {
-    '+': () => fullscreenZoom.zoomIn(),
-    '=': () => fullscreenZoom.zoomIn(),
-    '-': () => fullscreenZoom.zoomOut(),
-    '_': () => fullscreenZoom.zoomOut(),
-    '0': () => fullscreenZoom.reset(),
-    'ArrowUp': () => { fullscreenZoom.translateY.value += moveStep },
-    'ArrowDown': () => { fullscreenZoom.translateY.value -= moveStep },
-    'ArrowLeft': () => { fullscreenZoom.translateX.value += moveStep },
-    'ArrowRight': () => { fullscreenZoom.translateX.value -= moveStep },
-  }
-
-  const handler = keyHandlers[event.key]
-  if (handler) {
-    event.preventDefault()
-    handler()
-  }
-}
-
-if (import.meta.client) {
-  const fullscreenDocument = computed(() => isFullscreen.value ? document : null)
-  const fullscreenWindow = computed(() => isFullscreen.value ? window : null)
-  const fullscreenVisualViewport = computed(() => (isFullscreen.value ? window.visualViewport : null))
-
-  useEventListener(fullscreenWindow, 'wheel', handleFullscreenWheel, { passive: false })
-  useEventListener(fullscreenDocument, 'keydown', handleFullscreenKeyDown)
-  useEventListener(fullscreenWindow, 'focus', refreshFullscreenOrigin)
-  useEventListener(fullscreenDocument, 'fullscreenchange', refreshFullscreenOrigin)
-  useEventListener(fullscreenVisualViewport, 'resize', refreshFullscreenOrigin, { passive: true })
-  useEventListener(fullscreenDocument, 'visibilitychange', () => {
-    if (document.visibilityState === 'visible') refreshFullscreenOrigin()
-  })
-}
-
 interface MermaidExpandOverlayExpose {
   toggle: (event?: Event) => void
   openFromDiagram: (event: MouseEvent) => void
@@ -397,8 +276,10 @@ function getBuiltInRenderRequest() {
       target: mermaidContainer.value,
     }),
     prepare: () => {
-      if (import.meta.client)
+      if (import.meta.client) {
         expandOverlay.value?.endForDiagramReplacement()
+        void endFullscreenForDiagramReplacement()
+      }
 
       hasError.value = false
       errorContent.value = null
@@ -794,11 +675,11 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       <MermaidZoomToolbar
         v-if="isFullscreen"
         variant="fullscreen"
-        :scale="fullscreenZoom.scale.value"
+        :scale="fullscreenScale"
         :icon-size="iconSize"
-        @zoom-out="fullscreenZoom.zoomOut()"
-        @zoom-in="fullscreenZoom.zoomIn()"
-        @reset="fullscreenZoom.reset()"
+        @zoom-out="zoomFullscreenOut"
+        @zoom-in="zoomFullscreenIn"
+        @reset="resetFullscreenZoom"
       />
 
       <!-- Fullscreen Zoom Hint -->
@@ -813,6 +694,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
 
       <!-- Diagram Container -->
       <div
+        ref="mermaidWrapper"
         class="mermaid-wrapper"
         :class="{
           'ncm-is-loading': isLoading && !hasRenderedOnce,
@@ -822,20 +704,11 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         }"
         :style="cursorVariables"
         @click="handleMermaidClick"
-        @mousedown="isFullscreen && fullscreenZoom.handleDragStart($event)"
-        @mousemove="isFullscreen && fullscreenZoom.handleDragMove($event)"
-        @touchstart="isFullscreen && fullscreenZoom.handleDragStart($event)"
-        @touchmove="isFullscreen && fullscreenZoom.handleDragMove($event)"
-        @touchend="isFullscreen && fullscreenZoom.handleDragEnd()"
       >
         <div
           ref="mermaidContainer"
           class="mermaid"
-          :style="isFullscreen ? {
-            transform: fullscreenZoom.transformStyle.value.transform,
-            transformOrigin: '0 0',
-            cursor: fullscreenZoom.cursor.value,
-          } : undefined"
+          :style="isFullscreen ? fullscreenTargetStyle : undefined"
         >
           <!-- Initially show the slot's <pre><code> for SSR; client-side rendering will replace it with the mermaid SVG -->
           <slot>

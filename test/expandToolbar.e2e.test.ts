@@ -80,7 +80,7 @@ describe('expand/fullscreen toolbars', async () => {
 
     await page.waitForSelector('#mock-svg', { state: 'visible', timeout: 5000 })
 
-    await page.getByLabel('Expand diagram').click()
+    await page.locator('#diagram-root').getByLabel('Expand diagram').click()
     await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
 
     expect(await page.locator('body > .ncm-expand-modal').count()).toBe(1)
@@ -174,15 +174,18 @@ describe('expand/fullscreen toolbars', async () => {
     expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
   })
 
-  it('toggles fullscreen toolbar, zooms, and shows hint', { timeout: 20000 }, async () => {
+  it('proves the complete fullscreen lifecycle and cleanup through the Package User path', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installFullscreenStub(page)
     await page.goto(url('/'))
     await page.waitForSelector('#mock-svg', { state: 'visible', timeout: 5000 })
 
-    await page.getByLabel('Enter fullscreen').click({ timeout: 5000 })
+    await page.locator('#diagram-root').getByLabel('Enter fullscreen').click({ timeout: 5000 })
     await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
     expect(await page.locator('.ncm-fullscreen-zoom-hint').count()).toBe(0)
+    expect(await page.locator('#diagram-root .mermaid-block > .ncm-zoom-toolbar--fullscreen').count()).toBe(1)
+    expect(await page.locator('#diagram-root .mermaid-wrapper.ncm-fullscreen-zoom > .mermaid').count()).toBe(1)
+    expect(await page.evaluate(() => document.fullscreenElement?.classList.contains('mermaid-block'))).toBe(true)
 
     const fullscreenZoomInfo = page.locator('.ncm-zoom-toolbar--fullscreen .ncm-zoom-info')
     const initialFullscreenPercent = parsePercent(await fullscreenZoomInfo.textContent())
@@ -195,14 +198,82 @@ describe('expand/fullscreen toolbars', async () => {
     expect(afterFullscreenPercent).toBeGreaterThan(initialFullscreenPercent)
 
     await page.evaluate(() => {
-      window.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }))
+      window.dispatchEvent(new Event('focus'))
+      window.visualViewport?.dispatchEvent(new Event('resize'))
+      return new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     })
+    expect(parsePercent(await fullscreenZoomInfo.textContent())).toBe(afterFullscreenPercent)
+
+    const activeRouting = await page.evaluate(() => {
+      const wheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+      const key = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+      window.dispatchEvent(wheel)
+      document.dispatchEvent(key)
+      return { wheel: wheel.defaultPrevented, key: key.defaultPrevented }
+    })
+    expect(activeRouting).toEqual({ wheel: false, key: true })
     await page.waitForSelector('.ncm-fullscreen-zoom-hint', { state: 'attached', timeout: 2000 })
     const hintText = await page.locator('.ncm-fullscreen-zoom-hint').textContent()
     expect(hintText).toContain('Scroll to zoom')
 
-    await page.getByLabel('Exit fullscreen').click({ timeout: 5000 })
+    const spaceLocked = await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true }))
+      document.querySelector('.mermaid-wrapper')
+        ?.dispatchEvent(new MouseEvent('mousedown', { clientX: 10, clientY: 10, bubbles: true, cancelable: true }))
+      return {
+        body: document.body.style.userSelect,
+        html: document.documentElement.style.userSelect,
+      }
+    })
+    expect(spaceLocked).toEqual({ body: 'none', html: 'none' })
+
+    await page.locator('#diagram-root').getByLabel('Exit fullscreen').click({ timeout: 5000 })
     await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'detached', timeout: 5000 })
-    await page.close()
+    expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+    expect(await readPageStyles(page)).toEqual(restoredPageStyles)
+
+    await page.locator('#diagram-root').getByLabel('Enter fullscreen').click({ timeout: 5000 })
+    await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
+    await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true }))
+      document.querySelector<HTMLButtonElement>('#unmount-diagram')?.click()
+    })
+    await page.waitForSelector('#diagram-root', { state: 'detached', timeout: 5000 })
+    await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'detached', timeout: 5000 })
+    expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
+    expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+    expect(await readPageStyles(page)).toEqual(restoredPageStyles)
+  })
+
+  it('ends fullscreen on render replacement and keeps diagrams isolated', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installFullscreenStub(page)
+    await page.goto(url('/'))
+    await page.waitForSelector('#mock-svg-secondary', { state: 'visible', timeout: 5000 })
+
+    await page.locator('#diagram-root').getByLabel('Enter fullscreen').click({ timeout: 5000 })
+    await page.waitForSelector('#diagram-root .ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
+    expect(await page.locator('#secondary-root .ncm-zoom-toolbar--fullscreen').count()).toBe(0)
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true }))
+      document.querySelector<HTMLButtonElement>('#update-diagram')?.click()
+    })
+
+    await page.waitForSelector('#diagram-root .ncm-zoom-toolbar--fullscreen', { state: 'detached', timeout: 5000 })
+    expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
+    expect(await page.locator('#secondary-root #mock-svg-secondary').count()).toBe(1)
+    expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+    expect(await readPageStyles(page)).toEqual(restoredPageStyles)
+
+    await page.locator('#secondary-root').getByLabel('Enter fullscreen').click({ timeout: 5000 })
+    await page.waitForSelector('#secondary-root .ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
+    expect(await page.locator('#diagram-root .ncm-zoom-toolbar--fullscreen').count()).toBe(0)
+    expect(await page.evaluate(() => document.fullscreenElement?.closest('#secondary-root') !== null)).toBe(true)
+
+    await page.locator('#secondary-root').getByLabel('Exit fullscreen').click({ timeout: 5000 })
+    await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'detached', timeout: 5000 })
+    expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
   })
 })
