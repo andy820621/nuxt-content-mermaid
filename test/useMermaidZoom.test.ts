@@ -109,6 +109,32 @@ describe('useMermaidZoom', () => {
     expect(zoom.scale.value).toBe(0.9)
   })
 
+  it('uses the configured browser instance for viewport mechanics', () => {
+    const injectedDocument = {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      documentElement: { style: { userSelect: '' } },
+      body: { style: { userSelect: '' } },
+    }
+    const injectedWindow = {
+      innerWidth: 400,
+      innerHeight: 200,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      document: injectedDocument,
+    }
+    const zoom = useMermaidZoom({
+      document: injectedDocument as unknown as Document,
+      window: injectedWindow as unknown as Window,
+    })
+    zoom.init({ scale: 1, translateX: 0, translateY: 0, top: 0, left: 0 })
+
+    zoom.zoomIn()
+
+    expect(zoom.translateX.value).toBe(-50)
+    expect(zoom.translateY.value).toBe(-25)
+  })
+
   it('handleWheel requires modifier and updates scale', () => {
     const zoom = useMermaidZoom({ zoomSpeed: 0.2 })
     zoom.init({ scale: 1, translateX: 0, translateY: 0, top: 0, left: 0 })

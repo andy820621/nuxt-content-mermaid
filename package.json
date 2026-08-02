@@ -57,8 +57,8 @@
     "release:rc": "pnpm run release:base && changelogen --release --prerelease rc --push && pnpm publish --tag rc",
     "release": "pnpm run release:patch",
     "lint": "eslint .",
-    "test": "vitest run --dir test",
-    "test:watch": "vitest watch --dir test",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit"
   },
   "dependencies": {

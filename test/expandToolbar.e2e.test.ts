@@ -251,6 +251,19 @@ describe('expand/fullscreen toolbars', async () => {
     await page.goto(url('/'))
     await page.waitForSelector('#mock-svg-secondary', { state: 'visible', timeout: 5000 })
 
+    await page.locator('#diagram-root').getByLabel('Expand diagram').click()
+    await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
+    await page.evaluate(() => {
+      document.querySelector<HTMLButtonElement>('#diagram-root [aria-label="Enter fullscreen"]')?.click()
+    })
+    await page.waitForSelector('#diagram-root .ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
+    await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
+    await page.locator('#mock-svg').click()
+    expect(await page.locator('.ncm-expand-modal').count()).toBe(0)
+    expect(await page.locator('#diagram-root [aria-label="Expand diagram"]').count()).toBe(0)
+    await page.locator('#diagram-root').getByLabel('Exit fullscreen').click({ timeout: 5000 })
+    await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'detached', timeout: 5000 })
+
     await page.locator('#diagram-root').getByLabel('Enter fullscreen').click({ timeout: 5000 })
     await page.waitForSelector('#diagram-root .ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
     expect(await page.locator('#secondary-root .ncm-zoom-toolbar--fullscreen').count()).toBe(0)

@@ -42,11 +42,20 @@ function createBrowser() {
       documentTarget.dispatch('fullscreenchange')
     }),
   })
+  const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+    const id = ++rafId
+    rafs.set(id, callback)
+    rafHistory.push(callback)
+    return id
+  })
+  const cancelFrame = vi.fn((id: number) => rafs.delete(id))
   const windowTarget = createEventTarget({
     innerWidth: 1000,
     innerHeight: 800,
     visualViewport,
     document: documentTarget,
+    requestAnimationFrame: requestFrame,
+    cancelAnimationFrame: cancelFrame,
   })
   const fullscreenTarget = createEventTarget({
     nodeType: 1,
@@ -60,18 +69,14 @@ function createBrowser() {
   let renderRect = { top: 20, left: 30, width: 200, height: 100 }
   const renderTarget = {
     nodeType: 1,
+    style: { transform: '', transformOrigin: '', cursor: '' },
     getBoundingClientRect: () => renderRect,
   }
 
   vi.stubGlobal('document', documentTarget)
   vi.stubGlobal('window', windowTarget)
-  vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
-    const id = ++rafId
-    rafs.set(id, callback)
-    rafHistory.push(callback)
-    return id
-  }))
-  vi.stubGlobal('cancelAnimationFrame', vi.fn((id: number) => rafs.delete(id)))
+  vi.stubGlobal('requestAnimationFrame', requestFrame)
+  vi.stubGlobal('cancelAnimationFrame', cancelFrame)
 
   return {
     documentTarget,
@@ -155,7 +160,7 @@ describe('useMermaidFullscreen', () => {
     await enterFullscreen(fullscreen)
 
     expect(fullscreen.isActive.value).toBe(true)
-    expect(fullscreen.targetStyle.value.transform).toBe('translate(0px, 0px) scale(1)')
+    expect(browser.renderTarget.style.transform).toBe('translate(0px, 0px) scale(1)')
     expect(browser.windowTarget.listenerCount('wheel')).toBe(1)
     expect(browser.documentTarget.listenerCount('keydown')).toBeGreaterThan(0)
 
@@ -187,7 +192,7 @@ describe('useMermaidFullscreen', () => {
     const arrow = { key: 'ArrowRight', ctrlKey: false, metaKey: false, preventDefault: vi.fn() }
     browser.documentTarget.dispatch('keydown', arrow)
     expect(arrow.preventDefault).toHaveBeenCalled()
-    expect(fullscreen.targetStyle.value.transform).not.toContain('translate(0px, 0px)')
+    expect(browser.renderTarget.style.transform).not.toContain('translate(0px, 0px)')
 
     browser.documentTarget.dispatch('keydown', { code: 'Space', repeat: false, preventDefault: vi.fn() })
     browser.viewportTarget.dispatch('mousedown', { clientX: 10, clientY: 10, preventDefault: vi.fn() })
@@ -219,9 +224,28 @@ describe('useMermaidFullscreen', () => {
     browser.windowTarget.dispatch('focus')
     const staleFrame = browser.rafHistory.at(-1)
 
-    if (ending === 'exit') await mounted.fullscreen.toggle()
-    else if (ending === 'replacement') await mounted.fullscreen.endForDiagramReplacement()
-    else mounted.unmount()
+    if (ending === 'exit') {
+      await mounted.fullscreen.toggle()
+    }
+    else if (ending === 'replacement') {
+      const replacementEnd = mounted.fullscreen.endForDiagramReplacement()
+      const wheel = {
+        deltaY: 120,
+        ctrlKey: false,
+        metaKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      }
+      const key = { key: 'ArrowDown', ctrlKey: false, metaKey: false, preventDefault: vi.fn() }
+      browser.windowTarget.dispatch('wheel', wheel)
+      browser.documentTarget.dispatch('keydown', key)
+      expect(mounted.fullscreen.showZoomHint.value).toBe(false)
+      expect(key.preventDefault).not.toHaveBeenCalled()
+      await replacementEnd
+    }
+    else {
+      mounted.unmount()
+    }
     await nextTick()
 
     expect(mounted.fullscreen.isActive.value).toBe(false)
@@ -235,7 +259,7 @@ describe('useMermaidFullscreen', () => {
     browser.flushRafs()
     staleFrame?.(0)
     expect(mounted.fullscreen.isActive.value).toBe(false)
-    expect(mounted.fullscreen.targetStyle.value.transform).toBe('translate(0px, 0px) scale(1)')
+    expect(browser.renderTarget.style).toMatchObject({ transform: '', transformOrigin: '', cursor: '' })
   })
 
   it('keeps inactive diagrams isolated from fullscreen routing', async () => {

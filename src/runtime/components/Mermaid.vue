@@ -20,7 +20,6 @@ import { createMermaidRenderer } from '../mermaid-rendering'
 import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
-import { useMermaidFullscreen } from '../composables/useMermaidFullscreen'
 import { DEFAULT_TOOLBAR_OPTIONS, DEFAULT_EXPAND_OPTIONS } from '../constants'
 import type { ExpandOptions } from '../types/expand'
 import Spinner from './Spinner.vue'
@@ -33,9 +32,7 @@ import MermaidExpandOverlay from './MermaidExpandOverlay.vue'
 import type { MermaidToolbarOptions } from '../../types/mermaid'
 import IconExpand from './icons/IconExpand.vue'
 import IconCollapse from './icons/IconCollapse.vue'
-import MermaidZoomToolbar from './MermaidZoomToolbar.vue'
-
-const isMac = import.meta.client ? /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) : false
+import MermaidFullscreenPresentation from './MermaidFullscreenPresentation.vue'
 
 const props = defineProps<{
   // Using `unknown` to avoid Vue runtime prop type warnings when user's collection schema is misconfigured; actual validation below.
@@ -88,22 +85,23 @@ const { currentTheme: manualThemeMode } = useMermaidTheme()
 const mermaidBlock = useTemplateRef('mermaidBlock')
 const mermaidWrapper = useTemplateRef('mermaidWrapper')
 const mermaidContainer = useTemplateRef('mermaidContainer')
-const {
-  isSupported: isFullscreenSupported,
-  isActive: isFullscreen,
-  targetStyle: fullscreenTargetStyle,
-  scale: fullscreenScale,
-  showZoomHint: showFullscreenZoomHint,
-  toggle: toggleFullscreen,
-  endForDiagramReplacement: endFullscreenForDiagramReplacement,
-  zoomIn: zoomFullscreenIn,
-  zoomOut: zoomFullscreenOut,
-  resetZoom: resetFullscreenZoom,
-} = useMermaidFullscreen({
-  getFullscreenTarget: () => mermaidBlock.value,
-  getViewportTarget: () => mermaidWrapper.value,
-  getRenderTarget: () => mermaidContainer.value,
-})
+interface MermaidFullscreenPresentationExpose {
+  toggle: () => Promise<void>
+  endForDiagramReplacement: () => Promise<void>
+}
+const fullscreenPresentation = useTemplateRef<MermaidFullscreenPresentationExpose>('fullscreenPresentation')
+const isFullscreenSupported = ref(false)
+const isFullscreen = ref(false)
+const handleFullscreenSupportedChange = (supported: boolean) => {
+  isFullscreenSupported.value = supported
+}
+const handleFullscreenActiveChange = (active: boolean) => {
+  isFullscreen.value = active
+}
+const toggleFullscreen = () => {
+  expandOverlay.value?.endForDiagramReplacement()
+  return fullscreenPresentation.value?.toggle()
+}
 const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
 const hasError = ref(false)
@@ -278,7 +276,7 @@ function getBuiltInRenderRequest() {
     prepare: () => {
       if (import.meta.client) {
         expandOverlay.value?.endForDiagramReplacement()
-        void endFullscreenForDiagramReplacement()
+        void fullscreenPresentation.value?.endForDiagramReplacement()
       }
 
       hasError.value = false
@@ -672,25 +670,15 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         </div>
       </div>
 
-      <MermaidZoomToolbar
-        v-if="isFullscreen"
-        variant="fullscreen"
-        :scale="fullscreenScale"
+      <MermaidFullscreenPresentation
+        ref="fullscreenPresentation"
+        :fullscreen-target="mermaidBlock"
+        :viewport-target="mermaidWrapper"
+        :render-target="mermaidContainer"
         :icon-size="iconSize"
-        @zoom-out="zoomFullscreenOut"
-        @zoom-in="zoomFullscreenIn"
-        @reset="resetFullscreenZoom"
+        @active-change="handleFullscreenActiveChange"
+        @supported-change="handleFullscreenSupportedChange"
       />
-
-      <!-- Fullscreen Zoom Hint -->
-      <Transition name="ncm-hint-fade">
-        <div
-          v-if="showFullscreenZoomHint && isFullscreen"
-          class="ncm-fullscreen-zoom-hint"
-        >
-          {{ isMac ? '⌘' : 'Ctrl' }} + Scroll to zoom
-        </div>
-      </Transition>
 
       <!-- Diagram Container -->
       <div
@@ -708,7 +696,6 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         <div
           ref="mermaidContainer"
           class="mermaid"
-          :style="isFullscreen ? fullscreenTargetStyle : undefined"
         >
           <!-- Initially show the slot's <pre><code> for SSR; client-side rendering will replace it with the mermaid SVG -->
           <slot>
@@ -930,45 +917,6 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
 }
 .mermaid-wrapper.ncm-expand-clickable :deep(svg) {
   cursor: var(--ncm-cursor-expand);
-}
-
-/* Fullscreen Zoom Toolbar and Hint */
-.ncm-fullscreen-zoom-hint {
-  display: none;
-}
-
-:fullscreen .ncm-fullscreen-zoom-hint {
-  display: block;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 12px 24px;
-  background-color: var(--ncm-hint-bg, rgba(0, 0, 0, 0.75));
-  color: var(--ncm-hint-text, #fff);
-  border-radius: var(--ncm-hint-radius, 8px);
-  font-size: 20px;
-  font-weight: 500;
-  pointer-events: none;
-  user-select: none;
-  z-index: 20;
-  white-space: nowrap;
-}
-
-.ncm-hint-fade-enter-active,
-.ncm-hint-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.ncm-hint-fade-enter-from,
-.ncm-hint-fade-leave-to {
-  opacity: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ncm-hint-fade-enter-active,
-  .ncm-hint-fade-leave-active {
-    transition-duration: 0.01ms !important;
-  }
 }
 
 .mermaid-error-default {

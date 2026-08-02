@@ -1,4 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
+import type { ConfigurableDocument, ConfigurableWindow } from './_configurable'
 import { useEventListener } from './useEventListener'
 
 export interface ZoomMetrics {
@@ -9,7 +10,7 @@ export interface ZoomMetrics {
   left?: number
 }
 
-export interface UseMermaidZoomOptions {
+export interface UseMermaidZoomOptions extends ConfigurableDocument, ConfigurableWindow {
   active?: Ref<boolean>
   minScale?: number
   maxScale?: number
@@ -17,9 +18,11 @@ export interface UseMermaidZoomOptions {
 }
 
 export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
-  const isClient = typeof import.meta.client === 'boolean'
-    ? import.meta.client
-    : typeof window !== 'undefined' && typeof document !== 'undefined'
+  const browserDocument = options.document
+    ?? (typeof document === 'undefined' ? undefined : document)
+  const browserWindow = options.window
+    ?? (typeof window === 'undefined' ? undefined : window)
+  const isClient = !!browserDocument && !!browserWindow
   const {
     active = ref(true),
     minScale = 0.5,
@@ -68,20 +71,20 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   })
 
   function lockUserSelect() {
-    if (!isClient) return
+    if (!browserDocument) return
     if (userSelectState.locked) return
-    userSelectState.html = document.documentElement.style.userSelect
-    userSelectState.body = document.body.style.userSelect
-    document.documentElement.style.userSelect = 'none'
-    document.body.style.userSelect = 'none'
+    userSelectState.html = browserDocument.documentElement.style.userSelect
+    userSelectState.body = browserDocument.body.style.userSelect
+    browserDocument.documentElement.style.userSelect = 'none'
+    browserDocument.body.style.userSelect = 'none'
     userSelectState.locked = true
   }
 
   function unlockUserSelect() {
-    if (!isClient) return
+    if (!browserDocument) return
     if (!userSelectState.locked) return
-    document.documentElement.style.userSelect = userSelectState.html
-    document.body.style.userSelect = userSelectState.body
+    browserDocument.documentElement.style.userSelect = userSelectState.html
+    browserDocument.body.style.userSelect = userSelectState.body
     userSelectState.html = ''
     userSelectState.body = ''
     userSelectState.locked = false
@@ -116,9 +119,10 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     if (s === scale.value) return
 
     if (!center) {
+      if (!browserWindow) return
       // Zoom to center of viewport
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
+      const viewportWidth = browserWindow.innerWidth
+      const viewportHeight = browserWindow.innerHeight
       center = { x: viewportWidth / 2, y: viewportHeight / 2 }
     }
 
@@ -142,6 +146,15 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     zoomTo(scale.value * (1 - 0.25))
   }
 
+  function panBy(deltaX: number, deltaY: number) {
+    translateX.value += deltaX
+    translateY.value += deltaY
+  }
+
+  function setOrigin(left: number, top: number) {
+    origin.value = { x: left, y: top }
+  }
+
   function endInteraction() {
     if (!isPointerDown.value && !isDragging.value) return
     handleDragEnd()
@@ -162,8 +175,8 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
 
   if (isClient) {
     // Elegant toggle: When active is false, target becomes null, listener is removed.
-    const activeDocument = computed(() => active.value ? document : null)
-    const activeWindow = computed(() => active.value ? window : null)
+    const activeDocument = computed(() => active.value ? browserDocument : null)
+    const activeWindow = computed(() => active.value ? browserWindow : null)
 
     watch(active, (isActive) => {
       if (isActive) return
@@ -357,6 +370,8 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     reset,
     zoomIn,
     zoomOut,
+    panBy,
+    setOrigin,
     setMetrics,
     handleWheel,
     handleDragStart,
