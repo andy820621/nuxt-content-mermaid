@@ -19,7 +19,6 @@ import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
 import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
-import { useMermaidExpand } from '../composables/useMermaidExpand'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
 import { useFullscreen } from '../composables/useFullscreen'
 import { useMermaidZoom } from '../composables/useMermaidZoom'
@@ -72,16 +71,7 @@ function resolveExpandOptions(expand: ModuleOptions['expand']): ExpandOptions {
 const expandOptions = resolveExpandOptions(contentMermaidOptions.expand)
 const expandEnabled = expandOptions.enabled !== false
 const expandOpenOptions = expandOptions.invokeOpenOn || {}
-const expandCloseOptions = expandOptions.invokeCloseOn || {}
-const expandMargin = typeof expandOptions.margin === 'number' && Number.isFinite(expandOptions.margin)
-  ? Math.max(0, expandOptions.margin)
-  : 0
 const allowOpenDiagramClick = expandOpenOptions.diagramClick !== false
-const allowOverlayClose = expandCloseOptions.overlayClick !== false
-const allowCloseButtonClose = expandCloseOptions.closeButtonClick !== false
-const allowEscClose = expandCloseOptions.esc !== false
-const allowWheelClose = expandCloseOptions.wheel !== false
-const allowSwipeClose = expandCloseOptions.swipe !== false
 
 const lazyOption = loaderOptions.lazy
 const isLazy = lazyOption !== false
@@ -382,31 +372,19 @@ if (import.meta.client) {
   })
 }
 
-const {
-  setExpandTargetWrap,
-  expandTargetStyle,
-  isExpandActive,
-  isVisible,
-  closeExpand,
-  toggleExpand,
-  handleExpandTransitionEnd,
-  handleMermaidClick,
-  resetExpand,
-  zoom,
-  showZoomHint,
-} = useMermaidExpand({
-  getExpandTarget: getMermaidSvg,
-  expandMargin,
-  isBlocked: isExpandBlocked,
-  invokeOpenOn: {
-    diagramClick: allowOpenDiagramClick,
-  },
-  invokeCloseOn: {
-    esc: allowEscClose,
-    wheel: allowWheelClose,
-    swipe: allowSwipeClose,
-  },
-})
+interface MermaidExpandOverlayExpose {
+  toggle: (event?: Event) => void
+  openFromDiagram: (event: MouseEvent) => void
+  endForDiagramReplacement: () => void
+}
+
+const expandOverlay = useTemplateRef<MermaidExpandOverlayExpose>('expandOverlay')
+const isExpandActive = ref(false)
+const handleExpandActiveChange = (active: boolean) => {
+  isExpandActive.value = active
+}
+const toggleExpand = (event?: Event) => expandOverlay.value?.toggle(event)
+const handleMermaidClick = (event: MouseEvent) => expandOverlay.value?.openFromDiagram(event)
 
 let requestBuiltInRender: ReturnType<typeof createMermaidRenderer> | undefined
 
@@ -419,8 +397,8 @@ function getBuiltInRenderRequest() {
       target: mermaidContainer.value,
     }),
     prepare: () => {
-      if (import.meta.client && isExpandActive.value)
-        resetExpand()
+      if (import.meta.client)
+        expandOverlay.value?.endForDiagramReplacement()
 
       hasError.value = false
       errorContent.value = null
@@ -894,20 +872,14 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       </div>
 
       <MermaidExpandOverlay
-        :active="isExpandActive"
-        :is-visable="isVisible"
+        ref="expandOverlay"
+        :options="expandOptions"
+        :blocked="isExpandBlocked"
+        :get-expand-target="getMermaidSvg"
         :overlay-style="cursorVariables"
         :content-style="cursorVariables"
-        :target-style="expandTargetStyle"
-        :target-ref="setExpandTargetWrap"
-        :allow-overlay-close="allowOverlayClose"
-        :allow-close-button="allowCloseButtonClose"
-        :target-has-margin="expandMargin > 0"
         :icon-size="iconSize"
-        :zoom="zoom"
-        :show-hint="showZoomHint"
-        @close="closeExpand"
-        @transitionend="handleExpandTransitionEnd"
+        @active-change="handleExpandActiveChange"
       />
     </div>
   </div>

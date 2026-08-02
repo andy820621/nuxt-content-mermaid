@@ -1,77 +1,75 @@
 <script setup lang="ts">
-import type { CSSProperties, ComponentPublicInstance } from 'vue'
-import type { MermaidZoomReturn } from '../composables/useMermaidZoom'
+import { computed, watch } from 'vue'
+import type { CSSProperties } from 'vue'
+import type { ExpandOptions } from '../types/expand'
+import { useMermaidExpand } from '../composables/useMermaidExpand'
 import MermaidZoomToolbar from './MermaidZoomToolbar.vue'
 
 const props = defineProps<{
-  active: boolean
-  isVisable: boolean
+  options: ExpandOptions
+  blocked: boolean
+  getExpandTarget: () => SVGElement | null
   overlayStyle?: CSSProperties
   contentStyle?: CSSProperties
-  targetStyle?: CSSProperties
-  targetRef: (el: Element | ComponentPublicInstance | null) => void
-  allowOverlayClose: boolean
-  allowCloseButton: boolean
-  targetHasMargin: boolean
   iconSize?: number
-  zoom?: MermaidZoomReturn
-  showHint?: boolean
 }>()
 
 const isMac = import.meta.client ? /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) : false
 
 const emit = defineEmits<{
-  (e: 'close', event?: Event): void
-  (e: 'transitionend', event: TransitionEvent): void
+  (e: 'active-change', active: boolean): void
 }>()
 
-const handleButtonClick = (event: MouseEvent) => {
-  if (!props.allowCloseButton) return
-  emit('close', event)
-}
+const blocked = computed(() => props.blocked)
+const allowCloseButton = computed(() => props.options.invokeCloseOn?.closeButtonClick !== false)
+const targetHasMargin = computed(() => typeof props.options.margin === 'number' && props.options.margin > 0)
 
-// Handler for Modal Click (captures everything)
-const handleModalClick = (event: MouseEvent) => {
-  // Check explicit drag flag
-  if (props.zoom?.isSpacePressed.value) return
-  if (props.zoom?.wasLastInteractionDrag.value) {
-    event.stopPropagation()
-    return
-  }
+const {
+  setExpandModal,
+  setExpandTargetWrap,
+  expandTargetStyle,
+  isExpandActive,
+  isVisible,
+  toggle,
+  openFromDiagram,
+  endForDiagramReplacement,
+  closeFromButton,
+  zoomIn,
+  zoomOut,
+  resetZoom,
+  cursor,
+  isDragging,
+  scale,
+  isOverlayClosable,
+  showZoomHint,
+} = useMermaidExpand({
+  getExpandTarget: props.getExpandTarget,
+  expandOptions: props.options,
+  isBlocked: blocked,
+})
 
-  // If it wasn't a drag, check where we clicked.
-  // If we clicked on the overlay element (background), try to close.
-  const target = event.target as HTMLElement
-  if (target.classList.contains('ncm-expand-overlay') || target.classList.contains('ncm-expand-modal')) {
-    if (props.allowOverlayClose) {
-      emit('close', event)
-    }
-  }
-}
+watch(isExpandActive, active => emit('active-change', active), { flush: 'sync', immediate: true })
+
+defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
 </script>
 
 <template>
   <Teleport to="body">
     <div
-      v-if="active"
+      v-if="isExpandActive"
+      :ref="setExpandModal"
       class="ncm-expand-modal"
       :style="{
-        cursor: zoom?.cursor.value || 'auto',
+        cursor,
       }"
-      @click="handleModalClick"
-      @mousedown="zoom?.handleDragStart($event)"
-      @mousemove="zoom?.handleDragMove($event)"
-      @touchstart="zoom?.handleDragStart($event)"
-      @touchmove="zoom?.handleDragMove($event)"
-      @touchend="zoom?.handleDragEnd()"
     >
       <div
         class="ncm-expand-overlay"
         :style="overlayStyle"
         :class="{
-          'ncm-expand-overlay-visible': isVisable,
-          'ncm-expand-overlay-closable': allowOverlayClose && !zoom?.isSpacePressed.value,
-          'ncm-expand-dragging': zoom?.isDragging.value,
+          'ncm-expand-overlay-visible': isVisible,
+          'ncm-expand-overlay-closable': isOverlayClosable,
+          'ncm-expand-dragging': isDragging,
         }"
       />
       <div
@@ -79,30 +77,28 @@ const handleModalClick = (event: MouseEvent) => {
         :style="contentStyle"
       >
         <div
-          :ref="targetRef"
+          :ref="setExpandTargetWrap"
           class="ncm-expand-target"
           :class="{
             'ncm-expand-target-with-margin': targetHasMargin,
           }"
-          :style="targetStyle"
-          @transitionend="emit('transitionend', $event)"
+          :style="expandTargetStyle"
         />
 
         <!-- Zoom Toolbar -->
         <MermaidZoomToolbar
-          v-if="zoom"
-          :scale="zoom.scale.value"
+          :scale="scale"
           :icon-size="iconSize"
           :icon-scale="0.75"
-          @zoom-out="zoom.zoomOut()"
-          @zoom-in="zoom.zoomIn()"
-          @reset="zoom.reset()"
+          @zoom-out="zoomOut"
+          @zoom-in="zoomIn"
+          @reset="resetZoom"
         />
 
         <!-- Zoom Hint Toast -->
         <Transition name="ncm-hint-fade">
           <div
-            v-if="showHint"
+            v-if="showZoomHint"
             class="ncm-zoom-hint"
           >
             {{ isMac ? '⌘' : 'Ctrl' }} + Scroll to zoom
@@ -114,7 +110,7 @@ const handleModalClick = (event: MouseEvent) => {
           type="button"
           class="ncm-expand-btn"
           aria-label="Minimize diagram"
-          @click="handleButtonClick"
+          @click="closeFromButton"
           @mousedown.stop
           @touchstart.stop
         >
