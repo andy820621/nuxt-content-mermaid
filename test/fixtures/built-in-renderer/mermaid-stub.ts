@@ -4,6 +4,8 @@ import type { MermaidControl, MermaidTestWindow } from './types'
 const pendingResolvers: Array<() => void> = []
 const initializedConfigs = new WeakSet<object>()
 let currentSecurityLevel: MermaidConfig['securityLevel']
+let currentTheme: MermaidConfig['theme']
+let currentUnknownMermaidExtensionEnabled = false
 const control: MermaidControl = {
   pending: 0,
   runs: [],
@@ -23,6 +25,10 @@ const mermaidStub = {
       control.reusedInitializationConfig = true
     initializedConfigs.add(config)
     currentSecurityLevel = config.securityLevel
+    currentTheme = config.theme
+    currentUnknownMermaidExtensionEnabled
+      = (config as MermaidConfig & { unknownMermaidExtension?: { enabled?: boolean } })
+        .unknownMermaidExtension?.enabled === true
   },
   render: async (_renderId: string, source: string, stagingTarget?: Element) => {
     const id = control.runs.length + 1
@@ -33,7 +39,9 @@ const mermaidStub = {
     control.runs.push({
       source,
       id,
+      theme: currentTheme,
       securityLevel: currentSecurityLevel,
+      unknownMermaidExtensionEnabled: currentUnknownMermaidExtensionEnabled,
       stagingConnected: stagingTarget?.isConnected === true,
       stagingHidden: stagingRoot?.getAttribute('aria-hidden') === 'true',
       stagingInert: stagingRoot?.inert === true && stagingRoot.style.pointerEvents === 'none',
