@@ -5,6 +5,7 @@
   },
   "include": [
     "./package-user.ts",
-    "./removed-transform.ts"
+    "./removed-transform.ts",
+    "./v3-configuration.ts"
   ]
 }

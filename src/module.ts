@@ -10,7 +10,6 @@ import {
 } from '@nuxt/kit'
 import { defu } from 'defu'
 import type { FileBeforeParseHook } from '@nuxt/content'
-import type { MermaidConfig } from 'mermaid'
 import {
   DEFAULT_DARK_THEME,
   DEFAULT_LIGHT_THEME,
@@ -18,9 +17,16 @@ import {
   DEFAULT_TOOLBAR_OPTIONS,
   DEFAULT_EXPAND_OPTIONS,
 } from './runtime/constants'
-import type { ExpandOptions } from './runtime/types/expand'
 import { transformMarkdownDiagrams } from './markdown-diagram-transform'
-import type { MermaidToolbarOptions } from './types/mermaid'
+import type { ModuleOptions, RuntimeMermaidConfig } from './types/config'
+
+export type {
+  MermaidComponentProps,
+  ModuleOptions,
+  PageMermaidConfig,
+  RuntimeMermaidConfig,
+  RuntimeOptions,
+} from './types/config'
 
 const MODULE_NAME = '@barzhsieh/nuxt-content-mermaid'
 
@@ -47,84 +53,10 @@ const MERMAID_OPTIMIZE_DEPS = [
   'dayjs/plugin/duration.js',
 ]
 
-export interface ModuleOptions {
-  /**
-   * Whether to enable the entire Mermaid process
-   * @default true
-   */
-  enabled?: boolean
-  /**
-   * Enable debug mode for detailed logging and error reporting
-   * @default false
-   */
-  debug?: boolean
-  /**
-   * Options related to loading mermaid
-   */
-  loader?: {
-    /**
-     * Pass-through to `mermaid.initialize`
-     */
-    init?: MermaidConfig
-    /**
-     * Whether to lazy load the diagram when it enters the viewport.
-     * Can be a boolean or an object with IntersectionObserver options.
-     * @default true
-     */
-    lazy?: boolean | { threshold?: number }
-  }
-  /**
-   * Options related to theme handling
-   */
-  theme?: {
-    /**
-     * @deprecated The module now automatically detects and syncs with @nuxtjs/color-mode.
-     * This option no longer has any effect and will be removed in a future version.
-     */
-    useColorModeTheme?: boolean
-    light?: MermaidConfig['theme']
-    dark?: MermaidConfig['theme']
-  }
-  /**
-   * Names for custom implementation components
-   */
-  components?: {
-    /**
-     * Custom Mermaid implementation component name (e.g., 'MyMermaid').
-     * The Markdown transformation phase always outputs `<Mermaid>`, this setting only affects
-     * which component implementation `Mermaid.vue` delegates to at runtime.
-     */
-    renderer?: string
-    /**
-     * Spinner component name to use while Mermaid is loading.
-     * This should be a globally available component name (e.g., under the project `components/` directory).
-     * If not provided, the module's built-in `Spinner.vue` will be used.
-     */
-    spinner?: string
-    /**
-     * Error component name to display when Mermaid rendering fails.
-     * This should be a globally available component name (e.g., under the project `components/` directory).
-     * If not provided, the module's built-in fallback message will be used.
-     */
-    error?: string
-  }
-  /**
-   * Options related to SVG expand (lightbox) interactions
-   */
-  /**
-   * Expand configuration. `false` disables expand, `true` uses defaults.
-   */
-  expand?: ExpandOptions | boolean
-  /**
-   * Default toolbar settings for Mermaid component
-   */
-  toolbar?: MermaidToolbarOptions
-}
-
 const DEFAULTS = {
   enabled: true,
   loader: {
-    init: { ...DEFAULT_MERMAID_CONFIG },
+    init: { ...DEFAULT_MERMAID_CONFIG } as RuntimeMermaidConfig,
     lazy: true,
   },
   theme: {
