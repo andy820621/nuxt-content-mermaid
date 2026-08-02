@@ -14,6 +14,7 @@ export interface MermaidControl {
   pending: number
   runs: MermaidRun[]
   stagingRoots: HTMLElement[]
+  reusedInitializationConfig: boolean
   lastError?: Error
   releaseNext: () => void
 }

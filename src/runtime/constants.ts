@@ -12,7 +12,6 @@ export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
   theme: 'default',
   fontFamily: 'Arial, sans-serif, 微軟正黑體',
   securityLevel: 'strict',
-  logLevel: 'error',
 }
 export const DEFAULT_TOOLBAR_OPTIONS: MermaidToolbarOptions = {
   title: 'mermaid',

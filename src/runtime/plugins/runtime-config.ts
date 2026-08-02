@@ -5,6 +5,6 @@ export default defineNuxtPlugin((nuxtApp) => {
   const runtimeConfig = useRuntimeConfig()
   installRuntimeMermaidSnapshot(
     nuxtApp,
-    runtimeConfig.public?.contentMermaid ?? {},
+    runtimeConfig.public?.contentMermaid,
   )
 })

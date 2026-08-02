@@ -207,13 +207,13 @@ const mermaidTheme = computed(() => {
   })
 })
 
-const effectiveMermaidInit = computed<MermaidConfig>(() => {
+function materializeEffectiveMermaidInit(): MermaidConfig {
   return mergeMermaidConfig({
     baseConfig: baseMermaidInit,
     overrideConfig: pageConfig.value,
     theme: mermaidTheme.value,
   })
-})
+}
 
 const configuredSpinnerName = computed(() => componentOptions.spinner?.trim() || '')
 const customSpinner = shallowRef<Component | null>(null)
@@ -252,7 +252,7 @@ function getBuiltInRenderRequest() {
     loadMermaid: $mermaid,
     readRenderData: () => ({
       source: mermaidDefinition.value,
-      config: effectiveMermaidInit.value,
+      config: materializeEffectiveMermaidInit(),
       target: mermaidContainer.value,
     }),
     beforeCommit: () => {

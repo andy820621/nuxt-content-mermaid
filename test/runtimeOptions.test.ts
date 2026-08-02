@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   resolveRuntimeOptionsSnapshot,
 } from '../src/runtime/configuration/runtime-options'
-import { resolveExpandOptions } from '../src/configuration/module'
+import { resolveExpandOptions, resolveModuleConfiguration } from '../src/configuration/module'
 
 describe('runtime options snapshot resolver', () => {
   it('applies runtime and debug defaults before deeply freezing the owned result', () => {
@@ -45,6 +45,18 @@ describe('runtime options snapshot resolver', () => {
     expect(explicitSnapshot.loader?.init).toMatchObject({
       logLevel: 0,
       suppressErrorRendering: true,
+    })
+  })
+
+  it('derives debug defaults after the real module transport omits absent Mermaid values', () => {
+    const transport = resolveModuleConfiguration({
+      nuxtResolvedOptions: { debug: true },
+      runtimeOverrides: {},
+    }).runtimeOptions
+
+    expect(resolveRuntimeOptionsSnapshot(transport).loader?.init).toMatchObject({
+      logLevel: 1,
+      suppressErrorRendering: false,
     })
   })
 

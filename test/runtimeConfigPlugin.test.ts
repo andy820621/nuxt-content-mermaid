@@ -47,4 +47,18 @@ describe('Universal Runtime Adapter plugin', () => {
       'Runtime Mermaid Snapshot has not been installed for this NuxtApp',
     )
   })
+
+  it('rejects an explicit null payload instead of treating it as absent', async () => {
+    const nuxtApp = {}
+    const module = await import('../src/runtime/plugins/runtime-config')
+    const plugin = module.default as unknown as RuntimeConfigPlugin
+    state.payload = null
+
+    expect(() => plugin(nuxtApp)).toThrowError(
+      expect.objectContaining({ name: 'ContentMermaidConfigurationError' }),
+    )
+    expect(() => getRuntimeMermaidSnapshot(nuxtApp)).toThrow(
+      'Runtime Mermaid Snapshot has not been installed for this NuxtApp',
+    )
+  })
 })
