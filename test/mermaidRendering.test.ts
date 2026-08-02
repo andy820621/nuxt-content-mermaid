@@ -1,58 +1,144 @@
 import type { Mermaid, MermaidConfig } from 'mermaid'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { scheduler } = vi.hoisted(() => ({
-  scheduler: { events: [] as string[] },
-}))
-
-vi.mock('vue', () => ({
-  nextTick: vi.fn(async () => {
-    scheduler.events.push('scheduler')
-  }),
-}))
-
-function createTarget(events: string[], svg: SVGSVGElement | null = null) {
-  let content = ''
-
-  const target = {
-    removeAttribute: vi.fn((name: string) => {
-      events.push(`remove:${name}`)
-    }),
-    get textContent() {
-      return content
-    },
-    set textContent(value: string | null) {
-      content = value ?? ''
-      events.push(`write:${content}`)
-    },
-    get innerHTML() {
-      return content
-    },
-    set innerHTML(value: string) {
-      content = value
-      events.push(`html:${value}`)
-    },
-    querySelector: vi.fn((selector: string) => {
-      events.push(`query:${selector}`)
-      return svg
-    }),
-  } as unknown as HTMLDivElement
-
-  return {
-    target,
-    readContent: () => content,
-  }
-}
-
-function asMermaid(value: Pick<Mermaid, 'initialize' | 'run'>): Mermaid {
+function asMermaid(value: object): Mermaid {
   return value as Mermaid
 }
 
-describe('createMermaidRenderer', () => {
-  beforeEach(() => {
-    scheduler.events = []
-  })
+class TestElement {
+  readonly attributes = new Map<string, string>()
+  readonly childNodes: TestElement[] = []
+  readonly style: Record<string, string> = {}
+  parentNode: TestElement | null = null
+  inert = false
+  tabIndex = 0
 
+  constructor(
+    readonly tagName: string,
+    readonly ownerDocument: TestDocument,
+    private readonly events: string[],
+  ) {}
+
+  get isConnected(): boolean {
+    return this === this.ownerDocument.body || this.parentNode?.isConnected === true
+  }
+
+  get textContent() {
+    return this.childNodes.map(node => node.textContent).join('')
+  }
+
+  set textContent(value: string) {
+    this.replaceChildren()
+    if (value) {
+      const text = this.ownerDocument.createElement('#text')
+      text.attributes.set('value', value)
+      this.appendChild(text)
+    }
+    this.events.push(`write:${value}`)
+  }
+
+  get innerHTML() {
+    return this.childNodes.map(node => `<${node.tagName}></${node.tagName}>`).join('')
+  }
+
+  set innerHTML(value: string) {
+    this.replaceChildren()
+    const tagName = value.includes('<iframe') ? 'iframe' : value.includes('<svg') ? 'svg' : undefined
+    if (tagName)
+      this.appendChild(this.ownerDocument.createElement(tagName))
+    this.events.push(`html:${value}`)
+  }
+
+  appendChild(node: TestElement) {
+    node.remove()
+    node.parentNode = this
+    this.childNodes.push(node)
+    return node
+  }
+
+  append(...nodes: TestElement[]) {
+    for (const node of nodes) this.appendChild(node)
+  }
+
+  removeChild(node: TestElement) {
+    const index = this.childNodes.indexOf(node)
+    if (index < 0) throw new Error('Node is not a child')
+    this.childNodes.splice(index, 1)
+    node.parentNode = null
+    return node
+  }
+
+  replaceChildren(...nodes: TestElement[]) {
+    for (const child of this.childNodes) child.parentNode = null
+    this.childNodes.splice(0)
+    this.append(...nodes)
+    this.events.push(`replace:${nodes.map(node => node.tagName).join(',')}`)
+  }
+
+  remove() {
+    if (!this.parentNode) return
+    const index = this.parentNode.childNodes.indexOf(this)
+    if (index >= 0) this.parentNode.childNodes.splice(index, 1)
+    this.parentNode = null
+  }
+
+  contains(candidate: TestElement): boolean {
+    return candidate === this || this.childNodes.some(child => child.contains(candidate))
+  }
+
+  querySelector(selector: string): TestElement | null {
+    const tagName = selector.toLowerCase()
+    for (const child of this.childNodes) {
+      if (child.tagName === tagName) return child
+      const descendant = child.querySelector(selector)
+      if (descendant) return descendant
+    }
+    return null
+  }
+
+  setAttribute(name: string, value: string) {
+    this.attributes.set(name, value)
+  }
+
+  hasAttribute(name: string) {
+    return this.attributes.has(name)
+  }
+
+  getAttribute(name: string) {
+    return this.attributes.get(name) ?? null
+  }
+
+  getBBox() {
+    return { x: 1, y: 2, width: 300, height: 200 }
+  }
+}
+
+class TestDocument {
+  readonly body: TestElement
+
+  constructor(private readonly events: string[]) {
+    this.body = new TestElement('body', this, events)
+  }
+
+  createElement(tagName: string) {
+    return new TestElement(tagName.toLowerCase(), this, this.events)
+  }
+}
+
+function createDomTarget(events: string[]) {
+  const document = new TestDocument(events)
+  const liveRoot = document.createElement('main')
+  const target = document.createElement('div')
+  const committed = document.createElement('svg')
+  committed.setAttribute('data-committed', 'true')
+  document.body.appendChild(liveRoot)
+  liveRoot.appendChild(target)
+  target.appendChild(committed)
+
+  return { document, liveRoot, target, committed }
+}
+
+describe('createMermaidRenderer', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
@@ -67,7 +153,7 @@ describe('createMermaidRenderer', () => {
 
     const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
     const loadMermaid = vi.fn()
-    const prepare = vi.fn()
+    const beforeCommit = vi.fn()
     const readRenderData = vi.fn(() => ({
       source: 'graph TD; A-->B',
       config: {} satisfies MermaidConfig,
@@ -77,24 +163,24 @@ describe('createMermaidRenderer', () => {
     const requestRender = createMermaidRenderer({
       loadMermaid,
       readRenderData,
-      prepare,
+      beforeCommit,
       debug: true,
     })
 
     expect(readRenderData).not.toHaveBeenCalled()
     expect(loadMermaid).not.toHaveBeenCalled()
-    expect(prepare).not.toHaveBeenCalled()
+    expect(beforeCommit).not.toHaveBeenCalled()
 
     await expect(requestRender()).resolves.toEqual({ status: 'skipped' })
     expect(readRenderData).toHaveBeenCalledOnce()
     expect(loadMermaid).not.toHaveBeenCalled()
-    expect(prepare).not.toHaveBeenCalled()
+    expect(beforeCommit).not.toHaveBeenCalled()
   })
 
-  it('skips an empty source before prepare or Mermaid loading', async () => {
+  it('skips an empty source before commit preparation or Mermaid loading', async () => {
     const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
     const loadMermaid = vi.fn()
-    const prepare = vi.fn()
+    const beforeCommit = vi.fn()
     const readRenderData = vi.fn(() => ({
       source: '',
       config: {} satisfies MermaidConfig,
@@ -104,51 +190,52 @@ describe('createMermaidRenderer', () => {
     const requestRender = createMermaidRenderer({
       loadMermaid,
       readRenderData,
-      prepare,
+      beforeCommit,
       debug: false,
     })
 
     await expect(requestRender()).resolves.toEqual({ status: 'skipped' })
     expect(loadMermaid).not.toHaveBeenCalled()
-    expect(prepare).not.toHaveBeenCalled()
+    expect(beforeCommit).not.toHaveBeenCalled()
   })
 
-  it('follows the valid Render Attempt protocol and normalizes the SVG viewBox', async () => {
+  it('stages a valid Render Attempt offscreen and commits it in one live replacement', async () => {
     const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
     const events: string[] = []
-    scheduler.events = events
     const config = { theme: 'dark' } satisfies MermaidConfig
-    const svg = {
-      hasAttribute: vi.fn((name: string) => {
-        events.push(`has:${name}`)
-        return false
-      }),
-      getBBox: vi.fn(() => {
-        events.push('bbox')
-        return { x: 1, y: 2, width: 300, height: 200 }
-      }),
-      setAttribute: vi.fn((name: string, value: string) => {
-        events.push(`set:${name}:${value}`)
-      }),
-    } as unknown as SVGSVGElement
-    const { target } = createTarget(events, svg)
+    const { document, liveRoot, target, committed } = createDomTarget(events)
+    let finishRender!: (value: { svg: string }) => void
+    const renderResult = new Promise<{ svg: string }>((resolve) => {
+      finishRender = resolve
+    })
     const mermaid = asMermaid({
       initialize: vi.fn((receivedConfig: MermaidConfig) => {
         expect(receivedConfig).toBe(config)
         events.push('initialize')
       }),
-      run: vi.fn(async (options) => {
-        expect(options).toEqual({ nodes: [target], suppressErrors: true })
-        events.push('run')
+      render: vi.fn(async (_id, source, stagingTarget) => {
+        expect(source).toBe('graph TD; A-->B')
+        expect(stagingTarget).not.toBe(target)
+        const stagingElement = stagingTarget as unknown as TestElement
+        const stagingRoot = stagingElement.parentNode
+        expect(stagingElement.isConnected).toBe(true)
+        expect(liveRoot.contains(stagingElement)).toBe(false)
+        expect(stagingRoot?.getAttribute('aria-hidden')).toBe('true')
+        expect(stagingRoot?.inert).toBe(true)
+        expect(stagingRoot?.tabIndex).toBe(-1)
+        expect(stagingRoot?.style.pointerEvents).toBe('none')
+        expect(stagingRoot?.style.opacity).toBe('0')
+        events.push('render')
+        return renderResult
       }),
     })
     const requestRender = createMermaidRenderer({
       readRenderData: () => {
         events.push('read')
-        return { source: 'graph TD; A-->B', config, target }
+        return { source: 'graph TD; A-->B', config, target: target as unknown as HTMLDivElement }
       },
-      prepare: () => {
-        events.push('prepare')
+      beforeCommit: () => {
+        events.push('beforeCommit')
       },
       loadMermaid: async () => {
         events.push('load')
@@ -157,118 +244,280 @@ describe('createMermaidRenderer', () => {
       debug: false,
     })
 
-    const outcome = await requestRender()
-    events.push(outcome.status)
+    const outcome = requestRender()
+    await vi.waitFor(() => expect(mermaid.render).toHaveBeenCalledOnce())
+    expect(target.childNodes).toEqual([committed])
 
-    expect(events).toEqual([
-      'read',
-      'prepare',
-      'load',
-      'initialize',
-      'remove:data-processed',
-      'write:graph TD; A-->B',
-      'scheduler',
-      'run',
-      'query:svg',
-      'has:viewBox',
-      'bbox',
-      'set:viewBox:1 2 300 200',
-      'success',
-    ])
+    finishRender({ svg: '<svg data-staged="true"></svg>' })
+    await expect(outcome).resolves.toEqual({ status: 'success' })
+
+    expect(target.childNodes.map(node => node.tagName)).toEqual(['svg'])
+    expect(target.childNodes[0]).not.toBe(committed)
+    expect(events.indexOf('beforeCommit')).toBeLessThan(events.lastIndexOf('replace:svg'))
+    expect(document.body.childNodes).toEqual([liveRoot])
   })
 
-  it('shares one FIFO and reads each requester data only when dequeued', async () => {
+  it.each([
+    ['strict SVG', '<svg data-security="strict"></svg>', 'svg'],
+    ['sandbox iframe', '<iframe data-security="sandbox"></iframe>', 'iframe'],
+  ])('moves committed %s nodes from staging without reparsing', async (_label, output, expectedTag) => {
     const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
     const events: string[] = []
-    let releaseFirst!: () => void
-    let markFirstStarted!: () => void
-    const firstStarted = new Promise<void>((resolve) => {
-      markFirstStarted = resolve
-    })
-    const firstGate = new Promise<void>((resolve) => {
-      releaseFirst = resolve
-    })
-    const firstTarget = createTarget(events).target
-    const oldTarget = createTarget(events)
-    const latestTarget = createTarget(events)
-    const oldConfig = { theme: 'default' } satisfies MermaidConfig
-    const latestConfig = { theme: 'forest' } satisfies MermaidConfig
-    let secondData = {
-      source: 'old source',
-      config: oldConfig as MermaidConfig,
-      target: oldTarget.target,
-    }
-
-    const firstRequester = createMermaidRenderer({
-      readRenderData: () => ({ source: 'first source', config: {}, target: firstTarget }),
-      prepare: () => {},
+    const { target } = createDomTarget(events)
+    let boundNode: TestElement | undefined
+    const requestRender = createMermaidRenderer({
+      readRenderData: () => ({
+        source: 'source',
+        config: {},
+        target: target as unknown as HTMLDivElement,
+      }),
+      beforeCommit: () => {},
       loadMermaid: async () => asMermaid({
         initialize: vi.fn(),
-        run: vi.fn(async () => {
-          events.push('first:start')
-          markFirstStarted()
-          await firstGate
-          events.push('first:finish')
-        }),
-      }),
-      debug: false,
-    })
-    const secondRead = vi.fn(() => secondData)
-    const secondInitialize = vi.fn()
-    const secondRequester = createMermaidRenderer({
-      readRenderData: secondRead,
-      prepare: () => {},
-      loadMermaid: async () => asMermaid({
-        initialize: secondInitialize,
-        run: vi.fn(async () => {
-          events.push('second')
-        }),
+        render: vi.fn(async () => ({
+          svg: output,
+          bindFunctions: (stagingTarget: Element) => {
+            boundNode = (stagingTarget as unknown as TestElement).childNodes[0]
+          },
+        })),
       }),
       debug: false,
     })
 
-    const firstOutcome = firstRequester()
-    await firstStarted
-    const secondOutcome = secondRequester()
-    secondData = {
-      source: 'latest source',
-      config: latestConfig,
-      target: latestTarget.target,
-    }
-
-    await Promise.resolve()
-    expect(secondRead).not.toHaveBeenCalled()
-
-    releaseFirst()
-    await expect(Promise.all([firstOutcome, secondOutcome])).resolves.toEqual([
-      { status: 'success' },
-      { status: 'success' },
-    ])
-    expect(events.indexOf('first:finish')).toBeLessThan(events.indexOf('second'))
-    expect(secondInitialize).toHaveBeenCalledWith(latestConfig)
-    expect(oldTarget.readContent()).toBe('')
-    expect(latestTarget.readContent()).toBe('latest source')
+    await expect(requestRender()).resolves.toEqual({ status: 'success' })
+    expect(target.childNodes).toEqual([boundNode])
+    expect(target.childNodes[0]?.tagName).toBe(expectedTag)
   })
 
-  it('preserves failures from every attempt stage, clears the target, and recovers the FIFO', async () => {
+  it('skips a stale queued Render Request before reading data or loading Mermaid', async () => {
     const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
-    const stages = ['prepare', 'loader', 'initialize', 'run', 'normalization'] as const
+    const events: string[] = []
+    let releaseBlocker!: (value: { svg: string }) => void
+    let markBlockerStarted!: () => void
+    const blockerStarted = new Promise<void>((resolve) => {
+      markBlockerStarted = resolve
+    })
+    const blockerGate = new Promise<{ svg: string }>((resolve) => {
+      releaseBlocker = resolve
+    })
+    const blockerTarget = createDomTarget(events).target
+    const latestTarget = createDomTarget(events).target
+
+    const blockerRequester = createMermaidRenderer({
+      readRenderData: () => ({ source: 'blocker source', config: {}, target: blockerTarget as unknown as HTMLDivElement }),
+      beforeCommit: () => {},
+      loadMermaid: async () => asMermaid({
+        initialize: vi.fn(),
+        render: vi.fn(async () => {
+          markBlockerStarted()
+          return blockerGate
+        }),
+      }),
+      debug: false,
+    })
+    const readRenderData = vi.fn(() => ({
+      source: 'latest source',
+      config: { theme: 'forest' } satisfies MermaidConfig,
+      target: latestTarget as unknown as HTMLDivElement,
+    }))
+    const initialize = vi.fn()
+    const render = vi.fn(async () => ({ svg: '<svg data-source="latest"></svg>' }))
+    const loadMermaid = vi.fn(async () => asMermaid({ initialize, render }))
+    const requestRender = createMermaidRenderer({
+      readRenderData,
+      beforeCommit: () => {},
+      loadMermaid,
+      debug: false,
+    })
+
+    const blockerOutcome = blockerRequester()
+    await blockerStarted
+    const staleOutcome = requestRender()
+    const latestOutcome = requestRender()
+
+    releaseBlocker({ svg: '<svg></svg>' })
+    await expect(Promise.all([blockerOutcome, staleOutcome, latestOutcome])).resolves.toEqual([
+      { status: 'success' },
+      { status: 'stale' },
+      { status: 'success' },
+    ])
+    expect(readRenderData).toHaveBeenCalledOnce()
+    expect(loadMermaid).toHaveBeenCalledOnce()
+    expect(initialize).toHaveBeenCalledOnce()
+    expect(render).toHaveBeenCalledOnce()
+  })
+
+  it('discards an executing Render Attempt that becomes stale before commit', async () => {
+    const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
+    const events: string[] = []
+    const { target, committed } = createDomTarget(events)
+    let source = 'old source'
+    let finishOld!: (value: { svg: string }) => void
+    let finishLatest!: (value: { svg: string }) => void
+    const oldGate = new Promise<{ svg: string }>((resolve) => {
+      finishOld = resolve
+    })
+    const latestGate = new Promise<{ svg: string }>((resolve) => {
+      finishLatest = resolve
+    })
+    const render = vi.fn()
+      .mockImplementationOnce(async () => oldGate)
+      .mockImplementationOnce(async () => latestGate)
+    const beforeCommit = vi.fn()
+    const requestRender = createMermaidRenderer({
+      readRenderData: () => ({
+        source,
+        config: {},
+        target: target as unknown as HTMLDivElement,
+      }),
+      beforeCommit,
+      loadMermaid: async () => asMermaid({ initialize: vi.fn(), render }),
+      debug: false,
+    })
+
+    const staleOutcome = requestRender()
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+    source = 'latest source'
+    const latestOutcome = requestRender()
+
+    finishOld({ svg: '<svg data-source="old"></svg>' })
+    await expect(staleOutcome).resolves.toEqual({ status: 'stale' })
+    expect(beforeCommit).not.toHaveBeenCalled()
+    expect(target.childNodes).toEqual([committed])
+
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2))
+    finishLatest({ svg: '<svg data-source="latest"></svg>' })
+    await expect(latestOutcome).resolves.toEqual({ status: 'success' })
+    expect(beforeCommit).toHaveBeenCalledOnce()
+    expect(target.childNodes[0]).not.toBe(committed)
+  })
+
+  it('classifies a failure from an invalidated Render Attempt as stale', async () => {
+    const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
+    const events: string[] = []
+    const { target, committed } = createDomTarget(events)
+    const staleFailure = new Error('stale failure')
+    let rejectStale!: (reason: unknown) => void
+    let finishLatest!: (value: { svg: string }) => void
+    const staleGate = new Promise<{ svg: string }>((_resolve, reject) => {
+      rejectStale = reject
+    })
+    const latestGate = new Promise<{ svg: string }>((resolve) => {
+      finishLatest = resolve
+    })
+    const render = vi.fn()
+      .mockImplementationOnce(async () => staleGate)
+      .mockImplementationOnce(async () => latestGate)
+    const beforeCommit = vi.fn()
+    const requestRender = createMermaidRenderer({
+      readRenderData: () => ({
+        source: 'source',
+        config: {},
+        target: target as unknown as HTMLDivElement,
+      }),
+      beforeCommit,
+      loadMermaid: async () => asMermaid({ initialize: vi.fn(), render }),
+      debug: false,
+    })
+
+    const staleOutcome = requestRender()
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+    const latestOutcome = requestRender()
+    rejectStale(staleFailure)
+
+    await expect(staleOutcome).resolves.toEqual({ status: 'stale' })
+    expect(target.childNodes).toEqual([committed])
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2))
+    finishLatest({ svg: '<svg data-source="latest"></svg>' })
+    await expect(latestOutcome).resolves.toEqual({ status: 'success' })
+    expect(beforeCommit).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to parent removal when staging root cleanup throws', async () => {
+    const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
+    const events: string[] = []
+    const { document, liveRoot, target } = createDomTarget(events)
+    const originalCreateElement = document.createElement.bind(document)
+    let stagingRoot: TestElement | undefined
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const element = originalCreateElement(tagName)
+      if (!stagingRoot) {
+        stagingRoot = element
+        const remove = element.remove.bind(element)
+        element.remove = () => {
+          if (element.isConnected) throw new Error('cleanup failed')
+          remove()
+        }
+      }
+      return element
+    })
+    const requestRender = createMermaidRenderer({
+      readRenderData: () => ({
+        source: 'source',
+        config: {},
+        target: target as unknown as HTMLDivElement,
+      }),
+      beforeCommit: () => {},
+      loadMermaid: async () => asMermaid({
+        initialize: vi.fn(),
+        render: vi.fn(async () => ({ svg: '<svg></svg>' })),
+      }),
+      debug: false,
+    })
+
+    await expect(requestRender()).resolves.toEqual({ status: 'success' })
+    expect(stagingRoot?.parentNode).toBeNull()
+    expect(document.body.childNodes).toEqual([liveRoot])
+  })
+
+  it('logically invalidates an executing Render Attempt without physical cancellation', async () => {
+    const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
+    const events: string[] = []
+    const { target, committed } = createDomTarget(events)
+    let finishRender!: (value: { svg: string }) => void
+    const renderGate = new Promise<{ svg: string }>((resolve) => {
+      finishRender = resolve
+    })
+    const beforeCommit = vi.fn()
+    const render = vi.fn(async () => renderGate)
+    const requestRender = createMermaidRenderer({
+      readRenderData: () => ({
+        source: 'source',
+        config: {},
+        target: target as unknown as HTMLDivElement,
+      }),
+      beforeCommit,
+      loadMermaid: async () => asMermaid({ initialize: vi.fn(), render }),
+      debug: false,
+    })
+
+    const outcome = requestRender()
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+    requestRender.invalidate()
+    finishRender({ svg: '<svg></svg>' })
+
+    await expect(outcome).resolves.toEqual({ status: 'stale' })
+    expect(beforeCommit).not.toHaveBeenCalled()
+    expect(target.childNodes).toEqual([committed])
+  })
+
+  it('preserves the Committed Diagram and cleans staging after every failure stage', async () => {
+    const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
+    const stages = ['loader', 'initialize', 'render', 'binding', 'beforeCommit'] as const
 
     for (const stage of stages) {
       const events: string[] = []
       const thrownValue = { stage }
-      const { target } = createTarget(events)
-
-      if (stage === 'normalization') {
-        target.querySelector = vi.fn(() => {
-          throw thrownValue
-        })
-      }
+      const { document, liveRoot, target, committed } = createDomTarget(events)
 
       const requestRender = createMermaidRenderer({
-        readRenderData: () => ({ source: `${stage} source`, config: {}, target }),
-        prepare: () => {
-          if (stage === 'prepare') throw thrownValue
+        readRenderData: () => ({
+          source: `${stage} source`,
+          config: {},
+          target: target as unknown as HTMLDivElement,
+        }),
+        beforeCommit: () => {
+          if (stage === 'beforeCommit') throw thrownValue
         },
         loadMermaid: async () => {
           if (stage === 'loader') throw thrownValue
@@ -277,8 +526,14 @@ describe('createMermaidRenderer', () => {
             initialize: vi.fn(() => {
               if (stage === 'initialize') throw thrownValue
             }),
-            run: vi.fn(async () => {
-              if (stage === 'run') throw thrownValue
+            render: vi.fn(async () => {
+              if (stage === 'render') throw thrownValue
+              return {
+                svg: '<svg></svg>',
+                bindFunctions: () => {
+                  if (stage === 'binding') throw thrownValue
+                },
+              }
             }),
           })
         },
@@ -290,25 +545,33 @@ describe('createMermaidRenderer', () => {
       expect(outcome.status).toBe('failure')
       if (outcome.status === 'failure')
         expect(outcome.error).toBe(thrownValue)
-      expect(events).toContain('html:')
+      expect(target.childNodes).toEqual([committed])
+      expect(document.body.childNodes).toEqual([liveRoot])
     }
 
-    const recoveredTarget = createTarget([])
+    const recoveredTarget = createDomTarget([])
     const recoveredRequest = createMermaidRenderer({
-      readRenderData: () => ({ source: 'recovered', config: {}, target: recoveredTarget.target }),
-      prepare: () => {},
-      loadMermaid: async () => asMermaid({ initialize: vi.fn(), run: vi.fn() }),
+      readRenderData: () => ({
+        source: 'recovered',
+        config: {},
+        target: recoveredTarget.target as unknown as HTMLDivElement,
+      }),
+      beforeCommit: () => {},
+      loadMermaid: async () => asMermaid({
+        initialize: vi.fn(),
+        render: vi.fn(async () => ({ svg: '<svg></svg>' })),
+      }),
       debug: false,
     })
 
     await expect(recoveredRequest()).resolves.toEqual({ status: 'success' })
-    expect(recoveredTarget.readContent()).toBe('recovered')
+    expect(recoveredTarget.target.childNodes[0]).not.toBe(recoveredTarget.committed)
   })
 
   it('reports debug diagnostics by semantic event category', async () => {
     const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
     const thrownValue = new Error('debug failure')
-    const { target } = createTarget([])
+    const { target } = createDomTarget([])
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.stubGlobal('performance', {
@@ -317,11 +580,15 @@ describe('createMermaidRenderer', () => {
         .mockReturnValueOnce(125),
     })
     const requestRender = createMermaidRenderer({
-      readRenderData: () => ({ source: 'debug source', config: {}, target }),
-      prepare: () => {},
+      readRenderData: () => ({
+        source: 'debug source',
+        config: {},
+        target: target as unknown as HTMLDivElement,
+      }),
+      beforeCommit: () => {},
       loadMermaid: async () => asMermaid({
         initialize: vi.fn(),
-        run: vi.fn(async () => {
+        render: vi.fn(async () => {
           throw thrownValue
         }),
       }),

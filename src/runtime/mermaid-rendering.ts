@@ -1,9 +1,9 @@
 import type { Mermaid, MermaidConfig } from 'mermaid'
-import { nextTick } from 'vue'
 import { MERMAID_LOG_PREFIX } from './constants'
 
 let renderQueue = Promise.resolve()
 let queueSize = 0
+let renderId = 0
 
 export interface MermaidRenderData {
   source: string | null | undefined
@@ -13,27 +13,36 @@ export interface MermaidRenderData {
 
 export type MermaidRenderOutcome
   = | { status: 'skipped' }
+    | { status: 'stale' }
     | { status: 'success' }
     | { status: 'failure', error: unknown }
 
 export interface MermaidRendererDependencies {
   loadMermaid: () => Promise<Mermaid>
   readRenderData: () => MermaidRenderData
-  prepare: () => void
+  beforeCommit: () => void
   debug: boolean
+}
+
+export interface MermaidRenderRequest {
+  (): Promise<MermaidRenderOutcome>
+  invalidate: () => void
 }
 
 /** @internal */
 export function createMermaidRenderer(
   dependencies: MermaidRendererDependencies,
-): () => Promise<MermaidRenderOutcome> {
+): MermaidRenderRequest {
   if (dependencies.debug) {
     console.log(MERMAID_LOG_PREFIX, {
       event: 'renderer:create',
     })
   }
 
-  return () => {
+  let latestGeneration = 0
+
+  const request: MermaidRenderRequest = () => {
+    const generation = ++latestGeneration
     queueSize++
     if (dependencies.debug) {
       console.log(MERMAID_LOG_PREFIX, {
@@ -44,6 +53,7 @@ export function createMermaidRenderer(
 
     const render = async (): Promise<MermaidRenderOutcome> => {
       let target: HTMLDivElement | null | undefined
+      let stagingRoot: HTMLDivElement | undefined
       let attemptStart: number | undefined
 
       if (dependencies.debug) {
@@ -54,6 +64,9 @@ export function createMermaidRenderer(
       }
 
       try {
+        if (generation !== latestGeneration)
+          return { status: 'stale' }
+
         const renderData = dependencies.readRenderData()
         const { source, config } = renderData
         target = renderData.target
@@ -64,34 +77,40 @@ export function createMermaidRenderer(
         if (dependencies.debug)
           attemptStart = performance.now()
 
-        dependencies.prepare()
-
         const mermaid = await dependencies.loadMermaid()
         mermaid.initialize(config)
-        target.removeAttribute('data-processed')
-        target.textContent = source
-        await nextTick()
 
-        await mermaid.run({
-          nodes: [target],
-          suppressErrors: !dependencies.debug,
-        })
+        const staging = createStagingTarget(target)
+        stagingRoot = staging.root
+        const result = await mermaid.render(
+          `nuxt-content-mermaid-${++renderId}`,
+          source,
+          staging.target,
+        )
 
-        const svg = target.querySelector('svg')
+        if (generation !== latestGeneration)
+          return { status: 'stale' }
+
+        staging.target.innerHTML = result.svg
+
+        const svg = staging.target.querySelector('svg')
         if (svg)
           ensureViewBox(svg)
+
+        result.bindFunctions?.(staging.target)
+
+        if (generation !== latestGeneration)
+          return { status: 'stale' }
+
+        // The commit phase must not yield after this final eligibility check.
+        dependencies.beforeCommit()
+        target.replaceChildren(...staging.target.childNodes)
 
         return { status: 'success' }
       }
       catch (error) {
-        if (target) {
-          try {
-            target.innerHTML = ''
-          }
-          catch {
-            // Preserve the original failure when cleanup itself cannot complete.
-          }
-        }
+        if (generation !== latestGeneration)
+          return { status: 'stale' }
 
         if (dependencies.debug) {
           console.error(
@@ -104,6 +123,9 @@ export function createMermaidRenderer(
         return { status: 'failure', error }
       }
       finally {
+        if (stagingRoot)
+          removeStagingRoot(stagingRoot)
+
         if (dependencies.debug && attemptStart !== undefined) {
           console.log(MERMAID_LOG_PREFIX, {
             event: 'attempt:duration',
@@ -128,6 +150,47 @@ export function createMermaidRenderer(
     )
     return outcome
   }
+
+  request.invalidate = () => {
+    latestGeneration++
+  }
+
+  return request
+}
+
+function removeStagingRoot(root: HTMLDivElement) {
+  const parent = root.parentNode
+  try {
+    root.remove()
+  }
+  catch {
+    try {
+      parent?.removeChild(root)
+    }
+    catch {
+      // Cleanup must not replace the Render Outcome with a secondary DOM error.
+    }
+  }
+}
+
+function createStagingTarget(target: HTMLDivElement) {
+  const document = target.ownerDocument
+  const root = document.createElement('div')
+  const stagingTarget = document.createElement('div')
+
+  root.setAttribute('aria-hidden', 'true')
+  root.inert = true
+  root.tabIndex = -1
+  root.style.position = 'fixed'
+  root.style.left = '-100000px'
+  root.style.top = '0'
+  root.style.opacity = '0'
+  root.style.pointerEvents = 'none'
+  root.style.zIndex = '-1'
+  root.appendChild(stagingTarget)
+  document.body.appendChild(root)
+
+  return { root, target: stagingTarget }
 }
 
 function ensureViewBox(svg: SVGSVGElement) {

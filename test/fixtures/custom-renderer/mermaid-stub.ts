@@ -7,9 +7,14 @@ if (typeof window !== 'undefined')
 
 const mermaidStub = {
   initialize: () => {},
-  run: async () => {
+  render: async () => {
     if (typeof window !== 'undefined')
       (window as TestWindow).__builtInMermaidRunCount__ = ((window as TestWindow).__builtInMermaidRunCount__ || 0) + 1
+
+    return {
+      diagramType: 'flowchart',
+      svg: '<svg></svg>',
+    }
   },
 }
 

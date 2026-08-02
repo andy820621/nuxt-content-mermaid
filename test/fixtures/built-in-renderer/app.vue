@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { MermaidConfig } from 'mermaid'
 
 const primaryVersion = ref(0)
 const primaryCode = ref('graph TD;INITIAL-->DONE')
@@ -7,6 +8,10 @@ const blockerVersion = ref(0)
 const showBlocker = ref(false)
 const skippedCode = ref('graph TD;SKIPPED-->DONE')
 const showSkipped = ref(false)
+const showStrict = ref(false)
+const showSandbox = ref(false)
+const strictConfig: MermaidConfig = { securityLevel: 'strict' }
+const sandboxConfig: MermaidConfig = { securityLevel: 'sandbox' }
 
 const encodedPrimary = computed(() => encodeURIComponent(primaryCode.value))
 const encodedBlocker = computed(() => encodeURIComponent(`graph TD;BLOCKER_${blockerVersion.value}-->DONE`))
@@ -44,6 +49,14 @@ function mountSkipped() {
 
 function clearSkipped() {
   skippedCode.value = ''
+}
+
+function mountStrict() {
+  showStrict.value = true
+}
+
+function mountSandbox() {
+  showSandbox.value = true
 }
 </script>
 
@@ -106,6 +119,20 @@ function clearSkipped() {
       >
         Clear skipped
       </button>
+      <button
+        id="strict-mount"
+        type="button"
+        @click="mountStrict"
+      >
+        Mount strict
+      </button>
+      <button
+        id="sandbox-mount"
+        type="button"
+        @click="mountSandbox"
+      >
+        Mount sandbox
+      </button>
     </div>
 
     <section id="primary">
@@ -124,6 +151,26 @@ function clearSkipped() {
       id="skipped"
     >
       <Mermaid :code="encodedSkipped" />
+    </section>
+
+    <section
+      v-if="showStrict"
+      id="strict"
+    >
+      <Mermaid
+        :code="encodeURIComponent('graph TD;STRICT-->DONE')"
+        :config="strictConfig"
+      />
+    </section>
+
+    <section
+      v-if="showSandbox"
+      id="sandbox"
+    >
+      <Mermaid
+        :code="encodeURIComponent('graph TD;SANDBOX-->DONE')"
+        :config="sandboxConfig"
+      />
     </section>
   </main>
 </template>
