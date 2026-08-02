@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onErrorCaptured, reactive, ref, resolveComponent, shallowRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
+import type { PageMermaidConfig } from '../../../src/types/config'
 
 const primaryVersion = ref(0)
 const primaryCode = ref('graph TD;INITIAL-->DONE')
@@ -10,8 +11,32 @@ const skippedCode = ref('graph TD;SKIPPED-->DONE')
 const showSkipped = ref(false)
 const showStrict = ref(false)
 const showSandbox = ref(false)
+const showPageConfig = ref(false)
+const showConflict = ref(false)
+const showReactiveConflict = ref(false)
+const componentErrorFingerprint = ref<{ name?: string, code?: string } | null>(null)
 const strictConfig: MermaidConfig = { securityLevel: 'strict' }
 const sandboxConfig: MermaidConfig = { securityLevel: 'sandbox' }
+const pageConfig = reactive({
+  theme: 'forest' as const,
+  unknownMermaidExtension: { enabled: true },
+})
+const pageConfigSource = shallowRef<PageMermaidConfig | undefined>(pageConfig)
+const conflictPageConfig = { theme: 'forest' }
+const conflictDirectConfig: MermaidConfig = { theme: 'dark' }
+const reactiveConflictPageConfig = { theme: 'forest' } as const
+const reactiveConflictDirectConfig = shallowRef<MermaidConfig>()
+const reactiveConflictCode = ref('graph TD;REACTIVE_CONFLICT-->LEGAL')
+const MermaidComponent = resolveComponent('Mermaid')
+
+onErrorCaptured((error) => {
+  const fingerprint = error as { name?: string, code?: string }
+  componentErrorFingerprint.value = {
+    name: fingerprint.name,
+    code: fingerprint.code,
+  }
+  return false
+})
 
 const encodedPrimary = computed(() => encodeURIComponent(primaryCode.value))
 const encodedBlocker = computed(() => encodeURIComponent(`graph TD;BLOCKER_${blockerVersion.value}-->DONE`))
@@ -57,6 +82,35 @@ function mountStrict() {
 
 function mountSandbox() {
   showSandbox.value = true
+}
+
+function mountPageConfig() {
+  showPageConfig.value = true
+}
+
+function invalidatePageConfig() {
+  const invalidPageConfig = pageConfig as unknown as { theme: null }
+  invalidPageConfig.theme = null
+}
+
+function removePageConfig() {
+  pageConfigSource.value = undefined
+}
+
+function mountConflict() {
+  showConflict.value = true
+}
+
+function mountReactiveConflict() {
+  showReactiveConflict.value = true
+}
+
+function enterReactiveConflict() {
+  reactiveConflictDirectConfig.value = { theme: 'dark' }
+}
+
+function updateReactiveConflictCode() {
+  reactiveConflictCode.value = 'graph TD;REACTIVE_CONFLICT-->UPDATED'
 }
 </script>
 
@@ -133,6 +187,55 @@ function mountSandbox() {
       >
         Mount sandbox
       </button>
+      <button
+        id="conflict-mount"
+        type="button"
+        @click="mountConflict"
+      >
+        Mount conflict
+      </button>
+      <button
+        id="page-config-mount"
+        type="button"
+        @click="mountPageConfig"
+      >
+        Mount page config
+      </button>
+      <button
+        id="page-config-invalidate"
+        type="button"
+        @click="invalidatePageConfig"
+      >
+        Invalidate page config
+      </button>
+      <button
+        id="page-config-remove"
+        type="button"
+        @click="removePageConfig"
+      >
+        Remove page config
+      </button>
+      <button
+        id="reactive-conflict-mount"
+        type="button"
+        @click="mountReactiveConflict"
+      >
+        Mount reactive conflict
+      </button>
+      <button
+        id="reactive-conflict-enter"
+        type="button"
+        @click="enterReactiveConflict"
+      >
+        Enter reactive conflict
+      </button>
+      <button
+        id="reactive-conflict-update-code"
+        type="button"
+        @click="updateReactiveConflictCode"
+      >
+        Update reactive conflict code
+      </button>
     </div>
 
     <section id="primary">
@@ -172,5 +275,46 @@ function mountSandbox() {
         :config="sandboxConfig"
       />
     </section>
+
+    <section
+      v-if="showConflict"
+      id="conflict"
+    >
+      <component
+        :is="MermaidComponent"
+        :code="encodeURIComponent('graph TD;CONFLICT-->DONE')"
+        :page-config="conflictPageConfig"
+        :config="conflictDirectConfig"
+      />
+    </section>
+
+    <section
+      v-if="showPageConfig"
+      id="page-config"
+    >
+      <Mermaid
+        :code="encodeURIComponent('graph TD;PAGE-->DONE')"
+        :page-config="pageConfigSource"
+      />
+    </section>
+
+    <section
+      v-if="showReactiveConflict"
+      id="reactive-conflict"
+    >
+      <component
+        :is="MermaidComponent"
+        :code="encodeURIComponent(reactiveConflictCode)"
+        :page-config="reactiveConflictPageConfig"
+        :config="reactiveConflictDirectConfig"
+      />
+    </section>
+
+    <output
+      v-if="componentErrorFingerprint"
+      id="component-error"
+      :data-name="componentErrorFingerprint.name"
+      :data-code="componentErrorFingerprint.code"
+    />
   </main>
 </template>

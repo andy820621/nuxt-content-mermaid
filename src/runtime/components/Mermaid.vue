@@ -14,6 +14,8 @@ import {
 import { defu } from 'defu'
 import type { Component, ComputedRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
+import type { MermaidComponentSource } from '../component-configuration'
+import { resolveMermaidComponentSource } from '../component-configuration'
 import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
@@ -29,16 +31,23 @@ import IconFullScreen from './icons/iconFullScreen.vue'
 import IconFullScreenExit from './icons/iconFullScreenExit.vue'
 import MermaidExpandOverlay from './MermaidExpandOverlay.vue'
 import type { MermaidToolbarOptions } from '../../types/mermaid'
+import type { MermaidComponentProps } from '../../types/config'
 import IconExpand from './icons/IconExpand.vue'
 import IconCollapse from './icons/IconCollapse.vue'
 import MermaidFullscreenPresentation from './MermaidFullscreenPresentation.vue'
 
-const props = defineProps<{
-  // Using `unknown` to avoid Vue runtime prop type warnings when user's collection schema is misconfigured; actual validation below.
-  config?: MermaidConfig | string | unknown
-  toolbar?: MermaidToolbarOptions
-  code?: string
-}>()
+const props = defineProps<MermaidComponentProps>()
+
+function resolveCurrentComponentSource() {
+  return resolveMermaidComponentSource({
+    pageConfig: props.pageConfig,
+    config: props.config,
+  })
+}
+
+const initialComponentSource = resolveCurrentComponentSource()
+if (initialComponentSource.kind === 'conflict') throw initialComponentSource.error
+const componentSource = shallowRef<MermaidComponentSource>(initialComponentSource)
 
 const nuxtApp = useNuxtApp()
 const contentMermaidOptions = getRuntimeMermaidSnapshot(nuxtApp)
@@ -174,33 +183,18 @@ const effectiveToolbarFontSizePx = computed(() => {
   return isFullscreen.value ? baseSize * fullscreenToolbarScale.value : baseSize
 })
 
-const pageConfig = computed<MermaidConfig | undefined>(() => {
-  const value = props.config
-  if (!value)
-    return undefined
-
-  if (typeof value !== 'object') {
-    // Only warn if it looks like a schema misconfiguration (received a primitive type)
-    // Skip warning for null or undefined (which are valid when config is optional in schema)
-    if (import.meta.dev && value !== null && value !== undefined) {
-      console.warn(
-        '[nuxt-content-mermaid] Received non-object `config` prop on <Mermaid> component. '
-        + 'This usually means your `content.config.ts` collection schema did not declare `config` as a JSON field. '
-        + 'See README section about per-page overrides via frontmatter.',
-        value,
-      )
-    }
-    return undefined
-  }
-
-  return value as MermaidConfig
+const diagramSourceConfig = computed<MermaidConfig | undefined>(() => {
+  const source = componentSource.value
+  return source.kind === 'runtime-only' || source.kind === 'conflict'
+    ? undefined
+    : source.config as MermaidConfig
 })
 
 const mermaidTheme = computed(() => {
   return resolveMermaidTheme({
     colorModeValue: colorMode?.value,
     manualThemeMode: manualThemeMode.value,
-    frontmatterTheme: pageConfig.value?.theme,
+    frontmatterTheme: diagramSourceConfig.value?.theme,
     baseTheme: baseMermaidInit.theme as MermaidConfig['theme'] | undefined,
     lightTheme,
     darkTheme,
@@ -210,7 +204,7 @@ const mermaidTheme = computed(() => {
 function materializeEffectiveMermaidInit(): MermaidConfig {
   return mergeMermaidConfig({
     baseConfig: baseMermaidInit,
-    overrideConfig: pageConfig.value,
+    overrideConfig: diagramSourceConfig.value,
     theme: mermaidTheme.value,
   })
 }
@@ -250,11 +244,21 @@ let requestBuiltInRender: ReturnType<typeof createMermaidRenderer> | undefined
 function getBuiltInRenderRequest() {
   requestBuiltInRender ??= createMermaidRenderer({
     loadMermaid: $mermaid,
-    readRenderData: () => ({
-      source: mermaidDefinition.value,
-      config: materializeEffectiveMermaidInit(),
-      target: mermaidContainer.value,
-    }),
+    readRenderData: () => {
+      if (componentSource.value.kind === 'conflict') {
+        return {
+          source: null,
+          config: {},
+          target: mermaidContainer.value,
+        }
+      }
+
+      return {
+        source: mermaidDefinition.value,
+        config: materializeEffectiveMermaidInit(),
+        target: mermaidContainer.value,
+      }
+    },
     beforeCommit: () => {
       if (import.meta.client) {
         expandOverlay.value?.endForDiagramReplacement()
@@ -428,6 +432,8 @@ function getMermaidSvg(): SVGSVGElement | null {
 }
 
 async function renderMermaid() {
+  if (componentSource.value.kind === 'conflict') return
+
   isLoading.value = true
 
   const outcome = await getBuiltInRenderRequest()()
@@ -539,15 +545,22 @@ onUnmounted(() => {
   if (copyResetTimer) clearTimeout(copyResetTimer)
 })
 
-watch(mermaidTheme, () => {
-  if (!isEnabled) return
-  if (hasRenderedOnce.value) renderMermaid()
-})
-
 watch(
-  pageConfig,
+  [() => colorMode?.value, manualThemeMode],
   () => {
     if (!isEnabled) return
+    if (componentSource.value.kind === 'conflict') return
+    if (hasRenderedOnce.value) renderMermaid()
+  },
+)
+
+watch(
+  [() => props.pageConfig, () => props.config],
+  () => {
+    const source = resolveCurrentComponentSource()
+    componentSource.value = source
+    if (!isEnabled) return
+    if (source.kind === 'conflict') return
     if (hasRenderedOnce.value) renderMermaid()
   },
   { deep: true },

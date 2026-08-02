@@ -4,6 +4,10 @@ import type { RuntimeMermaidConfig, RuntimeOptions } from '../types/config'
 import type { ExpandOptions } from './types/expand'
 
 export const MERMAID_LOG_PREFIX = '[nuxt-content-mermaid]'
+export const PAGE_MERMAID_CONFIG_PHASE = {
+  name: 'Page Mermaid Config',
+  root: 'pageConfig',
+} as const
 export const DEFAULT_LIGHT_THEME: MermaidConfig['theme'] = 'default'
 export const DEFAULT_DARK_THEME: MermaidConfig['theme'] = 'dark'
 export const FULLSCREEN_ZOOM_HINT_DURATION_MS = 3000

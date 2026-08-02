@@ -104,6 +104,107 @@ describe('built-in renderer integration', async () => {
     })).toBe(false)
   })
 
+  it('rejects an initial source conflict before creating render work', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    await page.locator('#conflict-mount').click()
+    const fingerprint = page.locator('#component-error')
+    await fingerprint.waitFor({ state: 'attached', timeout: 5000 })
+
+    expect(await fingerprint.getAttribute('data-name')).toBe('MermaidComponentConfigurationError')
+    expect(await fingerprint.getAttribute('data-code')).toBe('CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(1)
+  })
+
+  it('renders runtime-only and Page Mermaid Config sources through the shared seam', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    await page.locator('#page-config-mount').click()
+    await waitForRuns(page, 2)
+
+    const runs = await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs
+    })
+    expect(runs?.[0]).toEqual(expect.objectContaining({
+      theme: 'default',
+      securityLevel: 'strict',
+      unknownMermaidExtensionEnabled: false,
+    }))
+    expect(runs?.[1]).toEqual(expect.objectContaining({
+      theme: 'forest',
+      securityLevel: 'strict',
+      unknownMermaidExtensionEnabled: true,
+    }))
+
+    await releaseNext(page)
+    await page.locator('#page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
+  it('revalidates reactive Page Mermaid Config updates through the shared seam', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+    await page.locator('#page-config-mount').click()
+    await waitForRuns(page, 2)
+    await releaseNext(page)
+    await page.locator('#page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+
+    await page.locator('#page-config-invalidate').click()
+    const fingerprint = page.locator('#component-error')
+    await fingerprint.waitFor({ state: 'attached', timeout: 5000 })
+
+    expect(await fingerprint.getAttribute('data-name')).toBe('MermaidComponentConfigurationError')
+    expect(await fingerprint.getAttribute('data-code')).toBe('CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(2)
+  })
+
+  it('returns a reactive Page Mermaid Config invocation to runtime-only', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+    await page.locator('#page-config-mount').click()
+    await waitForRuns(page, 2)
+    await releaseNext(page)
+    await page.locator('#page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+
+    await page.locator('#page-config-remove').click()
+    await waitForRuns(page, 3)
+    const latestRun = await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
+    })
+    expect(latestRun).toEqual(expect.objectContaining({
+      theme: 'default',
+      securityLevel: 'strict',
+      unknownMermaidExtensionEnabled: false,
+    }))
+
+    await releaseNext(page)
+    await page.locator('#page-config svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
+  it('blocks non-source render triggers during a reactive source conflict', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+    await page.locator('#reactive-conflict-mount').click()
+    await waitForRuns(page, 2)
+    await releaseNext(page)
+    await page.locator('#reactive-conflict svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+
+    await page.locator('#reactive-conflict-enter').click()
+    await page.locator('#reactive-conflict-update-code').click()
+    await page.evaluate(async () => {
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    })
+
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(2)
+  })
+
   it('preserves the Committed Diagram through failure and pending recovery', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installDiagnosticCapture(page)

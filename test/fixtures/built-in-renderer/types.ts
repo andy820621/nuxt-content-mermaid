@@ -3,7 +3,9 @@ import type { MermaidConfig } from 'mermaid'
 export interface MermaidRun {
   source: string
   id: number
+  theme: MermaidConfig['theme']
   securityLevel: MermaidConfig['securityLevel']
+  unknownMermaidExtensionEnabled: boolean
   stagingConnected: boolean
   stagingHidden: boolean
   stagingInert: boolean
