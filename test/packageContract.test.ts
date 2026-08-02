@@ -6,5 +6,7 @@ describe('package root runtime contract', () => {
 
     expect(packageModule.default).toBeDefined()
     expect('transformMermaidCodeBlocks' in packageModule).toBe(false)
+    expect('ContentMermaidConfigurationError' in packageModule).toBe(false)
+    expect('ConfigurationIssue' in packageModule).toBe(false)
   })
 })
