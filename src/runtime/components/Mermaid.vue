@@ -14,7 +14,7 @@ import {
 import { defu } from 'defu'
 import type { Component, ComputedRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
-import type { ModuleOptions } from '../../module'
+import type { RuntimeOptions } from '../../types/config'
 import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
 import { parseSizeToPx, isRecord } from '../utils'
@@ -43,16 +43,13 @@ const props = defineProps<{
 
 const nuxtApp = useNuxtApp()
 const runtimeConfig = useRuntimeConfig()
-// Get module options from public runtimeConfig (prefers `contentMermaid`, falls back to deprecated `mermaidContent`)
-const contentMermaidOptions = (runtimeConfig.public?.contentMermaid
-  || runtimeConfig.public?.mermaidContent
-  || {}) as Partial<ModuleOptions>
-const isEnabled = contentMermaidOptions.enabled !== false
+const contentMermaidOptions = (runtimeConfig.public?.contentMermaid || {}) as RuntimeOptions
+const isEnabled = true
 const debug = contentMermaidOptions.debug || false
 const loaderOptions = contentMermaidOptions.loader || {}
 const themeOptions = contentMermaidOptions.theme || {}
 const componentOptions = contentMermaidOptions.components || {}
-function resolveExpandOptions(expand: ModuleOptions['expand']): ExpandOptions {
+function resolveExpandOptions(expand: RuntimeOptions['expand']): ExpandOptions {
   if (expand === false)
     return { ...DEFAULT_EXPAND_OPTIONS, enabled: false }
 

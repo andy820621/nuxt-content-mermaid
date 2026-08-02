@@ -15,9 +15,11 @@ export type ConfigurationIssueCode
     | 'NON_ENUMERABLE_PROPERTY'
     | 'NON_FINITE_NUMBER'
     | 'NON_PLAIN_OBJECT'
+    | 'INVALID_VALUE'
     | 'SPARSE_ARRAY_SLOT'
     | 'SYMBOL_KEY'
     | 'SYMBOL_VALUE'
+    | 'UNEXPECTED_PROPERTY'
     | 'UNDEFINED_VALUE'
 
 export interface ConfigurationIssue {

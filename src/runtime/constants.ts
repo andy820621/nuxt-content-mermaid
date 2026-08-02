@@ -1,5 +1,6 @@
 import type { MermaidConfig } from 'mermaid'
 import type { MermaidToolbarOptions } from '../types/mermaid'
+import type { RuntimeMermaidConfig, RuntimeOptions } from '../types/config'
 import type { ExpandOptions } from './types/expand'
 
 export const MERMAID_LOG_PREFIX = '[nuxt-content-mermaid]'
@@ -37,5 +38,19 @@ export const DEFAULT_EXPAND_OPTIONS: ExpandOptions = {
     closeButtonClick: true,
   },
 }
+
+export const DEFAULT_RUNTIME_OPTIONS = {
+  loader: {
+    init: DEFAULT_MERMAID_CONFIG as RuntimeMermaidConfig,
+    lazy: true,
+  },
+  theme: {
+    light: DEFAULT_LIGHT_THEME,
+    dark: DEFAULT_DARK_THEME,
+  },
+  components: {},
+  expand: DEFAULT_EXPAND_OPTIONS,
+  toolbar: DEFAULT_TOOLBAR_OPTIONS,
+} satisfies RuntimeOptions
 
 export const DEFAULT_FRONTMATTER_CONFIG_KEY = 'config'

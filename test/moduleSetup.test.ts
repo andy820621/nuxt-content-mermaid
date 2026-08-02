@@ -30,7 +30,11 @@ vi.mock('../src/markdown-diagram-transform', () => ({
 }))
 
 interface NuxtStub {
-  options: { runtimeConfig: { public: Record<string, unknown> } }
+  options: {
+    css?: string[]
+    mermaidContent?: unknown
+    runtimeConfig: { public: Record<string, unknown> }
+  }
   hook: (name: string, fn: (...args: unknown[]) => void) => void
 }
 
@@ -73,12 +77,99 @@ describe('module setup', () => {
     const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
     const { nuxt, hooks } = createNuxtStub()
 
+    const publicRuntimeConfig = nuxt.options.runtimeConfig.public
+
     await moduleDef.setup?.({ enabled: false }, nuxt)
 
     expect(addPlugin).not.toHaveBeenCalled()
     expect(addComponent).not.toHaveBeenCalled()
     expect(addTypeTemplate).not.toHaveBeenCalled()
     expect(addVitePlugin).not.toHaveBeenCalled()
+    expect(addImports).not.toHaveBeenCalled()
+    expect(nuxt.options.css).toBeUndefined()
+    expect(nuxt.options.runtimeConfig.public).toBe(publicRuntimeConfig)
+    expect(publicRuntimeConfig).toEqual({})
+    expect(Object.keys(hooks)).toHaveLength(0)
+  })
+
+  it('fails for an own legacy alias without invoking its getter or installing integration', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
+    let getterCalls = 0
+
+    Object.defineProperty(nuxt.options, 'mermaidContent', {
+      enumerable: true,
+      get() {
+        getterCalls += 1
+        return undefined
+      },
+    })
+
+    expect(() => moduleDef.setup?.({}, nuxt)).toThrowError(expect.objectContaining({
+      name: 'ContentMermaidConfigurationError',
+      code: 'CONTENT_MERMAID_CONFIGURATION_ERROR',
+    }))
+    expect(getterCalls).toBe(0)
+    expect(nuxt.options.css).toBeUndefined()
+    expect(nuxt.options.runtimeConfig.public).toEqual({})
+    expect(addPlugin).not.toHaveBeenCalled()
+    expect(addComponent).not.toHaveBeenCalled()
+    expect(addTypeTemplate).not.toHaveBeenCalled()
+    expect(addVitePlugin).not.toHaveBeenCalled()
+    expect(addImports).not.toHaveBeenCalled()
+    expect(Object.keys(hooks)).toHaveLength(0)
+  })
+
+  it('fails for an own legacy alias whose data value is undefined', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt } = createNuxtStub()
+
+    Object.defineProperty(nuxt.options, 'mermaidContent', {
+      enumerable: true,
+      value: undefined,
+    })
+
+    expect(() => moduleDef.setup?.({}, nuxt)).toThrowError(expect.objectContaining({
+      name: 'ContentMermaidConfigurationError',
+      code: 'CONTENT_MERMAID_CONFIGURATION_ERROR',
+    }))
+    expect(addPlugin).not.toHaveBeenCalled()
+    expect(nuxt.options.runtimeConfig.public).toEqual({})
+  })
+
+  it('validates runtime activation before disabled setup returns', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
+    nuxt.options.runtimeConfig.public.contentMermaid = { enabled: false }
+
+    expect(() => moduleDef.setup?.({ enabled: false }, nuxt)).toThrowError(expect.objectContaining({
+      name: 'ContentMermaidConfigurationError',
+      code: 'CONTENT_MERMAID_CONFIGURATION_ERROR',
+    }))
+    expect(nuxt.options.css).toBeUndefined()
+    expect(addPlugin).not.toHaveBeenCalled()
+    expect(Object.keys(hooks)).toHaveLength(0)
+  })
+
+  it('rejects a non-enumerable canonical runtime override before integration is installed', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
+
+    Object.defineProperty(nuxt.options.runtimeConfig.public, 'contentMermaid', {
+      enumerable: false,
+      value: { debug: true },
+    })
+
+    expect(() => moduleDef.setup?.({}, nuxt)).toThrowError(expect.objectContaining({
+      name: 'ContentMermaidConfigurationError',
+      code: 'CONTENT_MERMAID_CONFIGURATION_ERROR',
+    }))
+    expect(nuxt.options.css).toBeUndefined()
+    expect(addPlugin).not.toHaveBeenCalled()
     expect(Object.keys(hooks)).toHaveLength(0)
   })
 
@@ -94,6 +185,9 @@ describe('module setup', () => {
     expect(addTypeTemplate).toHaveBeenCalled()
     expect(addVitePlugin).toHaveBeenCalledTimes(1)
     expect(hooks['content:file:beforeParse']).toHaveLength(1)
+    expect(nuxt.options.runtimeConfig.public).toHaveProperty('contentMermaid')
+    expect(nuxt.options.runtimeConfig.public.contentMermaid).not.toHaveProperty('enabled')
+    expect(nuxt.options.runtimeConfig.public).not.toHaveProperty('mermaidContent')
 
     const createOptimizeDepsPlugin = addVitePlugin.mock.calls[0]?.[0] as
       (() => { configEnvironment?: (name: string, config: Record<string, unknown>) => void })

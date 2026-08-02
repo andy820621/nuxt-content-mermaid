@@ -6,19 +6,12 @@ import {
   addTypeTemplate,
   addVitePlugin,
   addImports,
-  useLogger,
 } from '@nuxt/kit'
-import { defu } from 'defu'
 import type { FileBeforeParseHook } from '@nuxt/content'
-import {
-  DEFAULT_DARK_THEME,
-  DEFAULT_LIGHT_THEME,
-  DEFAULT_MERMAID_CONFIG,
-  DEFAULT_TOOLBAR_OPTIONS,
-  DEFAULT_EXPAND_OPTIONS,
-} from './runtime/constants'
+import { ContentMermaidConfigurationError } from './configuration/core'
+import { resolveModuleConfiguration } from './configuration/module'
 import { transformMarkdownDiagrams } from './markdown-diagram-transform'
-import type { ModuleOptions, RuntimeMermaidConfig } from './types/config'
+import type { ModuleOptions } from './types/config'
 
 export type {
   MermaidComponentProps,
@@ -53,24 +46,45 @@ const MERMAID_OPTIMIZE_DEPS = [
   'dayjs/plugin/duration.js',
 ]
 
-const DEFAULTS = {
-  enabled: true,
-  loader: {
-    init: { ...DEFAULT_MERMAID_CONFIG } as RuntimeMermaidConfig,
-    lazy: true,
-  },
-  theme: {
-    light: DEFAULT_LIGHT_THEME,
-    dark: DEFAULT_DARK_THEME,
-  },
-  components: {
-    renderer: undefined,
-    spinner: undefined,
-    error: undefined,
-  },
-  expand: DEFAULT_EXPAND_OPTIONS,
-  toolbar: DEFAULT_TOOLBAR_OPTIONS,
-} satisfies ModuleOptions
+const LEGACY_ALIAS_PHASE = {
+  name: 'Nuxt Module Configuration',
+  root: 'nuxt.options',
+} as const
+
+function throwMigrationError(path: readonly string[], expected: string, received: string): never {
+  throw new ContentMermaidConfigurationError(LEGACY_ALIAS_PHASE, [{
+    path,
+    code: 'UNEXPECTED_PROPERTY',
+    expected,
+    received,
+  }], false)
+}
+
+function assertNoLegacyModuleAlias(nuxtOptions: object): void {
+  if (Object.getOwnPropertyDescriptor(nuxtOptions, 'mermaidContent')) {
+    throwMigrationError(['mermaidContent'], 'the supported contentMermaid key', 'removed legacy alias')
+  }
+}
+
+function readRuntimeOverrides(publicRuntimeConfig: object): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(publicRuntimeConfig, 'contentMermaid')
+  if (!descriptor) return undefined
+  if (!('value' in descriptor)) {
+    throwMigrationError(
+      ['runtimeConfig', 'public', 'contentMermaid'],
+      'an enumerable data property',
+      'accessor',
+    )
+  }
+  if (!descriptor.enumerable) {
+    throwMigrationError(
+      ['runtimeConfig', 'public', 'contentMermaid'],
+      'an enumerable data property',
+      'non-enumerable-property',
+    )
+  }
+  return descriptor.value
+}
 
 export default defineNuxtModule<ModuleOptions>({
   meta: {
@@ -80,58 +94,24 @@ export default defineNuxtModule<ModuleOptions>({
       nuxt: '^3.20.1 || ^4.1.0',
     },
   },
-  defaults: {
-    ...DEFAULTS,
-  },
   setup(options, nuxt) {
-    const logger = useLogger('nuxt-content-mermaid')
-    const warn = (message: string) => logger.warn(message)
+    assertNoLegacyModuleAlias(nuxt.options)
+    const publicRuntimeConfig = nuxt.options.runtimeConfig.public
+    const resolved = resolveModuleConfiguration({
+      nuxtResolvedOptions: options,
+      runtimeOverrides: readRuntimeOverrides(publicRuntimeConfig),
+    })
+    if (!resolved.enabled) return
 
-    const deprecatedOptions = (nuxt.options as { mermaidContent?: ModuleOptions }).mermaidContent
-    const hasDeprecatedOptions = deprecatedOptions
-      && typeof deprecatedOptions === 'object'
-      && Object.keys(deprecatedOptions).length > 0
-
-    if (hasDeprecatedOptions)
-      warn('[nuxt-content-mermaid] `mermaidContent` is deprecated, please switch to `contentMermaid`. The old key is still read for now but will be removed in a future release.')
-
-    const resolvedOptions = defu(
-      {},
-      options,
-      deprecatedOptions,
-      DEFAULTS,
-    ) as ModuleOptions
+    publicRuntimeConfig.contentMermaid
+      = resolved.runtimeOptions as typeof publicRuntimeConfig.contentMermaid
 
     const resolver = createResolver(import.meta.url)
     const runtimeDir = resolver.resolve('./runtime')
+    const baseMermaidComponentName = 'Mermaid'
 
     nuxt.options.css ||= []
     nuxt.options.css.push(resolver.resolve('./runtime/styles.css'))
-
-    const publicRuntimeConfig = nuxt.options.runtimeConfig.public
-    const runtimeOverrides = (publicRuntimeConfig.contentMermaid
-      || publicRuntimeConfig.mermaidContent
-      || {}) as Partial<ModuleOptions>
-
-    if (!publicRuntimeConfig.contentMermaid && publicRuntimeConfig.mermaidContent)
-      warn('[nuxt-content-mermaid] `runtimeConfig.public.mermaidContent` is deprecated, please use `runtimeConfig.public.contentMermaid` instead.')
-
-    const runtimeMermaidConfig = defu(
-      {},
-      runtimeOverrides,
-      resolvedOptions,
-    ) as ModuleOptions
-
-    publicRuntimeConfig.contentMermaid
-      = runtimeMermaidConfig as typeof publicRuntimeConfig.contentMermaid
-    publicRuntimeConfig.mermaidContent
-      = runtimeMermaidConfig as typeof publicRuntimeConfig.mermaidContent
-
-    // Transform Markdown output to use fixed <Mermaid>, delegated by runtime components.renderer
-    const baseMermaidComponentName = 'Mermaid'
-
-    const isEnabled = runtimeMermaidConfig.enabled !== false
-    if (!isEnabled) return
 
     // Ensure Vite pre-bundles mermaid and its CJS dependencies so ESM interop works in dev.
     // mermaid's ESM build (`mermaid.core.mjs`) externalizes CJS deps like `dayjs` and
@@ -195,12 +175,13 @@ export {}
     })
 
     // Transform mermaid fenced code blocks in Markdown
-    nuxt.hook('content:file:beforeParse', (ctx: FileBeforeParseHook) => {
+    // @nuxt/content augments this hook only in consuming applications.
+    nuxt.hook('content:file:beforeParse' as never, ((ctx: FileBeforeParseHook) => {
       const { file } = ctx
 
       if (!file.id?.endsWith('.md')) return
 
       file.body = transformMarkdownDiagrams(file.body)
-    })
+    }) as never)
   },
 })

@@ -53,3 +53,36 @@ jobs:
 
       - name: Test
         run: npm run test
+
+  module-compatibility:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        nuxt-version: ['3.20.1', '4.1.0']
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - run: npm i -g --force corepack@latest && corepack enable
+
+      - name: Select the supported Nuxt line
+        run: >-
+          pnpm pkg set
+          devDependencies.nuxt=${{ matrix.nuxt-version }}
+          devDependencies.@nuxt/schema=${{ matrix.nuxt-version }}
+          dependencies.@nuxt/kit=${{ matrix.nuxt-version }}
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Prepare Nuxt types and module stubs
+        run: pnpm dev:prepare
+
+      - name: Verify module configuration fixtures
+        run: pnpm vitest run test/moduleConfiguration.e2e.test.ts test/moduleConfigurationMigration.e2e.test.ts
