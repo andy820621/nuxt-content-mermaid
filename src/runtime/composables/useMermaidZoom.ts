@@ -17,6 +17,9 @@ export interface UseMermaidZoomOptions {
 }
 
 export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
+  const isClient = typeof import.meta.client === 'boolean'
+    ? import.meta.client
+    : typeof window !== 'undefined' && typeof document !== 'undefined'
   const {
     active = ref(true),
     minScale = 0.5,
@@ -39,6 +42,12 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   // Interaction tracking
   const wasLastInteractionDrag = ref(false)
   let totalMovement = 0
+  let startX = 0
+  let startY = 0
+  let lastX = 0
+  let lastY = 0
+  let lastPinchDist = -1
+  let wasPinching = false
 
   // Store initial state for reset
   const initialMetrics = ref<ZoomMetrics>({ scale: 1, translateX: 0, translateY: 0 })
@@ -59,7 +68,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   })
 
   function lockUserSelect() {
-    if (!import.meta.client) return
+    if (!isClient) return
     if (userSelectState.locked) return
     userSelectState.html = document.documentElement.style.userSelect
     userSelectState.body = document.body.style.userSelect
@@ -69,7 +78,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   }
 
   function unlockUserSelect() {
-    if (!import.meta.client) return
+    if (!isClient) return
     if (!userSelectState.locked) return
     document.documentElement.style.userSelect = userSelectState.html
     document.body.style.userSelect = userSelectState.body
@@ -82,12 +91,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     initialMetrics.value = { ...metrics }
     origin.value = { x: metrics.left || 0, y: metrics.top || 0 }
     // Reset states
-    isDragging.value = false
-    isPointerDown.value = false
-    isSpacePressed.value = false
-    wasLastInteractionDrag.value = false
-    totalMovement = 0
-    unlockUserSelect()
+    cancelInteraction()
     setMetrics(metrics)
   }
 
@@ -143,18 +147,27 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     handleDragEnd()
   }
 
+  function cancelInteraction() {
+    isDragging.value = false
+    isPointerDown.value = false
+    isSpacePressed.value = false
+    wasLastInteractionDrag.value = false
+    totalMovement = 0
+    lastPinchDist = -1
+    wasPinching = false
+    unlockUserSelect()
+  }
+
   // --- Global Listeners (Managed) ---
 
-  if (import.meta.client) {
+  if (isClient) {
     // Elegant toggle: When active is false, target becomes null, listener is removed.
     const activeDocument = computed(() => active.value ? document : null)
     const activeWindow = computed(() => active.value ? window : null)
 
     watch(active, (isActive) => {
       if (isActive) return
-      isSpacePressed.value = false
-      unlockUserSelect()
-      endInteraction()
+      cancelInteraction()
     })
 
     useEventListener(activeDocument, 'keydown', (e: KeyboardEvent) => {
@@ -213,13 +226,6 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
   }
 
   // Drag State
-  let startX = 0
-  let startY = 0
-  let lastX = 0
-  let lastY = 0
-  let lastPinchDist = -1
-  let wasPinching = false
-
   function getDistance(t1: Touch, t2: Touch) {
     const dx = t1.clientX - t2.clientX
     const dy = t1.clientY - t2.clientY
@@ -356,6 +362,7 @@ export function useMermaidZoom(options: UseMermaidZoomOptions = {}) {
     handleDragStart,
     handleDragMove,
     handleDragEnd,
+    cancelInteraction,
     isPointerDown,
   }
 }

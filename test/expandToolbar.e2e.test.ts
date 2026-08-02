@@ -10,13 +10,71 @@ const parsePercent = (value: string | null) => {
   return Number.parseInt(value.replace('%', '').trim(), 10)
 }
 
+type BrowserPage = Awaited<ReturnType<typeof createPage>>
+
+const restoredPageStyles = {
+  bodyOverflow: '',
+  bodyWidth: '',
+  bodyUserSelect: '',
+  htmlOverflow: '',
+  htmlWidth: '',
+  htmlUserSelect: '',
+}
+
+async function readPageStyles(page: BrowserPage) {
+  return page.evaluate(() => ({
+    bodyOverflow: document.body.style.overflow,
+    bodyWidth: document.body.style.width,
+    bodyUserSelect: document.body.style.userSelect,
+    htmlOverflow: document.documentElement.style.overflow,
+    htmlWidth: document.documentElement.style.width,
+    htmlUserSelect: document.documentElement.style.userSelect,
+  }))
+}
+
+async function readOutsideRouting(page: BrowserPage) {
+  return page.evaluate(() => {
+    const wheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+    const key = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+    window.dispatchEvent(wheel)
+    document.dispatchEvent(key)
+    return { wheel: wheel.defaultPrevented, key: key.defaultPrevented }
+  })
+}
+
+async function installFullscreenStub(page: BrowserPage) {
+  await page.addInitScript(() => {
+    const defineWritable = (target: object, key: string, value: unknown) => {
+      try {
+        Object.defineProperty(target, key, { value, writable: true, configurable: true })
+      }
+      catch {
+        // ignore
+      }
+    }
+
+    defineWritable(document, 'fullScreen', false)
+    defineWritable(document, 'fullscreenElement', null)
+    defineWritable(document, 'exitFullscreen', async () => {
+      ;(document as { fullScreen?: boolean }).fullScreen = false
+      ;(document as { fullscreenElement?: Element | null }).fullscreenElement = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    defineWritable(HTMLElement.prototype, 'requestFullscreen', async function (this: HTMLElement) {
+      ;(document as { fullScreen?: boolean }).fullScreen = true
+      ;(document as { fullscreenElement?: Element | null }).fullscreenElement = this
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+  })
+}
+
 describe('expand/fullscreen toolbars', async () => {
   await setup({
     rootDir,
     browser: true,
   })
 
-  it('opens expand overlay, zooms, shows hint, and closes', { timeout: 20000 }, async () => {
+  it('proves the complete expand lifecycle through toolbar and diagram entry', { timeout: 20000 }, async () => {
     const page = await createPage()
     await page.goto(url('/'))
 
@@ -24,6 +82,12 @@ describe('expand/fullscreen toolbars', async () => {
 
     await page.getByLabel('Expand diagram').click()
     await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
+
+    expect(await page.locator('body > .ncm-expand-modal').count()).toBe(1)
+    expect(await page.locator('.mermaid-wrapper.ncm-expand-hidden #mock-svg').count()).toBe(1)
+    expect(await page.locator('.ncm-expand-modal > .ncm-expand-overlay.ncm-expand-overlay-visible').count()).toBe(1)
+    expect(await page.locator('.ncm-expand-content > .ncm-expand-target > svg[id^="mock-svg-ncm-"]').count()).toBe(1)
+    expect(await page.getByLabel('Minimize diagram').getAttribute('type')).toBe('button')
 
     const overlayZoomInfo = page.locator('.ncm-zoom-toolbar--overlay .ncm-zoom-info')
     const initialOverlayPercent = parsePercent(await overlayZoomInfo.textContent())
@@ -43,39 +107,80 @@ describe('expand/fullscreen toolbars', async () => {
 
     await page.getByLabel('Minimize diagram').click()
     await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
+    expect(await page.locator('.mermaid-wrapper.ncm-expand-hidden').count()).toBe(0)
+
+    expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+
+    await page.locator('#mock-svg').click()
+    await page.waitForSelector('body > .ncm-expand-modal', { state: 'visible', timeout: 5000 })
+
+    const spaceLocked = await page.evaluate(() => {
+      const event = new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true })
+      document.dispatchEvent(event)
+      return {
+        prevented: event.defaultPrevented,
+        body: document.body.style.userSelect,
+        html: document.documentElement.style.userSelect,
+      }
+    })
+    expect(spaceLocked).toEqual({ prevented: true, body: 'none', html: 'none' })
+
+    await page.getByLabel('Minimize diagram').click()
+    await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
+
+    expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+    expect(await readPageStyles(page)).toEqual(restoredPageStyles)
+
+    const openThenClose = async (close: () => Promise<unknown>) => {
+      await page.locator('#mock-svg').click()
+      await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())))
+      await close()
+      await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
+    }
+
+    await openThenClose(() => page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    }))
+    await openThenClose(() => page.locator('.ncm-expand-overlay').dispatchEvent('click'))
+    await openThenClose(() => page.evaluate(() => {
+      document.querySelector('.ncm-expand-overlay')
+        ?.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }))
+    }))
+    await openThenClose(() => page.evaluate(() => {
+      const createTouchEvent = (type: string, screenY: number) => {
+        const event = new Event(type, { bubbles: true, cancelable: true })
+        const touch = { screenY }
+        Object.defineProperties(event, {
+          touches: { value: [touch] },
+          changedTouches: { value: [touch] },
+        })
+        return event
+      }
+      window.dispatchEvent(createTouchEvent('touchstart', 10))
+      window.dispatchEvent(createTouchEvent('touchmove', 30))
+    }))
+
+    await page.locator('#mock-svg').click()
+    await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
+    await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true, cancelable: true }))
+      document.querySelector<HTMLButtonElement>('#unmount-diagram')?.click()
+    })
+    await page.waitForSelector('#diagram-root', { state: 'detached', timeout: 5000 })
+    await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
+
+    expect(await readPageStyles(page)).toEqual(restoredPageStyles)
+    expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
   })
 
   it('toggles fullscreen toolbar, zooms, and shows hint', { timeout: 20000 }, async () => {
     const page = await createPage()
-
-    await page.addInitScript(() => {
-      const defineWritable = (target: object, key: string, value: unknown) => {
-        try {
-          Object.defineProperty(target, key, { value, writable: true, configurable: true })
-        }
-        catch {
-          // ignore
-        }
-      }
-
-      defineWritable(document, 'fullScreen', false)
-      defineWritable(document, 'fullscreenElement', null)
-      defineWritable(document, 'exitFullscreen', async () => {
-        ;(document as { fullScreen?: boolean }).fullScreen = false
-        ;(document as { fullscreenElement?: Element | null }).fullscreenElement = null
-        document.dispatchEvent(new Event('fullscreenchange'))
-      })
-      defineWritable(HTMLElement.prototype, 'requestFullscreen', async function (this: HTMLElement) {
-        ;(document as { fullScreen?: boolean }).fullScreen = true
-        ;(document as { fullscreenElement?: Element | null }).fullscreenElement = this
-        document.dispatchEvent(new Event('fullscreenchange'))
-      })
-    })
-
+    await installFullscreenStub(page)
     await page.goto(url('/'))
     await page.waitForSelector('#mock-svg', { state: 'visible', timeout: 5000 })
 
-    await page.getByLabel('Enter fullscreen').click()
+    await page.getByLabel('Enter fullscreen').click({ timeout: 5000 })
     await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
     expect(await page.locator('.ncm-fullscreen-zoom-hint').count()).toBe(0)
 
@@ -83,7 +188,8 @@ describe('expand/fullscreen toolbars', async () => {
     const initialFullscreenPercent = parsePercent(await fullscreenZoomInfo.textContent())
     expect(Number.isFinite(initialFullscreenPercent)).toBe(true)
 
-    await page.locator('.ncm-zoom-toolbar--fullscreen button[aria-label="Zoom In"]').click()
+    await page.waitForTimeout(100)
+    await page.locator('.ncm-zoom-toolbar--fullscreen button[aria-label="Zoom In"]').dispatchEvent('click')
     await page.waitForTimeout(100)
     const afterFullscreenPercent = parsePercent(await fullscreenZoomInfo.textContent())
     expect(afterFullscreenPercent).toBeGreaterThan(initialFullscreenPercent)
@@ -95,7 +201,8 @@ describe('expand/fullscreen toolbars', async () => {
     const hintText = await page.locator('.ncm-fullscreen-zoom-hint').textContent()
     expect(hintText).toContain('Scroll to zoom')
 
-    await page.getByLabel('Exit fullscreen').click()
+    await page.getByLabel('Exit fullscreen').click({ timeout: 5000 })
     await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'detached', timeout: 5000 })
+    await page.close()
   })
 })

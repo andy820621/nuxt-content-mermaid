@@ -1,6 +1,6 @@
 import { computed, nextTick, ref } from 'vue'
 import type { CSSProperties, ComponentPublicInstance, Ref } from 'vue'
-import type { ExpandInvokeCloseOn, ExpandInvokeOpenOn } from '../types/expand'
+import type { ExpandOptions } from '../types/expand'
 import { useMermaidZoom } from './useMermaidZoom'
 import { useEventListener } from './useEventListener'
 import { tryOnScopeDispose } from './shared/tryOnScopeDispose'
@@ -19,10 +19,8 @@ interface ExpandMetrics {
 
 interface UseMermaidExpandOptions {
   getExpandTarget: () => SVGElement | null
-  expandMargin?: number
+  expandOptions: ExpandOptions
   isBlocked?: Ref<boolean>
-  invokeOpenOn?: ExpandInvokeOpenOn
-  invokeCloseOn?: ExpandInvokeCloseOn
 }
 
 const swipeToCloseThreshold = 10
@@ -32,6 +30,10 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     ? import.meta.client
     : typeof window !== 'undefined' && typeof document !== 'undefined'
   const expandTargetWrap = ref<HTMLDivElement | null>(null)
+  const expandModal = ref<HTMLDivElement | null>(null)
+  const setExpandModal = (el: Element | ComponentPublicInstance | null) => {
+    expandModal.value = el && 'nodeType' in el ? el as HTMLDivElement : null
+  }
   const setExpandTargetWrap = (el: Element | ComponentPublicInstance | null) => {
     if (el && 'nodeType' in el) {
       expandTargetWrap.value = el as HTMLDivElement
@@ -57,10 +59,12 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     maxScale: 10,
   })
   const isVisible = computed(() => expandState.value === 'open')
-  const allowTargetClick = options.invokeOpenOn?.diagramClick !== false
-  const allowCloseByEsc = options.invokeCloseOn?.esc !== false
-  const allowCloseByWheel = options.invokeCloseOn?.wheel !== false
-  const allowCloseBySwipe = options.invokeCloseOn?.swipe !== false
+  const allowTargetClick = options.expandOptions.invokeOpenOn?.diagramClick !== false
+  const allowCloseByEsc = options.expandOptions.invokeCloseOn?.esc !== false
+  const allowCloseByWheel = options.expandOptions.invokeCloseOn?.wheel !== false
+  const allowCloseBySwipe = options.expandOptions.invokeCloseOn?.swipe !== false
+  const allowOverlayClose = options.expandOptions.invokeCloseOn?.overlayClick !== false
+  const allowCloseButton = options.expandOptions.invokeCloseOn?.closeButtonClick !== false
 
   const expandTargetStyle = computed<CSSProperties>(() => {
     const metrics = expandMetrics.value
@@ -82,6 +86,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
   let expandTransitionTimeout: ReturnType<typeof setTimeout> | undefined
   let expandResizeTimeout: ReturnType<typeof setTimeout> | undefined
+  let openingRaf: number | undefined
 
   const resizeDoubleRaf = {
     raf1: undefined as number | undefined,
@@ -114,6 +119,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     htmlOverflow: '',
     htmlWidth: '',
     lockedWidth: false,
+    locked: false,
   }
   const touchState: { isScaling: boolean, start?: number, end?: number } = {
     isScaling: false,
@@ -121,7 +127,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   let expandInstanceId = 0
 
   function resolveExpandMargin() {
-    const margin = options.expandMargin
+    const margin = options.expandOptions.margin
     if (typeof margin !== 'number' || Number.isNaN(margin)) return 0
     return Math.max(0, margin)
   }
@@ -164,6 +170,30 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   function clearRefreshRaf() {
     if (expandRefreshRaf != null) cancelAnimationFrame(expandRefreshRaf)
     expandRefreshRaf = undefined
+  }
+
+  function clearOpeningRaf() {
+    if (openingRaf != null) cancelAnimationFrame(openingRaf)
+    openingRaf = undefined
+  }
+
+  function resetSwipeState() {
+    touchState.isScaling = false
+    touchState.start = undefined
+    touchState.end = undefined
+  }
+
+  function cancelPendingWork() {
+    clearTimeout(expandTransitionTimeout)
+    clearTimeout(hintTimeout)
+    expandTransitionTimeout = undefined
+    hintTimeout = undefined
+    clearResizeTimers()
+    clearRefreshRaf()
+    clearOpeningRaf()
+    showZoomHint.value = false
+    resetSwipeState()
+    zoom.cancelInteraction()
   }
 
   function calculateExpandMetrics(target: SVGElement): ExpandMetrics | null {
@@ -264,10 +294,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
   function resetExpand() {
     if (!isClient) return
-    clearTimeout(expandTransitionTimeout)
-    clearTimeout(hintTimeout)
-    clearResizeTimers()
-    clearRefreshRaf()
+    cancelPendingWork()
     clearExpandSvg()
     expandState.value = 'idle'
     isExpanded.value = false
@@ -310,7 +337,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
         return
       }
 
-      requestAnimationFrame(() => {
+      openingRaf = requestAnimationFrame(() => {
+        openingRaf = undefined
         if (expandState.value !== 'opening') return
         isExpanded.value = true
         expandState.value = 'open'
@@ -324,6 +352,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       resetExpand()
       return
     }
+    cancelPendingWork()
     expandState.value = 'closing'
     isExpanded.value = false
     ensureExpandTransitionEnd()
@@ -478,16 +507,12 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
   function handleExpandTouchEnd() {
     if (!allowCloseBySwipe) return
-    touchState.isScaling = false
-    touchState.start = undefined
-    touchState.end = undefined
+    resetSwipeState()
   }
 
   function handleExpandTouchCancel() {
     if (!allowCloseBySwipe) return
-    touchState.isScaling = false
-    touchState.start = undefined
-    touchState.end = undefined
+    resetSwipeState()
   }
 
   function handleExpandResize() {
@@ -537,6 +562,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const activeWindow = computed(() => isExpandActive.value ? window : null)
     const activeDocument = computed(() => isExpandActive.value ? document : null)
     const activeVisualViewport = computed(() => (isExpandActive.value ? window.visualViewport : null))
+    const activeModal = computed(() => isExpandActive.value ? expandModal.value : null)
+    const activeTarget = computed(() => isExpandActive.value ? expandTargetWrap.value : null)
 
     useEventListener(activeWindow, 'resize', handleExpandResize, { passive: true })
     useEventListener(activeWindow, 'orientationchange', handleExpandResize, { passive: true })
@@ -547,14 +574,23 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     useEventListener(activeWindow, 'touchend', handleExpandTouchEnd, { passive: true })
     useEventListener(activeWindow, 'touchcancel', handleExpandTouchCancel, { passive: true })
     useEventListener(activeDocument, 'keydown', handleExpandKeyDown, true)
+    useEventListener(activeModal, 'click', handleModalClick)
+    useEventListener(activeModal, 'mousedown', zoom.handleDragStart)
+    useEventListener(activeModal, 'mousemove', zoom.handleDragMove)
+    useEventListener(activeModal, 'touchstart', zoom.handleDragStart)
+    useEventListener(activeModal, 'touchmove', zoom.handleDragMove)
+    useEventListener(activeModal, 'touchend', zoom.handleDragEnd)
+    useEventListener(activeTarget, 'transitionend', handleExpandTransitionEnd)
   }
 
   function disableBodyScroll() {
+    if (scrollState.locked) return
     scrollState.bodyOverflow = document.body.style.overflow
     scrollState.bodyWidth = document.body.style.width
     scrollState.htmlOverflow = document.documentElement.style.overflow
     scrollState.htmlWidth = document.documentElement.style.width
     scrollState.lockedWidth = shouldLockWidth()
+    scrollState.locked = true
     document.documentElement.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
     if (scrollState.lockedWidth) {
@@ -565,6 +601,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function enableBodyScroll() {
+    if (!scrollState.locked) return
     document.documentElement.style.width = scrollState.htmlWidth
     document.documentElement.style.overflow = scrollState.htmlOverflow
     scrollState.htmlOverflow = ''
@@ -574,6 +611,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     scrollState.bodyOverflow = ''
     scrollState.bodyWidth = ''
     scrollState.lockedWidth = false
+    scrollState.locked = false
   }
 
   function handleMermaidClick(event: MouseEvent) {
@@ -585,22 +623,47 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     openExpand(event)
   }
 
+  function handleModalClick(event: MouseEvent) {
+    if (zoom.isSpacePressed.value) return
+    if (zoom.wasLastInteractionDrag.value) {
+      event.stopPropagation()
+      return
+    }
+
+    const target = event.target as HTMLElement
+    if (!target.classList?.contains('ncm-expand-overlay') && !target.classList?.contains('ncm-expand-modal')) return
+    if (allowOverlayClose) closeExpand(event)
+  }
+
+  function closeFromButton(event?: Event) {
+    if (allowCloseButton) closeExpand(event)
+  }
+
+  function endForDiagramReplacement() {
+    if (isExpandActive.value) resetExpand()
+  }
+
   tryOnScopeDispose(() => {
     if (isClient) resetExpand()
   })
 
   return {
+    setExpandModal,
     setExpandTargetWrap,
     expandTargetStyle,
     isExpandActive,
     isVisible,
-    openExpand,
-    closeExpand,
-    toggleExpand,
-    handleExpandTransitionEnd,
-    handleMermaidClick,
-    resetExpand,
-    zoom,
+    toggle: toggleExpand,
+    openFromDiagram: handleMermaidClick,
+    endForDiagramReplacement,
+    closeFromButton,
+    zoomIn: zoom.zoomIn,
+    zoomOut: zoom.zoomOut,
+    resetZoom: zoom.reset,
+    cursor: computed(() => zoom.cursor.value),
+    isDragging: computed(() => zoom.isDragging.value),
+    scale: computed(() => zoom.scale.value),
+    isOverlayClosable: computed(() => allowOverlayClose && !zoom.isSpacePressed.value),
     showZoomHint,
   }
 }
