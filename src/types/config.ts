@@ -4,7 +4,7 @@ import type { MermaidToolbarOptions } from './mermaid'
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[]
-export type JsonObject = { [key: string]: JsonValue | undefined }
+export type JsonObject = { [key: string]: JsonValue }
 
 type IsAny<T> = 0 extends (1 & T) ? true : false
 

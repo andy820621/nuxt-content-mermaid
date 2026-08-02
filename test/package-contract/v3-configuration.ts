@@ -4,7 +4,7 @@ import type {
   ModuleOptions,
   RuntimeMermaidConfig,
   RuntimeOptions,
-} from '../../src/module'
+} from '@barzhsieh/nuxt-content-mermaid'
 
 const runtimeConfig = {
   debug: true,
@@ -39,6 +39,9 @@ const invalidNestedRuntimeFunction: RuntimeMermaidConfig = { unknownMermaidExten
 // @ts-expect-error runtime transport cannot contain arbitrary class instances
 const invalidRuntimeInstance: RuntimeMermaidConfig = { unknownMermaidExtension: new Date() }
 
+// @ts-expect-error runtime transport cannot contain explicit undefined values
+const invalidRuntimeUndefined: RuntimeMermaidConfig = { unknownMermaidExtension: undefined }
+
 // @ts-expect-error Mermaid's unbounded `any` field is not part of the runtime transport contract
 const invalidRuntimeAny: RuntimeMermaidConfig = { themeVariables: {} }
 
@@ -63,6 +66,7 @@ void [
   invalidRuntimeFunction,
   invalidNestedRuntimeFunction,
   invalidRuntimeInstance,
+  invalidRuntimeUndefined,
   invalidRuntimeAny,
   invalidRuntimeEnabled,
   invalidPageProps,
