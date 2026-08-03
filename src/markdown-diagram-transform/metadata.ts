@@ -1,7 +1,6 @@
-import { defu } from 'defu'
 import destr from 'destr'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
-import { isNonEmptyRecord, isRecord } from '../runtime/utils/is'
+import { isRecord } from '../runtime/utils/is'
 
 // Prevent prototype pollution via inline attribute paths.
 const UNSAFE_INLINE_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
@@ -13,14 +12,12 @@ export type MermaidFrontmatterInfo = {
   indent: string
 }
 
-export type MermaidInlineOverrides = {
-  title?: string
-  displayMode?: string
-  config?: Record<string, unknown>
-  toolbar?: Record<string, unknown>
-}
+export type MermaidFrontmatterParseResult
+  = | { kind: 'absent' }
+    | { kind: 'invalid' }
+    | { kind: 'valid', info: MermaidFrontmatterInfo }
 
-export function parseMermaidFrontmatter(rawCode: string, newline: string): MermaidFrontmatterInfo | null {
+export function inspectMermaidFrontmatter(rawCode: string, newline: string): MermaidFrontmatterParseResult {
   const lines = rawCode.split(newline)
   let startIndex = 0
 
@@ -47,11 +44,11 @@ export function parseMermaidFrontmatter(rawCode: string, newline: string): Merma
   }
 
   if (startIndex >= lines.length)
-    return null
+    return { kind: 'absent' }
 
   const startLine = lines[startIndex]!
   if (startLine.trim() !== '---')
-    return null
+    return { kind: 'absent' }
 
   const indentMatch = startLine.match(/^\s*/)
   const indent = indentMatch ? indentMatch[0] : ''
@@ -65,7 +62,7 @@ export function parseMermaidFrontmatter(rawCode: string, newline: string): Merma
   }
 
   if (endIndex === -1)
-    return null
+    return { kind: 'invalid' }
 
   const yamlLines = lines
     .slice(startIndex + 1, endIndex)
@@ -75,18 +72,26 @@ export function parseMermaidFrontmatter(rawCode: string, newline: string): Merma
   try {
     const data = yamlRaw ? parseYaml(yamlRaw) : {}
     if (!isRecord(data))
-      return null
+      return { kind: 'invalid' }
 
     return {
-      data,
-      startIndex,
-      endIndex,
-      indent,
+      kind: 'valid',
+      info: {
+        data,
+        startIndex,
+        endIndex,
+        indent,
+      },
     }
   }
   catch {
-    return null
+    return { kind: 'invalid' }
   }
+}
+
+export function parseMermaidFrontmatter(rawCode: string, newline: string): MermaidFrontmatterInfo | null {
+  const result = inspectMermaidFrontmatter(rawCode, newline)
+  return result.kind === 'valid' ? result.info : null
 }
 
 function isMermaidDirectiveStart(line: string) {
@@ -110,7 +115,7 @@ function skipMermaidDirective(lines: string[], startIndex: number) {
 
 export function parseInlineAttrs(info: string): Record<string, unknown> | null {
   const attrsBlock = extractInlineAttrsBlock(info)
-  if (!attrsBlock)
+  if (attrsBlock === null)
     return null
 
   return parseInlineAttrsBlock(attrsBlock)
@@ -153,7 +158,7 @@ function extractInlineAttrsBlock(info: string): string | null {
   return null
 }
 
-function parseInlineAttrsBlock(raw: string): Record<string, unknown> {
+function parseInlineAttrsBlock(raw: string): Record<string, unknown> | null {
   const result: Record<string, unknown> = {}
   let index = 0
 
@@ -182,7 +187,8 @@ function parseInlineAttrsBlock(raw: string): Record<string, unknown> {
       value = parseAttributeValue(rawValue, quoted)
     }
 
-    setNestedValue(result, key, value)
+    if (!setNestedValue(result, key, value))
+      return null
   }
 
   return result
@@ -333,17 +339,17 @@ function parseStructuredValue(value: string) {
 function setNestedValue(target: Record<string, unknown>, path: string, value: unknown) {
   const keys = path.split('.').filter(Boolean)
   if (!keys.length)
-    return
+    return false
 
   let current = target
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i]!
     if (UNSAFE_INLINE_KEYS.has(key))
-      return
+      return false
 
     if (i === keys.length - 1) {
       current[key] = value
-      return
+      return true
     }
 
     const existing = current[key]
@@ -352,55 +358,18 @@ function setNestedValue(target: Record<string, unknown>, path: string, value: un
     }
     current = current[key] as Record<string, unknown>
   }
+
+  return true
 }
-
-export function extractToolbarProps(source: Record<string, unknown> | null | undefined) {
-  if (!source)
-    return undefined
-
-  return isRecord(source.toolbar) ? source.toolbar : undefined
-}
-
-export function extractMermaidInlineOverrides(source: Record<string, unknown> | null): MermaidInlineOverrides | null {
-  if (!source)
-    return null
-
-  const overrides: MermaidInlineOverrides = {}
-  let hasOverrides = false
-
-  if (source.title !== undefined) {
-    overrides.title = String(source.title)
-    hasOverrides = true
-  }
-
-  if (source.displayMode !== undefined) {
-    overrides.displayMode = String(source.displayMode)
-    hasOverrides = true
-  }
-
-  if (isRecord(source.config)) {
-    overrides.config = source.config
-    hasOverrides = true
-  }
-
-  if (isRecord(source.toolbar)) {
-    overrides.toolbar = source.toolbar
-    hasOverrides = true
-  }
-
-  return hasOverrides ? overrides : null
-}
-
-export function applyMermaidFrontmatterOverrides(
+export function applyResolvedMermaidFrontmatter(
   rawCode: string,
   newline: string,
   frontmatterInfo: MermaidFrontmatterInfo | null,
-  overrides: MermaidInlineOverrides,
+  frontmatter: Record<string, unknown>,
   fallbackIndent: string,
 ) {
-  const mergedFrontmatter = mergeMermaidFrontmatter(frontmatterInfo?.data, overrides)
   const frontmatterLines = serializeMermaidFrontmatter(
-    mergedFrontmatter,
+    frontmatter,
     frontmatterInfo?.indent ?? fallbackIndent,
   )
 
@@ -416,44 +385,6 @@ export function applyMermaidFrontmatterOverrides(
     ...frontmatterLines,
     ...lines,
   ].join(newline)
-}
-
-function mergeMermaidFrontmatter(
-  existing: Record<string, unknown> | undefined,
-  overrides: MermaidInlineOverrides,
-) {
-  const merged = existing ? { ...existing } : {}
-
-  if (overrides.title !== undefined)
-    merged.title = overrides.title
-
-  if (overrides.displayMode !== undefined)
-    merged.displayMode = overrides.displayMode
-
-  if (overrides.config && isRecord(overrides.config)) {
-    const baseConfig = isRecord(merged.config) ? merged.config : undefined
-    merged.config = defu({}, overrides.config, baseConfig || {})
-  }
-
-  if (overrides.toolbar && isRecord(overrides.toolbar)) {
-    const baseToolbar = isRecord(merged.toolbar) ? merged.toolbar : undefined
-    merged.toolbar = defu({}, overrides.toolbar, baseToolbar || {})
-  }
-
-  return merged
-}
-
-export function mergeToolbarProps(
-  yamlToolbar: Record<string, unknown> | undefined,
-  inlineToolbar: Record<string, unknown> | undefined,
-) {
-  const merged = defu(
-    {},
-    inlineToolbar || {},
-    yamlToolbar || {},
-  )
-
-  return isNonEmptyRecord(merged) ? merged : undefined
 }
 
 function serializeMermaidFrontmatter(frontmatter: Record<string, unknown>, indent: string) {

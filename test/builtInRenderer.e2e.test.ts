@@ -144,6 +144,28 @@ describe('built-in renderer integration', async () => {
     await page.locator('#page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
+  it('renders Content-authored Markdown through the Page Mermaid Config protocol', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    expect(await page.locator('#markdown-page-status').getAttribute('data-loaded')).toBe('true')
+    await page.locator('#markdown-page-config-mount').click()
+    await waitForRuns(page, 2)
+
+    const markdownRun = await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[1]
+    })
+    expect(markdownRun).toEqual(expect.objectContaining({
+      source: expect.stringContaining('MARKDOWN_PAGE_CONFIG'),
+      theme: 'forest',
+      securityLevel: 'strict',
+      unknownMermaidExtensionEnabled: true,
+    }))
+
+    await releaseNext(page)
+    await page.locator('#markdown-page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
   it('revalidates reactive Page Mermaid Config updates through the shared seam', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialDiagram(page)

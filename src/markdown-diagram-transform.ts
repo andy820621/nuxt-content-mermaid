@@ -1,16 +1,18 @@
 import type { MermaidToolbarOptions } from './types/mermaid'
 import {
-  applyMermaidFrontmatterOverrides,
-  extractMermaidInlineOverrides,
-  extractToolbarProps,
-  mergeToolbarProps,
+  applyResolvedMermaidFrontmatter,
+  inspectMermaidFrontmatter,
   parseInlineAttrs,
-  parseMermaidFrontmatter,
 } from './markdown-diagram-transform/metadata'
+import {
+  resolveFenceInlineAttributes,
+  resolveMarkdownFrontmatter,
+  resolveMarkdownToolbar,
+} from './markdown-diagram-transform/configuration'
 import { isNonEmptyRecord } from './runtime/utils/is'
 
 const MERMAID_COMPONENT_NAME = 'Mermaid'
-const PAGE_MERMAID_CONFIG_BINDING = 'config'
+const PAGE_MERMAID_CONFIG_EXPRESSION = 'config'
 
 function serializeInlineAttributeRecord(value: Record<string, unknown>) {
   return JSON.stringify(value)
@@ -81,7 +83,7 @@ export function transformMarkdownDiagrams(body: string) {
 
   const buildComponentTag = (encoded: string, toolbar?: MermaidToolbarOptions) => {
     const attrs = [
-      `:config="${PAGE_MERMAID_CONFIG_BINDING}"`,
+      `:page-config="${PAGE_MERMAID_CONFIG_EXPRESSION}"`,
     ]
 
     if (toolbar && isNonEmptyRecord(toolbar)) {
@@ -146,16 +148,47 @@ export function transformMarkdownDiagrams(body: string) {
     }
 
     const inlineAttrs = parseInlineAttrs(fence.info)
-    const frontmatterInfo = parseMermaidFrontmatter(rawCode, newline)
-    const inlineOverrides = extractMermaidInlineOverrides(inlineAttrs)
-    const mergedCode = inlineOverrides
-      ? applyMermaidFrontmatterOverrides(rawCode, newline, frontmatterInfo, inlineOverrides, fence.indent)
-      : rawCode
+    if (fence.info.includes('{') && !inlineAttrs) {
+      output.push(...lines.slice(index, closingIndex + 1))
+      index = closingIndex
+      continue
+    }
 
-    const toolbarProps = mergeToolbarProps(
-      extractToolbarProps(frontmatterInfo?.data),
-      extractToolbarProps(inlineAttrs),
-    )
+    const frontmatterResult = inspectMermaidFrontmatter(rawCode, newline)
+    if (frontmatterResult.kind === 'invalid') {
+      output.push(...lines.slice(index, closingIndex + 1))
+      index = closingIndex
+      continue
+    }
+    const frontmatterInfo = frontmatterResult.kind === 'valid'
+      ? frontmatterResult.info
+      : null
+
+    const inlineOverrides = resolveFenceInlineAttributes(inlineAttrs)
+    if (inlineAttrs && !inlineOverrides) {
+      output.push(...lines.slice(index, closingIndex + 1))
+      index = closingIndex
+      continue
+    }
+
+    const resolvedFrontmatter = resolveMarkdownFrontmatter([
+      frontmatterInfo?.data,
+      inlineOverrides ?? undefined,
+    ])
+    const toolbarProps = resolveMarkdownToolbar([
+      frontmatterInfo?.data.toolbar,
+      inlineOverrides?.toolbar,
+    ])
+    if (resolvedFrontmatter === null || toolbarProps === null) {
+      output.push(...lines.slice(index, closingIndex + 1))
+      index = closingIndex
+      continue
+    }
+
+    const hasInlineOverrides = inlineOverrides && Object.keys(inlineOverrides).length > 0
+    const mergedCode = frontmatterInfo || hasInlineOverrides
+      ? applyResolvedMermaidFrontmatter(rawCode, newline, frontmatterInfo, resolvedFrontmatter, fence.indent)
+      : rawCode
 
     const encoded = encodeURIComponent(mergedCode.trim())
     output.push(`${fence.indent}${buildComponentTag(encoded, toolbarProps)}`)
