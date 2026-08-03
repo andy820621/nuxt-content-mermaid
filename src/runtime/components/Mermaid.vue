@@ -551,34 +551,40 @@ onUnmounted(() => {
   if (copyResetTimer) clearTimeout(copyResetTimer)
 })
 
+// Resolve every reactive render input at one post-flush boundary so a Vue update
+// batch produces one conflict outcome or one latest Render Request, never both.
 watch(
-  [() => colorMode?.value, manualThemeMode],
-  () => {
-    if (!isEnabled) return
-    if (componentSource.value.kind === 'conflict') return
-    if (hasRenderedOnce.value) renderMermaid()
-  },
-)
-
-watch(
-  () => collectMermaidComponentSourceDependencies({
-    pageConfig: props.pageConfig,
-    config: props.config,
+  () => ({
+    componentSourceDependencies: collectMermaidComponentSourceDependencies({
+      pageConfig: props.pageConfig,
+      config: props.config,
+    }),
+    code: decodedCode.value,
+    colorMode: colorMode?.value,
+    manualThemeMode: manualThemeMode.value,
   }),
-  () => {
+  ({ code }, previousInputs) => {
+    if (code !== previousInputs.code)
+      mermaidDefinition.value = code
+
+    const wasConflict = componentSource.value.kind === 'conflict'
     const source = resolveCurrentComponentSource()
     componentSource.value = source
-    if (!isEnabled) return
-    if (source.kind === 'conflict') return
-    if (hasRenderedOnce.value) renderMermaid()
-  },
-)
 
-watch(decodedCode, (newCode) => {
-  if (!isEnabled) return
-  mermaidDefinition.value = newCode
-  if (hasRenderedOnce.value) renderMermaid()
-})
+    if (source.kind === 'conflict') {
+      if (wasConflict) return
+
+      requestBuiltInRender?.invalidate()
+      isLoading.value = false
+      throw source.error
+    }
+
+    if (!isEnabled) return
+    if (isCustomMermaidResolutionPending.value || customMermaidImpl.value) return
+    if (wasConflict || hasRenderedOnce.value) renderMermaid()
+  },
+  { flush: 'post' },
+)
 
 // Dynamic Cursor Generation
 const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
