@@ -1,7 +1,6 @@
 import { defineNuxtPlugin } from '#app'
 import type { Mermaid, MermaidConfig } from 'mermaid'
-import { cloneOwnedData } from '../../configuration/core'
-import type { JsonObject } from '../../types/config'
+import { materializeMermaidConfigForInvocation } from '../mermaid-config'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 
 export default defineNuxtPlugin((nuxtApp) => {
@@ -15,9 +14,10 @@ export default defineNuxtPlugin((nuxtApp) => {
       try {
         const mermaid = await import('mermaid')
         const mermaidInstance = (mermaid.default ?? mermaid) as Mermaid
-        const initOptions = cloneOwnedData(
-          (snapshot.loader?.init ?? {}) as unknown as JsonObject,
-        ) as MermaidConfig
+        const initOptions = materializeMermaidConfigForInvocation({
+          runtimeConfig: (snapshot.loader?.init ?? {}) as MermaidConfig,
+          source: { kind: 'runtime-only' },
+        })
         mermaidInstance.initialize(initOptions)
         return mermaidInstance
       }

@@ -15,8 +15,11 @@ import { defu } from 'defu'
 import type { Component, ComputedRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { MermaidComponentSource } from '../component-configuration'
-import { resolveMermaidComponentSource } from '../component-configuration'
-import { mergeMermaidConfig, resolveMermaidTheme } from '../mermaid-config'
+import {
+  collectMermaidComponentSourceDependencies,
+  resolveMermaidComponentSource,
+} from '../component-configuration'
+import { materializeMermaidConfigForInvocation, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 import { parseSizeToPx, isRecord } from '../utils'
@@ -202,9 +205,12 @@ const mermaidTheme = computed(() => {
 })
 
 function materializeEffectiveMermaidInit(): MermaidConfig {
-  return mergeMermaidConfig({
-    baseConfig: baseMermaidInit,
-    overrideConfig: diagramSourceConfig.value,
+  const source = componentSource.value
+  if (source.kind === 'conflict') throw source.error
+
+  return materializeMermaidConfigForInvocation({
+    runtimeConfig: baseMermaidInit,
+    source,
     theme: mermaidTheme.value,
   })
 }
@@ -555,7 +561,10 @@ watch(
 )
 
 watch(
-  [() => props.pageConfig, () => props.config],
+  () => collectMermaidComponentSourceDependencies({
+    pageConfig: props.pageConfig,
+    config: props.config,
+  }),
   () => {
     const source = resolveCurrentComponentSource()
     componentSource.value = source
@@ -563,7 +572,6 @@ watch(
     if (source.kind === 'conflict') return
     if (hasRenderedOnce.value) renderMermaid()
   },
-  { deep: true },
 )
 
 watch(decodedCode, (newCode) => {

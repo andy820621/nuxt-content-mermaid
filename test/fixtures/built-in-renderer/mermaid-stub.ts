@@ -6,6 +6,9 @@ const initializedConfigs = new WeakSet<object>()
 let currentSecurityLevel: MermaidConfig['securityLevel']
 let currentTheme: MermaidConfig['theme']
 let currentUnknownMermaidExtensionEnabled = false
+let currentDirectCapabilityFontSize: number | undefined
+let currentDirectOpenValue: string | undefined
+let currentDirectSharedReferencePreserved = false
 const control: MermaidControl = {
   pending: 0,
   runs: [],
@@ -29,6 +32,16 @@ const mermaidStub = {
     currentUnknownMermaidExtensionEnabled
       = (config as MermaidConfig & { unknownMermaidExtension?: { enabled?: boolean } })
         .unknownMermaidExtension?.enabled === true
+    currentDirectCapabilityFontSize = config.sequence?.actorFont?.().fontSize as number | undefined
+    const directExtension = (config as MermaidConfig & {
+      directExtension?: {
+        first?: { value?: string }
+        second?: { value?: string }
+      }
+    }).directExtension
+    currentDirectOpenValue = directExtension?.first?.value
+    currentDirectSharedReferencePreserved
+      = directExtension?.first !== undefined && directExtension.first === directExtension.second
   },
   render: async (_renderId: string, source: string, stagingTarget?: Element) => {
     const id = control.runs.length + 1
@@ -42,6 +55,9 @@ const mermaidStub = {
       theme: currentTheme,
       securityLevel: currentSecurityLevel,
       unknownMermaidExtensionEnabled: currentUnknownMermaidExtensionEnabled,
+      directCapabilityFontSize: currentDirectCapabilityFontSize,
+      directOpenValue: currentDirectOpenValue,
+      directSharedReferencePreserved: currentDirectSharedReferencePreserved,
       stagingConnected: stagingTarget?.isConnected === true,
       stagingHidden: stagingRoot?.getAttribute('aria-hidden') === 'true',
       stagingInert: stagingRoot?.inert === true && stagingRoot.style.pointerEvents === 'none',

@@ -26,6 +26,8 @@ const skippedCode = ref('graph TD;SKIPPED-->DONE')
 const showSkipped = ref(false)
 const showStrict = ref(false)
 const showSandbox = ref(false)
+const showDirectCapability = ref(false)
+const showInvalidDirectConfig = ref(false)
 const showPageConfig = ref(false)
 const showMarkdownPageConfig = ref(false)
 const showConflict = ref(false)
@@ -33,6 +35,33 @@ const showReactiveConflict = ref(false)
 const componentErrorFingerprint = ref<{ name?: string, code?: string } | null>(null)
 const strictConfig: MermaidConfig = { securityLevel: 'strict' }
 const sandboxConfig: MermaidConfig = { securityLevel: 'sandbox' }
+const opaqueCapabilityInspections = ref(0)
+const trustedTypesPolicy = Object.defineProperty({}, 'createHTML', {
+  enumerable: true,
+  get() {
+    opaqueCapabilityInspections.value++
+    return (value: string) => value
+  },
+}) as NonNullable<NonNullable<MermaidConfig['dompurifyConfig']>['TRUSTED_TYPES_POLICY']>
+const directSharedConfig = { value: 'preserved' }
+const directCapabilityConfig = {
+  securityLevel: 'strict',
+  sequence: {
+    actorFont: () => ({ fontSize: 16 }),
+  },
+  dompurifyConfig: {
+    TRUSTED_TYPES_POLICY: trustedTypesPolicy,
+  },
+  directExtension: {
+    first: directSharedConfig,
+    second: directSharedConfig,
+  },
+} as MermaidConfig
+const invalidDirectConfig = {
+  flowchart: {
+    curve: () => 'basis',
+  },
+} as unknown as MermaidConfig
 const pageConfig = reactive({
   theme: 'forest' as const,
   unknownMermaidExtension: { enabled: true },
@@ -101,6 +130,14 @@ function mountStrict() {
 
 function mountSandbox() {
   showSandbox.value = true
+}
+
+function mountDirectCapability() {
+  showDirectCapability.value = true
+}
+
+function mountInvalidDirectConfig() {
+  showInvalidDirectConfig.value = true
 }
 
 function mountPageConfig() {
@@ -211,6 +248,20 @@ function updateReactiveConflictCode() {
         Mount sandbox
       </button>
       <button
+        id="direct-capability-mount"
+        type="button"
+        @click="mountDirectCapability"
+      >
+        Mount direct capability
+      </button>
+      <button
+        id="invalid-direct-config-mount"
+        type="button"
+        @click="mountInvalidDirectConfig"
+      >
+        Mount invalid direct config
+      </button>
+      <button
         id="conflict-mount"
         type="button"
         @click="mountConflict"
@@ -303,6 +354,31 @@ function updateReactiveConflictCode() {
       <Mermaid
         :code="encodeURIComponent('graph TD;SANDBOX-->DONE')"
         :config="sandboxConfig"
+      />
+    </section>
+
+    <section
+      v-if="showDirectCapability"
+      id="direct-capability"
+    >
+      <Mermaid
+        :code="encodeURIComponent('graph TD;DIRECT_CAPABILITY-->DONE')"
+        :config="directCapabilityConfig"
+      />
+      <output
+        id="opaque-capability-inspections"
+        :data-count="String(opaqueCapabilityInspections)"
+      />
+    </section>
+
+    <section
+      v-if="showInvalidDirectConfig"
+      id="invalid-direct-config"
+    >
+      <component
+        :is="MermaidComponent"
+        :code="encodeURIComponent('graph TD;INVALID_DIRECT-->DONE')"
+        :config="invalidDirectConfig"
       />
     </section>
 
