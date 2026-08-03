@@ -100,6 +100,7 @@ const toggleFullscreen = () => {
   expandOverlay.value?.endForDiagramReplacement()
   return fullscreenPresentation.value?.toggle()
 }
+const hasRenderStarted = ref(false)
 const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
 const hasError = ref(false)
@@ -437,9 +438,18 @@ function getMermaidSvg(): SVGSVGElement | null {
   return svg instanceof SVGSVGElement ? svg : null
 }
 
+function stopLazyObservation() {
+  const activeObserver = observer
+  observer = null
+  activeObserver?.takeRecords()
+  activeObserver?.disconnect()
+}
+
 async function renderMermaid() {
   if (componentSource.value.kind === 'conflict') return
 
+  hasRenderStarted.value = true
+  stopLazyObservation()
   isLoading.value = true
 
   const outcome = await getBuiltInRenderRequest()()
@@ -470,18 +480,17 @@ function setupMermaidContainer() {
     return
   }
 
-  observer = new IntersectionObserver(
+  const nextObserver = new IntersectionObserver(
     (entries) => {
-      if (entries[0]?.isIntersecting && !hasRenderedOnce.value) {
+      if (observer !== nextObserver) return
+      if (entries[0]?.isIntersecting && !hasRenderedOnce.value)
         renderMermaid()
-
-        if (observer) observer.disconnect()
-      }
     },
     { threshold: lazyThreshold },
   )
 
-  observer.observe(container)
+  observer = nextObserver
+  nextObserver.observe(container)
 }
 
 async function copyMermaidSource() {
@@ -547,38 +556,44 @@ onMounted(() => {
 
 onUnmounted(() => {
   requestBuiltInRender?.invalidate()
-  if (observer) observer.disconnect()
+  stopLazyObservation()
   if (copyResetTimer) clearTimeout(copyResetTimer)
 })
 
+// Resolve every reactive render input at one post-flush boundary so a Vue update
+// batch produces one conflict outcome or one latest Render Request, never both.
 watch(
-  [() => colorMode?.value, manualThemeMode],
-  () => {
-    if (!isEnabled) return
-    if (componentSource.value.kind === 'conflict') return
-    if (hasRenderedOnce.value) renderMermaid()
-  },
-)
-
-watch(
-  () => collectMermaidComponentSourceDependencies({
-    pageConfig: props.pageConfig,
-    config: props.config,
+  () => ({
+    componentSourceDependencies: collectMermaidComponentSourceDependencies({
+      pageConfig: props.pageConfig,
+      config: props.config,
+    }),
+    code: decodedCode.value,
+    colorMode: colorMode?.value,
+    manualThemeMode: manualThemeMode.value,
   }),
-  () => {
+  ({ code }, previousInputs) => {
+    if (code !== previousInputs.code)
+      mermaidDefinition.value = code
+
+    const wasConflict = componentSource.value.kind === 'conflict'
     const source = resolveCurrentComponentSource()
     componentSource.value = source
-    if (!isEnabled) return
-    if (source.kind === 'conflict') return
-    if (hasRenderedOnce.value) renderMermaid()
-  },
-)
 
-watch(decodedCode, (newCode) => {
-  if (!isEnabled) return
-  mermaidDefinition.value = newCode
-  if (hasRenderedOnce.value) renderMermaid()
-})
+    if (source.kind === 'conflict') {
+      if (wasConflict) return
+
+      requestBuiltInRender?.invalidate()
+      isLoading.value = false
+      throw source.error
+    }
+
+    if (!isEnabled) return
+    if (isCustomMermaidResolutionPending.value || customMermaidImpl.value) return
+    if (wasConflict || hasRenderStarted.value) renderMermaid()
+  },
+  { flush: 'post' },
+)
 
 // Dynamic Cursor Generation
 const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)

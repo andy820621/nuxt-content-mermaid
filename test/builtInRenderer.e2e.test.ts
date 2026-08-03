@@ -28,6 +28,12 @@ async function waitForRuns(page: BrowserPage, expected: number) {
   }, expected, { timeout: 5000 })
 }
 
+async function waitForComponentErrors(page: BrowserPage, expected: number) {
+  await page.waitForFunction((count: number) => {
+    return document.querySelector('#component-error')?.getAttribute('data-count') === String(count)
+  }, expected, { timeout: 5000 })
+}
+
 async function waitForDiagnosticCount(page: BrowserPage, event: string, expected: number) {
   await page.waitForFunction(
     ({ eventName, count }: { eventName: string, count: number }) => {
@@ -67,6 +73,14 @@ async function renderInitialDiagram(page: BrowserPage) {
   await releaseNext(page)
   await page.locator('#primary svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
   await page.getByTestId('built-in-spinner').waitFor({ state: 'detached', timeout: 5000 })
+}
+
+async function renderInitialReactiveConflictDiagram(page: BrowserPage) {
+  await renderInitialDiagram(page)
+  await page.locator('#reactive-conflict-mount').click()
+  await waitForRuns(page, 2)
+  await releaseNext(page)
+  await page.locator('#reactive-conflict svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
 }
 
 describe('built-in renderer integration', async () => {
@@ -114,6 +128,15 @@ describe('built-in renderer integration', async () => {
 
     expect(await fingerprint.getAttribute('data-name')).toBe('MermaidComponentConfigurationError')
     expect(await fingerprint.getAttribute('data-code')).toBe('CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR')
+    expect(await fingerprint.getAttribute('data-count')).toBe('1')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(1)
+
+    await page.locator('#conflict-resolve').click()
+    await page.evaluate(async () => {
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    })
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs.length
     })).toBe(1)
@@ -243,23 +266,104 @@ describe('built-in renderer integration', async () => {
     await page.locator('#page-config svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
-  it('blocks non-source render triggers during a reactive source conflict', { timeout: 20000 }, async () => {
+  it('reports once per reactive conflict episode and recovers exactly once with the latest state', { timeout: 20000 }, async () => {
     const page = await createPage()
-    await renderInitialDiagram(page)
-    await page.locator('#reactive-conflict-mount').click()
-    await waitForRuns(page, 2)
-    await releaseNext(page)
-    await page.locator('#reactive-conflict svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+    await renderInitialReactiveConflictDiagram(page)
 
     await page.locator('#reactive-conflict-enter').click()
-    await page.locator('#reactive-conflict-update-code').click()
+    await waitForComponentErrors(page, 1)
+    const fingerprint = page.locator('#component-error')
+    expect(await fingerprint.getAttribute('data-name')).toBe('MermaidComponentConfigurationError')
+    expect(await fingerprint.getAttribute('data-code')).toBe('CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR')
+    await page.locator('#reactive-conflict-update').click()
     await page.evaluate(async () => {
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     })
 
+    expect(await page.locator('#component-error').getAttribute('data-count')).toBe('1')
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs.length
     })).toBe(2)
+
+    await page.locator('#reactive-conflict-recover').click()
+    await waitForRuns(page, 3)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
+    })).toEqual(expect.objectContaining({
+      source: expect.stringContaining('RECOVERED_LATEST'),
+      theme: 'dark',
+    }))
+    await releaseNext(page)
+    await page.locator('#reactive-conflict svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(3)
+
+    await page.locator('#reactive-conflict-reenter').click()
+    await waitForComponentErrors(page, 2)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(3)
+  })
+
+  it('invalidates an executing generation without changing committed or fullscreen state', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installFullscreenStub(page)
+    await renderInitialReactiveConflictDiagram(page)
+
+    await page.locator('#reactive-conflict [aria-label="Enter fullscreen"]').click()
+    await page.locator('#reactive-conflict .ncm-zoom-toolbar--fullscreen').waitFor({ state: 'visible', timeout: 5000 })
+    await page.locator('#reactive-conflict-queue').click()
+    await waitForRuns(page, 3)
+
+    await page.locator('#reactive-conflict-enter').click()
+    await waitForComponentErrors(page, 1)
+    await releaseNext(page)
+    await waitForPending(page, 0)
+
+    expect(await page.locator('#reactive-conflict .mermaid > svg').getAttribute('data-run-id')).toBe('2')
+    expect(await page.locator('#reactive-conflict [data-testid="built-in-error"]').count()).toBe(0)
+    await page.locator('#reactive-conflict .ncm-zoom-toolbar--fullscreen').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
+  })
+
+  it('invalidates a queued first generation and recovers its first render once', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installDiagnosticCapture(page)
+    await renderInitialDiagram(page)
+    await page.locator('#blocker-mount').click()
+    await waitForRuns(page, 2)
+
+    await page.locator('#reactive-conflict-mount').click()
+    await waitForDiagnosticCount(page, 'queue:enqueue', 3)
+    const spinner = page.locator('#reactive-conflict [data-testid="built-in-spinner"]')
+    await spinner.waitFor({ state: 'visible', timeout: 5000 })
+
+    await page.locator('#reactive-conflict-enter').click()
+    await waitForComponentErrors(page, 1)
+    await spinner.waitFor({ state: 'detached', timeout: 5000 })
+    await releaseNext(page)
+    await waitForDiagnosticCount(page, 'queue:finish', 3)
+
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(2)
+    expect(await page.locator('#reactive-conflict .mermaid > svg').count()).toBe(0)
+    expect(await page.locator('#reactive-conflict [data-testid="built-in-error"]').count()).toBe(0)
+
+    await page.locator('#reactive-conflict-recover').click()
+    await waitForRuns(page, 3)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
+    })).toEqual(expect.objectContaining({
+      source: expect.stringContaining('RECOVERED_LATEST'),
+      theme: 'dark',
+    }))
+    await releaseNext(page)
+    await page.locator('#reactive-conflict svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(3)
   })
 
   it('preserves the Committed Diagram through failure and pending recovery', { timeout: 20000 }, async () => {

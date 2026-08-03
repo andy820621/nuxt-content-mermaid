@@ -33,6 +33,7 @@ const showMarkdownPageConfig = ref(false)
 const showConflict = ref(false)
 const showReactiveConflict = ref(false)
 const componentErrorFingerprint = ref<{ name?: string, code?: string } | null>(null)
+const componentErrorCount = ref(0)
 const strictConfig: MermaidConfig = { securityLevel: 'strict' }
 const sandboxConfig: MermaidConfig = { securityLevel: 'sandbox' }
 const opaqueCapabilityInspections = ref(0)
@@ -68,8 +69,8 @@ const pageConfig = reactive({
 })
 const pageConfigSource = shallowRef<PageMermaidConfig | undefined>(pageConfig)
 const conflictPageConfig = { theme: 'forest' }
-const conflictDirectConfig: MermaidConfig = { theme: 'dark' }
-const reactiveConflictPageConfig = { theme: 'forest' } as const
+const conflictDirectConfig = shallowRef<MermaidConfig | undefined>({ theme: 'dark' })
+const reactiveConflictPageConfig = shallowRef<PageMermaidConfig | undefined>({ theme: 'forest' })
 const reactiveConflictDirectConfig = shallowRef<MermaidConfig>()
 const reactiveConflictCode = ref('graph TD;REACTIVE_CONFLICT-->LEGAL')
 const MermaidComponent = resolveComponent('Mermaid')
@@ -79,6 +80,7 @@ const { data: markdownPage } = await useAsyncData('markdown-page-config', () =>
 
 onErrorCaptured((error) => {
   const fingerprint = error as { name?: string, code?: string }
+  componentErrorCount.value++
   componentErrorFingerprint.value = {
     name: fingerprint.name,
     code: fingerprint.code,
@@ -161,6 +163,10 @@ function mountConflict() {
   showConflict.value = true
 }
 
+function resolveInitialConflict() {
+  conflictDirectConfig.value = undefined
+}
+
 function mountReactiveConflict() {
   showReactiveConflict.value = true
 }
@@ -169,8 +175,23 @@ function enterReactiveConflict() {
   reactiveConflictDirectConfig.value = { theme: 'dark' }
 }
 
-function updateReactiveConflictCode() {
-  reactiveConflictCode.value = 'graph TD;REACTIVE_CONFLICT-->UPDATED'
+function queueReactiveConflictRender() {
+  reactiveConflictCode.value = 'graph TD;REACTIVE_PENDING-->LEGAL'
+}
+
+function updateReactiveConflictEpisode() {
+  reactiveConflictDirectConfig.value = { theme: 'neutral' }
+  reactiveConflictCode.value = 'graph TD;CONFLICT_INTERMEDIATE-->IGNORED'
+}
+
+function recoverReactiveConflict() {
+  reactiveConflictPageConfig.value = undefined
+  reactiveConflictDirectConfig.value = { theme: 'dark' }
+  reactiveConflictCode.value = 'graph TD;RECOVERED_LATEST-->DONE'
+}
+
+function reenterReactiveConflict() {
+  reactiveConflictPageConfig.value = { theme: 'forest' }
 }
 </script>
 
@@ -269,6 +290,13 @@ function updateReactiveConflictCode() {
         Mount conflict
       </button>
       <button
+        id="conflict-resolve"
+        type="button"
+        @click="resolveInitialConflict"
+      >
+        Resolve initial conflict
+      </button>
+      <button
         id="page-config-mount"
         type="button"
         @click="mountPageConfig"
@@ -311,11 +339,32 @@ function updateReactiveConflictCode() {
         Enter reactive conflict
       </button>
       <button
-        id="reactive-conflict-update-code"
+        id="reactive-conflict-queue"
         type="button"
-        @click="updateReactiveConflictCode"
+        @click="queueReactiveConflictRender"
       >
-        Update reactive conflict code
+        Queue reactive conflict render
+      </button>
+      <button
+        id="reactive-conflict-update"
+        type="button"
+        @click="updateReactiveConflictEpisode"
+      >
+        Update reactive conflict episode
+      </button>
+      <button
+        id="reactive-conflict-recover"
+        type="button"
+        @click="recoverReactiveConflict"
+      >
+        Recover reactive conflict
+      </button>
+      <button
+        id="reactive-conflict-reenter"
+        type="button"
+        @click="reenterReactiveConflict"
+      >
+        Re-enter reactive conflict
       </button>
     </div>
 
@@ -431,6 +480,7 @@ function updateReactiveConflictCode() {
       id="component-error"
       :data-name="componentErrorFingerprint.name"
       :data-code="componentErrorFingerprint.code"
+      :data-count="String(componentErrorCount)"
     />
     <output
       id="markdown-page-status"
