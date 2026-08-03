@@ -34,10 +34,8 @@ import IconExpand from '../components/icons/IconExpand.vue'
 import IconCollapse from '../components/icons/IconCollapse.vue'
 import MermaidFullscreenPresentation from '../components/MermaidFullscreenPresentation.vue'
 
-type RenderingOwnership = 'pending' | 'built-in'
 type BuiltInRendererProps = MermaidComponentProps & {
   componentSource: MermaidComponentSource
-  renderingOwnership: RenderingOwnership
   spinnerComponent: Component | string
 }
 
@@ -234,13 +232,7 @@ const handleMermaidClick = (event: MouseEvent) => expandOverlay.value?.openFromD
 
 let requestBuiltInRender: ReturnType<typeof createMermaidRenderer> | undefined
 
-function hasBuiltInRenderingOwnership() {
-  return props.renderingOwnership === 'built-in'
-}
-
 function getBuiltInRenderRequest() {
-  if (!hasBuiltInRenderingOwnership()) return undefined
-
   requestBuiltInRender ??= createMermaidRenderer({
     loadMermaid: $mermaid,
     readRenderData: () => {
@@ -418,11 +410,9 @@ function stopLazyObservation() {
 }
 
 async function renderMermaid() {
-  if (!hasBuiltInRenderingOwnership()) return
   if (componentSource.value.kind === 'conflict') return
 
   const request = getBuiltInRenderRequest()
-  if (!request) return
 
   hasRenderStarted.value = true
   stopLazyObservation()
@@ -446,8 +436,6 @@ async function renderMermaid() {
 }
 
 function setupMermaidContainer() {
-  if (!hasBuiltInRenderingOwnership()) return
-
   const container = mermaidContainer.value
   if (!container) return
 
@@ -536,14 +524,6 @@ onUnmounted(() => {
   if (copyResetTimer) clearTimeout(copyResetTimer)
 })
 
-watch(
-  () => props.renderingOwnership,
-  (ownership) => {
-    if (ownership === 'built-in')
-      nextTick(() => setupMermaidContainer())
-  },
-)
-
 // Resolve every reactive render input at one post-flush boundary so a Vue update
 // batch produces one conflict outcome or one latest Render Request, never both.
 watch(
@@ -568,7 +548,6 @@ watch(
     }
 
     if (!isEnabled) return
-    if (!hasBuiltInRenderingOwnership()) return
     if (wasConflict || hasRenderStarted.value) renderMermaid()
   },
   { flush: 'post' },
