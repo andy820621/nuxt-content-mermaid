@@ -437,9 +437,15 @@ function getMermaidSvg(): SVGSVGElement | null {
   return svg instanceof SVGSVGElement ? svg : null
 }
 
+function stopLazyObservation() {
+  observer?.disconnect()
+  observer = null
+}
+
 async function renderMermaid() {
   if (componentSource.value.kind === 'conflict') return
 
+  stopLazyObservation()
   isLoading.value = true
 
   const outcome = await getBuiltInRenderRequest()()
@@ -472,11 +478,8 @@ function setupMermaidContainer() {
 
   observer = new IntersectionObserver(
     (entries) => {
-      if (entries[0]?.isIntersecting && !hasRenderedOnce.value) {
+      if (entries[0]?.isIntersecting && !hasRenderedOnce.value)
         renderMermaid()
-
-        if (observer) observer.disconnect()
-      }
     },
     { threshold: lazyThreshold },
   )
@@ -547,7 +550,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   requestBuiltInRender?.invalidate()
-  if (observer) observer.disconnect()
+  stopLazyObservation()
   if (copyResetTimer) clearTimeout(copyResetTimer)
 })
 

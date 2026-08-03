@@ -75,6 +75,14 @@ async function renderInitialDiagram(page: BrowserPage) {
   await page.getByTestId('built-in-spinner').waitFor({ state: 'detached', timeout: 5000 })
 }
 
+async function renderInitialReactiveConflictDiagram(page: BrowserPage) {
+  await renderInitialDiagram(page)
+  await page.locator('#reactive-conflict-mount').click()
+  await waitForRuns(page, 2)
+  await releaseNext(page)
+  await page.locator('#reactive-conflict svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+}
+
 describe('built-in renderer integration', async () => {
   await setup({
     rootDir,
@@ -260,11 +268,7 @@ describe('built-in renderer integration', async () => {
 
   it('reports once per reactive conflict episode and recovers exactly once with the latest state', { timeout: 20000 }, async () => {
     const page = await createPage()
-    await renderInitialDiagram(page)
-    await page.locator('#reactive-conflict-mount').click()
-    await waitForRuns(page, 2)
-    await releaseNext(page)
-    await page.locator('#reactive-conflict svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+    await renderInitialReactiveConflictDiagram(page)
 
     await page.locator('#reactive-conflict-enter').click()
     await waitForComponentErrors(page, 1)
@@ -305,11 +309,7 @@ describe('built-in renderer integration', async () => {
   it('invalidates an executing generation without changing committed or fullscreen state', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installFullscreenStub(page)
-    await renderInitialDiagram(page)
-    await page.locator('#reactive-conflict-mount').click()
-    await waitForRuns(page, 2)
-    await releaseNext(page)
-    await page.locator('#reactive-conflict svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+    await renderInitialReactiveConflictDiagram(page)
 
     await page.locator('#reactive-conflict [aria-label="Enter fullscreen"]').click()
     await page.locator('#reactive-conflict .ncm-zoom-toolbar--fullscreen').waitFor({ state: 'visible', timeout: 5000 })
@@ -327,7 +327,7 @@ describe('built-in renderer integration', async () => {
     expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
   })
 
-  it('invalidates a queued first generation before it starts', { timeout: 20000 }, async () => {
+  it('invalidates a queued first generation and recovers its first render once', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installDiagnosticCapture(page)
     await renderInitialDiagram(page)
@@ -350,6 +350,20 @@ describe('built-in renderer integration', async () => {
     })).toBe(2)
     expect(await page.locator('#reactive-conflict .mermaid > svg').count()).toBe(0)
     expect(await page.locator('#reactive-conflict [data-testid="built-in-error"]').count()).toBe(0)
+
+    await page.locator('#reactive-conflict-recover').click()
+    await waitForRuns(page, 3)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
+    })).toEqual(expect.objectContaining({
+      source: expect.stringContaining('RECOVERED_LATEST'),
+      theme: 'dark',
+    }))
+    await releaseNext(page)
+    await page.locator('#reactive-conflict svg[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(3)
   })
 
   it('preserves the Committed Diagram through failure and pending recovery', { timeout: 20000 }, async () => {
