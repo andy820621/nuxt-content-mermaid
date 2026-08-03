@@ -4,7 +4,7 @@
 
 Accepted for the 3.0 implementation tracked by [GitHub Issue #21](https://github.com/andy820621/nuxt-content-mermaid/issues/21) and its sub-issues.
 
-ADRs 0002–0017 remain the source of individual decisions and rationale. This specification defines their integrated seam ownership, public release boundary, and verification scope.
+ADRs 0002–0018 remain the source of individual decisions and rationale. This specification defines their integrated seam ownership, public release boundary, and verification scope.
 
 ## Release Boundary
 
@@ -32,8 +32,12 @@ flowchart LR
   end
 
   subgraph Diagram[One Mermaid component]
+    CAND[Optional Custom Renderer Candidate] --> RSEL{Renderer Selection}
+    RSEL -->|resolved| CUSTOM[Custom Renderer]
+    RSEL -->|absent or resolution failed| BUILTIN[Built-in Renderer]
     PC[Page Mermaid Config] --> CSR[Component Source Resolver]
     DC[Direct Mermaid Config] --> CSR
+    BUILTIN --> CSR
     CSR --> DCR
     DCR --> WC[Per-invocation Working Copy]
     WC --> TR[Transactional Renderer]
@@ -144,7 +148,29 @@ If the component survives Vue error handling and later becomes legal, exactly on
 
 Conflict orchestration consumes Component Source Resolver outcomes and Direct Config materialization results. It does not repeat source validation, source discrimination, or working-copy logic.
 
-### 10. Transactional Rendering
+### 10. Renderer Selection and Rendering Ownership
+
+Setting `components.renderer` creates a Custom Renderer Candidate, not a Rendering Owner. Renderer Selection resolves that candidate before assigning ownership and maintains the following internal state machine:
+
+```mermaid
+stateDiagram-v2
+  [*] --> BuiltInOwner: no candidate
+  [*] --> Pending: candidate configured
+  Pending --> CustomOwner: resolution succeeds
+  Pending --> ResolutionFailure: not-found or load-failed
+  ResolutionFailure --> BuiltInOwner: diagnostic reported
+  CustomOwner --> CustomOwner: mount or render failure
+```
+
+While resolution is pending, the component has no Rendering Owner. Renderer Selection retains the established outer styling seam and neutral source fallback from the slot or `code`, but it does not instantiate Built-in Renderer UI, lazy loading, error handling, or render lifecycle. Exact pending DOM structure beyond existing styling hooks is not a public contract.
+
+Successful resolution atomically assigns ownership to the Custom Renderer. It receives only the established `code`, default slot, and `spinner` inputs and completely owns configuration, theme, toolbar, loading, error presentation, and rendering. A later Custom Renderer mount or render failure never transfers ownership to the Built-in Renderer.
+
+`not-found` and `load-failed` resolution failures each produce one Custom Renderer Resolution Diagnostic per failed ownership handoff. Reporting happens before the Built-in Renderer receives ownership. The diagnostic is an internal invariant and test seam, not a public structured-diagnostics interface. Independently of `debug`, Package Users receive a console diagnostic containing the package prefix, candidate, and understandable failure reason; exact wording is not guaranteed. `components.error` remains exclusive to Built-in Mermaid render failures.
+
+This preserves the existing availability-oriented fallback. Fail-closed selection is deferred unless a concrete safety or compliance requirement makes a Custom Renderer mandatory. A future need to preserve package UI and lifecycle while replacing only diagram generation must use a separately named low-level render adapter rather than changing `components.renderer`.
+
+### 11. Transactional Rendering
 
 Every Render Request belongs to a component-local Render Generation. Only the latest legal generation can commit live package-managed DOM or presentation state. A stale queued request may be skipped; work already executing may finish but its result is discarded. No public contract promises physical interruption, `AbortSignal`, or a particular queue implementation.
 
@@ -178,6 +204,8 @@ Unchanged public contracts include the Nuxt compatibility range, `$mermaid` inje
 - Explicit Mermaid initialization log-level and error-rendering values win; otherwise their values derive from the module debug policy.
 - Transactional success requires an error-propagating Mermaid render call. A result that may have swallowed a render failure cannot be committed as success.
 - The existing Custom Renderer interface is preserved. The wrapper enforces source mutual exclusion without inventing new Custom Renderer config props.
+- A configured Custom Renderer Candidate pauses Built-in creation until resolution assigns exactly one Rendering Owner.
+- Failure after successful Custom Renderer resolution never falls back to the Built-in Renderer.
 - A Staging Render Target may be document-connected only in a package-owned offscreen measurement host; isolation from the live target is the invariant.
 
 ## Implementation Defaults
@@ -193,6 +221,7 @@ These choices are internal, reversible, and not public contracts:
 - begin with the narrow capability and RegExp path allowlist represented by supported Mermaid and DOMPurify types;
 - use a fresh offscreen measurement host for each active attempt and remove it unconditionally;
 - keep `theme.useColorModeTheme` as its existing deprecated no-op in 3.0;
+- choose the console method, internal function names, diagnostic object representation, component-loading mechanism, and test helper without expanding their public contract;
 - preserve current lazy-loading and Custom Renderer behavior except where the accepted conflict and recovery invariant requires one latest recovery request.
 
 ## Out of Scope
@@ -204,6 +233,7 @@ These choices are internal, reversible, and not public contracts:
 - a versioned public structured-diagnostics interface;
 - additional non-plain-instance adapters or capability paths without a current typed Package User;
 - a redesign of the Custom Renderer interface;
+- a low-level render adapter that preserves Built-in Renderer UI and lifecycle while replacing only diagram generation;
 - removal of the deprecated `theme.useColorModeTheme` no-op.
 
 ## Verification Boundary
@@ -217,5 +247,8 @@ Implementation is complete only when tests cover:
 - per-NuxtApp snapshot ownership, proxy detachment, deep freeze, fail-fast behavior, and non-live runtime mutation;
 - Page and Direct source validation, capability materialization, open-key preservation, and per-invocation isolation;
 - Markdown metadata ownership, Selective Fallback, and the Page Mermaid Config protocol;
+- no-owner pending behavior, neutral source fallback, atomic Custom Renderer ownership, and absence of Built-in creation after successful resolution;
+- exactly-once `not-found` and `load-failed` diagnostics before Built-in fallback with `debug` both enabled and disabled, without routing through `components.error`;
+- Custom Renderer mount and render failures remaining under Custom Renderer ownership without Built-in fallback;
 - logical invalidation, stale work, staging cleanup, strict and sandbox commit, Committed Diagram preservation, one-error-per-conflict, and latest-only recovery;
 - lint, unit tests, type tests, package build, playground production build, and relevant Nuxt browser fixtures.

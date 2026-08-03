@@ -125,11 +125,27 @@ The Markdown Diagram Transform rule that recognized invalid diagram input follow
 _Avoid_: Error recovery, fail-safe
 
 **Built-in Renderer**:
-The package-provided rendering behavior used when a Package User has not selected a replacement renderer.
+The package-provided rendering behavior that becomes the Rendering Owner when no Custom Renderer Candidate exists or after candidate resolution fails.
 _Avoid_: Default component
 
+**Custom Renderer Candidate**:
+A Package User's configured intent to replace the Built-in Renderer, represented by `components.renderer` until the named component resolves. A candidate is not a Rendering Owner.
+_Avoid_: Custom Renderer, selected renderer
+
+**Renderer Selection**:
+The per-instance protocol that resolves an optional Custom Renderer Candidate and assigns Rendering Ownership. Candidate resolution completes as either a Custom Renderer or, after reporting a Custom Renderer Resolution Diagnostic, the Built-in Renderer.
+_Avoid_: Renderer adapter, renderer branch
+
+**Custom Renderer Resolution Diagnostic**:
+An internal, non-public semantic record reported once before Rendering Ownership passes to the Built-in Renderer after candidate resolution fails. It identifies the candidate and whether the failure was `not-found` or `load-failed`.
+_Avoid_: Public diagnostic contract, render error
+
+**Rendering Owner**:
+The renderer solely responsible for one diagram component instance's rendering experience and lifecycle. An instance may temporarily have no owner while a Custom Renderer Candidate is pending, but it never has more than one.
+_Avoid_: Active renderer, renderer path
+
 **Custom Renderer**:
-A Package User-provided renderer that completely replaces the Built-in Renderer while preserving its established extension inputs.
+A successfully resolved Package User-provided renderer that completely replaces the Built-in Renderer, owns the entire rendering experience and lifecycle, and receives only its established extension inputs.
 _Avoid_: Built-in renderer wrapper
 
 **Render Request**:

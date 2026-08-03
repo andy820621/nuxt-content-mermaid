@@ -441,12 +441,15 @@ graph TD
 
 If you want full control over rendering (for example to add a border, expand controls, or other UI), you can provide a custom component via `components.renderer`.
 
+The configured name is a candidate until its component resolves. Built-in rendering remains paused during resolution. If the component cannot be found or loaded, the module falls back to the Built-in Renderer. Once resolution succeeds, the Custom Renderer completely owns rendering; its later mount or render failures do not trigger Built-in fallback.
+
 1. Specify the component name in `nuxt.config.ts`:
 
    ```ts
    contentMermaid: {
      components: {
        renderer: "MyCustomMermaid",
+       spinner: "MySpinner", // optional input for your component
      },
    }
    ```
@@ -455,60 +458,60 @@ If you want full control over rendering (for example to add a border, expand con
 
    ```vue
    <script setup lang="ts">
-   // You can consume slot content or invoke useMermaid() logic here
+   import { onMounted, ref, shallowRef, useId } from 'vue'
+   import type { Component } from 'vue'
+
+   const props = defineProps<{
+     code?: string
+     spinner: Component | string
+   }>()
+
+   const loading = ref(true)
+   const error = shallowRef<unknown>()
+   const svg = ref('')
+   const renderId = `custom-mermaid-${useId().replaceAll(':', '')}`
+
+   onMounted(async () => {
+     try {
+       const mermaid = await useNuxtApp().$mermaid()
+       svg.value = (await mermaid.render(renderId, props.code ?? '')).svg
+     }
+     catch (cause) {
+       error.value = cause
+     }
+     finally {
+       loading.value = false
+     }
+   })
    </script>
 
    <template>
      <div class="custom-wrapper border rounded p-4">
-       <Mermaid>
-         <slot />
-       </Mermaid>
+       <component
+         :is="props.spinner"
+         v-if="loading"
+       />
+       <p
+         v-else-if="error"
+         role="alert"
+       >
+         Diagram failed: {{ error instanceof Error ? error.message : String(error) }}
+       </p>
+       <div
+         v-else
+         v-html="svg"
+       />
      </div>
    </template>
    ```
 
-#### Loading Indicator
+The Custom Renderer receives the existing `code`, default slot, and `spinner` inputs. It does not receive Built-in configuration, theme, toolbar, loading, or error state. `components.error` handles only Built-in Mermaid render failures, so a Custom Renderer must own its error presentation as shown above.
 
-The module renders a built-in spinner before the first Mermaid render. If you set `components.spinner`, the named component will replace the default spinner and will be passed into your custom renderer as a `spinner` prop.
-
-Minimal example that uses the provided spinner while waiting for your own loading logic:
-
-```ts
-// nuxt.config.ts
-export default defineNuxtConfig({
-  contentMermaid: {
-    components: {
-      renderer: 'MyCustomMermaid',
-      spinner: 'MySpinner', // optional: globally replace the default spinner
-    },
-  },
-})
-```
-
-```vue
-<!-- components/MyCustomMermaid.vue -->
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import type { Component } from 'vue'
-
-const props = defineProps<{ spinner: Component | string }>()
-const loading = ref(true)
-onMounted(() => { loading.value = false })
-</script>
-
-<template>
-  <div class="my-mermaid">
-    <component v-if="loading" :is="props.spinner" />
-    <Mermaid v-else>
-      <slot />
-    </Mermaid>
-  </div>
-</template>
-```
+Do not render `<Mermaid>` from the component currently configured as `components.renderer`: that nested component would select the same Custom Renderer again. Invoke `$mermaid`, another rendering library, or your own renderer directly instead.
 
 ### Wrapper Example
 
-You can wrap `<Mermaid>` inside your own Vue component.
+Independently of `components.renderer`, you can wrap `<Mermaid>` inside your own Vue component. Do not configure that wrapper itself as the Custom Renderer.
 For example, you can bundle a title, loading state, and error/fallback UI, then drop it anywhere in templates:
 
 ```vue
