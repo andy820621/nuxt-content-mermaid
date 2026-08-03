@@ -1,5 +1,8 @@
-import { defu } from 'defu'
 import type { MermaidConfig } from 'mermaid'
+import { mergeByPresence } from '../configuration/core'
+import type { JsonObject } from '../types/config'
+import type { MermaidComponentSource } from './component-configuration'
+import { mergeDirectMermaidConfigForInvocation } from './direct-mermaid-config'
 import type { MermaidThemeMode } from './composables/useMermaidTheme'
 
 interface ThemeOptions {
@@ -45,75 +48,47 @@ export function resolveMermaidTheme(options: ThemeOptions) {
   return baseTheme ?? lightTheme ?? 'default'
 }
 
-interface MergeOptions extends MermaidConfig {
-  baseConfig?: MermaidConfig
-  overrideConfig?: MermaidConfig
+type LegalMermaidComponentSource = Exclude<MermaidComponentSource, { readonly kind: 'conflict' }>
+
+interface InvocationConfigOptions {
+  runtimeConfig?: MermaidConfig
+  source: LegalMermaidComponentSource
   theme?: MermaidConfig['theme']
 }
 
-function materializeStructuralData(
-  value: unknown,
-  memo: WeakMap<object, unknown>,
-): unknown {
-  if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
-    return value
-  if (typeof value === 'function')
-    return value
+export function materializeMermaidConfigForInvocation(
+  options: InvocationConfigOptions,
+): MermaidConfig {
+  const runtimeWorkingCopy = mergeByPresence([
+    { startOnLoad: false },
+    (options.runtimeConfig ?? {}) as JsonObject,
+  ]) as MermaidConfig
 
-  const existing = memo.get(value)
-  if (existing !== undefined)
-    return existing
-
-  if (Array.isArray(value)) {
-    const clone: unknown[] = []
-    memo.set(value, clone)
-    for (const item of value)
-      clone.push(materializeStructuralData(item, memo))
-    return clone
+  let sourceWorkingCopy: MermaidConfig
+  if (options.source.kind === 'direct') {
+    sourceWorkingCopy = mergeDirectMermaidConfigForInvocation(
+      runtimeWorkingCopy,
+      options.source.config,
+    )
+  }
+  else if (options.source.kind === 'page') {
+    sourceWorkingCopy = mergeByPresence([
+      runtimeWorkingCopy as JsonObject,
+      options.source.config,
+    ]) as MermaidConfig
+  }
+  else {
+    sourceWorkingCopy = runtimeWorkingCopy
   }
 
-  const prototype = Object.getPrototypeOf(value)
-  if (prototype !== Object.prototype && prototype !== null)
-    return value
-
-  const clone = Object.create(prototype) as Record<PropertyKey, unknown>
-  memo.set(value, clone)
-  for (const key of Reflect.ownKeys(value)) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key)
-    if (!descriptor?.enumerable || !('value' in descriptor))
-      continue
-    Object.defineProperty(clone, key, {
+  if (options.theme !== undefined) {
+    Object.defineProperty(sourceWorkingCopy, 'theme', {
       configurable: true,
       enumerable: true,
-      value: materializeStructuralData(descriptor.value, memo),
+      value: options.theme,
       writable: true,
     })
   }
-  return clone
-}
 
-function materializeMermaidConfigWorkingCopy(config: MermaidConfig): MermaidConfig {
-  return materializeStructuralData(config, new WeakMap()) as MermaidConfig
-}
-
-export function mergeMermaidConfig(options: MergeOptions): MermaidConfig {
-  const {
-    baseConfig,
-    overrideConfig,
-    theme,
-    ...overrides
-  } = options
-
-  const merged = defu(
-    {},
-    overrides || {},
-    overrideConfig || {},
-    baseConfig || {},
-  ) as MermaidConfig
-
-  return materializeMermaidConfigWorkingCopy({
-    startOnLoad: false,
-    ...merged,
-    theme: theme ?? merged.theme,
-  })
+  return sourceWorkingCopy
 }

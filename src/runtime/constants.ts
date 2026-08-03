@@ -58,3 +58,45 @@ export const DEFAULT_RUNTIME_OPTIONS = {
 } satisfies RuntimeOptions
 
 export const DEFAULT_FRONTMATTER_CONFIG_KEY = 'config'
+
+export const MERMAID_11_12_3_REGEXP_PATHS = [
+  ['dompurifyConfig', 'ALLOWED_URI_REGEXP'],
+  ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'attributeNameCheck'],
+  ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'tagNameCheck'],
+] as const
+
+export const MERMAID_11_12_3_FUNCTION_CAPABILITY_PATHS = [
+  ['sequence', 'actorFont'],
+  ['sequence', 'messageFont'],
+  ['sequence', 'noteFont'],
+  ['c4', 'personFont'],
+  ['c4', 'external_personFont'],
+  ['c4', 'systemFont'],
+  ['c4', 'external_systemFont'],
+  ['c4', 'system_dbFont'],
+  ['c4', 'external_system_dbFont'],
+  ['c4', 'system_queueFont'],
+  ['c4', 'external_system_queueFont'],
+  ['c4', 'containerFont'],
+  ['c4', 'external_containerFont'],
+  ['c4', 'container_dbFont'],
+  ['c4', 'external_container_dbFont'],
+  ['c4', 'container_queueFont'],
+  ['c4', 'external_container_queueFont'],
+  ['c4', 'componentFont'],
+  ['c4', 'external_componentFont'],
+  ['c4', 'component_dbFont'],
+  ['c4', 'external_component_dbFont'],
+  ['c4', 'component_queueFont'],
+  ['c4', 'external_component_queueFont'],
+  ['c4', 'boundaryFont'],
+  ['c4', 'messageFont'],
+  ['dompurifyConfig', 'ADD_ATTR'],
+  ['dompurifyConfig', 'ADD_TAGS'],
+  ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'attributeNameCheck'],
+  ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'tagNameCheck'],
+] as const
+
+export const DOMPURIFY_3_3_0_OPAQUE_CAPABILITY_PATHS = [
+  ['dompurifyConfig', 'TRUSTED_TYPES_POLICY'],
+] as const

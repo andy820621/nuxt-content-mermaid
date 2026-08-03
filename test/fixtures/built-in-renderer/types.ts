@@ -6,6 +6,9 @@ export interface MermaidRun {
   theme: MermaidConfig['theme']
   securityLevel: MermaidConfig['securityLevel']
   unknownMermaidExtensionEnabled: boolean
+  directCapabilityFontSize?: number
+  directOpenValue?: string
+  directSharedReferencePreserved: boolean
   stagingConnected: boolean
   stagingHidden: boolean
   stagingInert: boolean

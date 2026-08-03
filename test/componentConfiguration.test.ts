@@ -65,6 +65,16 @@ describe('Component Source Resolver', () => {
     expectComponentConfigurationError(() => resolveMermaidComponentSource({ config: null }))
   })
 
+  it('rejects unsupported Direct Mermaid Config through the shared source resolver', () => {
+    expectComponentConfigurationError(() => resolveMermaidComponentSource({
+      config: {
+        flowchart: {
+          curve: () => 'basis',
+        },
+      },
+    }))
+  })
+
   it('rejects non-pure page data without invoking accessors', () => {
     let getterCalls = 0
     const accessorConfig = Object.defineProperty({}, 'theme', {

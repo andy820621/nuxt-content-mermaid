@@ -144,6 +144,41 @@ describe('built-in renderer integration', async () => {
     await page.locator('#page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
+  it('does not traverse provider-owned Direct Mermaid Config capabilities', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    await page.locator('#direct-capability-mount').click()
+    await waitForRuns(page, 2)
+
+    expect(await page.locator('#opaque-capability-inspections').getAttribute('data-count')).toBe('0')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[1]
+    })).toEqual(expect.objectContaining({
+      directCapabilityFontSize: 16,
+      directOpenValue: 'preserved',
+      directSharedReferencePreserved: true,
+    }))
+
+    await releaseNext(page)
+    await page.locator('#direct-capability svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
+  it('rejects unsupported Direct Mermaid Config before creating render work', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    await page.locator('#invalid-direct-config-mount').click()
+    const fingerprint = page.locator('#component-error')
+    await fingerprint.waitFor({ state: 'attached', timeout: 5000 })
+
+    expect(await fingerprint.getAttribute('data-name')).toBe('MermaidComponentConfigurationError')
+    expect(await fingerprint.getAttribute('data-code')).toBe('CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(1)
+  })
+
   it('renders Content-authored Markdown through the Page Mermaid Config protocol', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialDiagram(page)
