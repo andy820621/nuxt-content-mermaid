@@ -4,6 +4,10 @@ status: accepted
 
 # Transfer rendering ownership after custom renderer resolution
 
+## Implementation staging
+
+This ADR records the target ownership semantics for #44, which are delivered through ordered tickets rather than one atomic change. #45 introduces only the Renderer Selection outcome seam. #46 is deliberately a behavior-preserving extraction: candidate pending still mounts the legacy Built-in markup and lifecycle while guarding Built-in Mermaid Render Request creation and execution. #47 replaces that compatibility state with the no-owner neutral pending path described below, and #48 completes resolution-failure diagnostics and fallback ordering. Intermediate tickets must therefore satisfy their explicit compatibility constraints; #46 is not evidence that the final pending semantics are already implemented.
+
 Setting `components.renderer` creates a Custom Renderer Candidate rather than immediately assigning Rendering Ownership. Without a candidate, the Built-in Renderer owns the instance. With a candidate, Renderer Selection enters a no-owner pending phase: it preserves neutral source content for SSR and hydration but does not instantiate or execute Built-in Renderer UI, lazy loading, error handling, or rendering.
 
 Successful resolution atomically assigns ownership to the Custom Renderer, which receives only the established `code`, default slot, and `spinner` inputs and completely replaces Built-in behavior. Once assigned, ownership is not transferred because the Custom Renderer later fails to mount or render. A future seam that keeps package UI and lifecycle but replaces diagram generation must have a different name and responsibility.
