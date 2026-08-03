@@ -21,6 +21,7 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
 - [Requirements](#requirements)
 - [Quick Setup](#quick-setup)
 - [Configuration](#configuration)
+- [Migrating to v3](#migrating-to-v3)
 - [Styling (CSS Variables)](#styling-css-variables)
 - [Advanced Usage](#advanced-usage)
   - [Debug mode](#debug-mode)
@@ -42,7 +43,7 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
 - **Performance friendly**: Supports lazy loading — Mermaid core and related resources are only loaded when the component mounts.
 - **Theme integration**: Integrates with `@nuxtjs/color-mode` to automatically switch between light and dark Mermaid themes.
 - **Highly customizable**: Allows custom wrapper components, loading spinners, error views, and custom CDN or local import sources.
-- **Runtime config**: Settings can be overridden at deployment time through runtime config / environment variables.
+- **Deployment configuration**: Pure-data settings can be transported through public runtime config and are resolved once for each Nuxt application.
 
 ## Requirements
 
@@ -124,8 +125,7 @@ The module will automatically transform the block into an SVG chart component.
 
 ## Configuration
 
-You can configure the module globally through the `contentMermaid` option.
-(`mermaidContent` is still accepted for backward compatibility, but will be removed in a future release.)
+Configure the module globally through the canonical `contentMermaid` option. The former `mermaidContent` alias was removed in v3 and produces a migration error.
 
 ```ts
 // nuxt.config.ts
@@ -189,7 +189,7 @@ export default defineNuxtConfig({
 
 | Option            | Type                                  | Default                | Description                                                                      |
 | :---------------- | :------------------------------------ | :--------------------- | :------------------------------------------------------------------------------- |
-| `loader.init`     | `MermaidConfig`                       | `{ startOnLoad: false }` | Raw options object passed to `mermaid.initialize`.                               |
+| `loader.init`     | `RuntimeMermaidConfig` (strict pure data) | `{ startOnLoad: false }` | Pure-data Mermaid options transported to `mermaid.initialize`.                  |
 | `loader.lazy`     | `boolean \| { threshold?: number }` | `true`                 | Lazy load Mermaid when the component enters the viewport; set `false` to preload. |
 
 **theme**
@@ -250,7 +250,11 @@ A zoom toolbar appears with +/−/Reset buttons and a percentage display.
 Use `toolbar.fullscreenToolbarScale` to scale the fullscreen toolbar and zoom controls.
 
 
-> **Note**: `runtimeConfig.public.contentMermaid` is resolved once during each Nuxt application initialization. Mutating it afterward does not update the established runtime snapshot. The legacy `runtimeConfig.public.mermaidContent` key is not supported in v3.
+> **Note**: `contentMermaid.enabled` controls Module Activation during Nuxt setup. It is never a public runtime setting. `runtimeConfig.public.contentMermaid` carries only strict pure data and is resolved once during each Nuxt application initialization; mutating it later does not update the established Runtime Mermaid Snapshot.
+
+## Migrating to v3
+
+The [v3 migration guide](./docs/en/MIGRATION_V3.md) covers the removed configuration alias, build-time activation, pure-data runtime transport, Page versus Direct Mermaid Config, Property-Presence Merge, expand reset semantics, and public diagnostic and rendering guarantees. A runnable companion is available at `/migration` in the playground.
 
 ## Styling (CSS Variables)
 
@@ -307,7 +311,7 @@ Variables:
   - **Runtime behavior**:
     - **Debug on**: `mermaid.run` uses `suppressErrors: false`, errors throw with full stack traces for debugging.
     - **Debug off**: `mermaid.run` uses `suppressErrors: true`, so one failing chart won't block others.
-  - **Console output**: Adds queue diagnostics and render-time stats.
+  - **Console output**: Debug log wording and internal render scheduling are not public APIs. For configuration failures, recognize the documented public fingerprint instead of parsing private details.
 
 ### Theme & Color Mode
 
