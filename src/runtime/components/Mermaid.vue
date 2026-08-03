@@ -161,15 +161,8 @@ if (import.meta.client) {
           component: resolvedOutcome.component,
         }
       }
-      else if (resolvedOutcome.status === 'not-found') {
-        commitResolutionFailure(resolvedOutcome)
-      }
       else {
-        console.error(
-          '[nuxt-content-mermaid] Failed to load mermaid component:',
-          resolvedOutcome.error,
-        )
-        rendererSelectionState.value = { status: 'built-in' }
+        commitResolutionFailure(resolvedOutcome)
       }
     },
     { immediate: true },
