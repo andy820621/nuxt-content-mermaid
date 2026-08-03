@@ -104,4 +104,3 @@ The approved seams are:
 - Consistency: the public entry owns validation and routing; the internal renderer owns materialization, presentation, and rendering lifecycle. The interface and data flow match that split.
 - Scope: one internal deep module plus one focused architecture test; no unrelated module decomposition.
 - Ambiguity: pending mounts existing Built-in markup but cannot create or execute a Render Request; failed selection changes ownership at the existing next-tick fallback boundary.
-

@@ -426,4 +426,3 @@ After an approved landing request, watch until GitHub reports the exact authoriz
 - Placeholder scan: no implementation step contains TBD, TODO, "similar to", or unspecified error handling.
 - Type consistency: `renderingOwnership`, `componentSource`, and `spinnerComponent` names and types are identical across architecture, extraction, and verification tasks.
 - Scope check: exactly one internal module is introduced; no index, composable extraction, public API, or unrelated refactor appears in the plan.
-
