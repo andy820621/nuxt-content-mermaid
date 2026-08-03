@@ -30,7 +30,7 @@ The change replaces those parallel failure branches with one attempt-scoped prot
 
 Each pending Renderer Selection attempt owns a one-shot failure commit. After its asynchronous outcome settles, the public entry first applies the existing current-attempt check. A current failure then invokes the commit exactly once. The commit synchronously reports the internal diagnostic and commits Built-in ownership.
 
-This keeps stale cancellation outside the protocol, centralizes ordering and deduplication, and leaves the asynchronous component loader separate from the synchronous ownership commit.
+This keeps superseded attempts whose outcomes become stale outside the protocol, centralizes ordering and deduplication, and leaves the asynchronous component loader separate from the synchronous ownership commit.
 
 ### Report while resolving the candidate — rejected
 
@@ -42,16 +42,16 @@ This preserves the current shape but makes diagnostic ordering, exactly-once beh
 
 ## Attempt Identity and State
 
-One attempt begins when a normalized, non-empty Custom Renderer Candidate starts resolution. It remains eligible until a newer Renderer Selection request supersedes it. A deliberate later retry is a distinct attempt, even if the candidate string is unchanged.
+One attempt begins when a normalized, non-empty Custom Renderer Candidate starts resolution. It remains eligible until a newer Renderer Selection request supersedes it. An independent later selection is a distinct attempt, even if the candidate string is unchanged.
 
 The one-shot commit records whether it has been consumed. Its observable rules are:
 
-1. A stale or cancelled outcome is ignored before the commit is invoked; it emits no diagnostic and assigns no Rendering Owner.
+1. A superseded attempt whose outcome becomes stale is ignored by the existing current-request check before the commit is invoked; it emits no diagnostic and assigns no Rendering Owner.
 2. A current `resolved` outcome assigns Custom Renderer ownership and never enters the failure protocol.
 3. A current `not-found` or `load-failed` outcome invokes its attempt's failure commit.
 4. The first invocation reports the diagnostic and then commits Built-in ownership synchronously.
 5. Later invocations for the same attempt are no-ops.
-6. A later intentional retry gets a new one-shot commit and may independently report and fall back.
+6. An independent later selection attempt gets a new one-shot commit and may independently report and fall back.
 
 The existing request identity may remain an implementation detail. The design does not require a particular counter, token, closure, class, or object representation.
 
@@ -64,7 +64,7 @@ The failure commit is a non-async operation with no `await`, promise chaining, `
 
 The state commit is the only resolution-failure entry into Built-in fallback. Vue may schedule Built-in mounting after the synchronous state assignment, but the semantic diagnostic has already completed before that assignment and therefore before the established Built-in factory and Mermaid execution instrumentation can occur.
 
-The commit consumes the attempt before invoking externally injected effects. This prevents re-entrant or repeated observation from reporting or assigning twice. Reporter failure is not converted into a second fallback path.
+The one-shot boundary prevents repeated observation of the same attempt from reporting or assigning twice.
 
 ## Diagnostic Semantics
 
@@ -101,16 +101,16 @@ Focused Vitest tests use injected effects and semantic matching rather than a fi
 
 - `not-found` reports `resolution-failed`, candidate, and the corresponding reason;
 - `load-failed` reports the same semantic identity and preserves the original failure value;
-- a stale or cancelled attempt never invokes the failure commit, diagnostic reporter, or ownership effect;
 - repeated invocation of one attempt commits diagnostic and ownership exactly once;
 - the event order is diagnostic before Built-in ownership;
-- a distinct retry attempt can independently commit once.
+- an independent later selection attempt has its own one-shot commit.
 
 ### Public Mermaid integration and E2E seam
 
 Public tests observe Package User-visible behavior and accepted instrumentation:
 
 - `debug: false` and `debug: true` both emit understandable output containing the package prefix, candidate, and reason;
+- a superseded attempt whose outcome becomes stale emits no diagnostic and does not enter Built-in fallback through the existing Mermaid orchestration current-request check;
 - `not-found` and `load-failed` both enter the same Built-in fallback lifecycle;
 - Built-in factory creation and Mermaid execution occur only after the diagnostic and only once;
 - repeated Vue updates or render cycles do not create a second Built-in owner or duplicate the diagnostic;
@@ -128,4 +128,4 @@ During TDD, run the focused Renderer Selection test after each RED and GREEN ste
 - Placeholder scan: no TBD, TODO, deferred decision, or unspecified error-handling requirement remains.
 - Consistency: attempt currency is checked before the one-shot commit; the commit reports before assigning Built-in ownership and is the sole failure fallback entry.
 - Scope: the design changes only resolution-failure diagnostics and handoff orchestration; successful selection and renderer execution semantics remain unchanged.
-- Ambiguity: a retry is a new attempt, stale outcomes are no-ops, consumption precedes injected effects, and no asynchronous boundary exists inside the failure commit.
+- Ambiguity: an independent later selection is a new attempt, superseded/stale outcomes are discarded by the existing Mermaid current-request check, and no asynchronous boundary exists inside the failure commit.
