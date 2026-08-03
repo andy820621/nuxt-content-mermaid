@@ -23,6 +23,16 @@ function recoverConflict() {
   directConfig.value = { theme: 'dark' }
   code.value = 'graph TD;RECOVERED_LATEST-->DONE'
 }
+
+function recoverConflictWithFailure() {
+  pageConfig.value = undefined
+  directConfig.value = { theme: 'dark' }
+  code.value = 'graph TD;__FAIL__'
+}
+
+function retryRecovery() {
+  code.value = 'graph TD;RECOVERED_AFTER_FAILURE-->DONE'
+}
 </script>
 
 <template>
@@ -40,6 +50,20 @@ function recoverConflict() {
       @click="recoverConflict"
     >
       Recover conflict
+    </button>
+    <button
+      id="recover-conflict-with-failure"
+      type="button"
+      @click="recoverConflictWithFailure"
+    >
+      Recover conflict with failure
+    </button>
+    <button
+      id="retry-recovery"
+      type="button"
+      @click="retryRecovery"
+    >
+      Retry recovery
     </button>
     <output id="component-error">{{ componentErrorCount }}</output>
     <component

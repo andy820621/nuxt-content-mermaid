@@ -100,6 +100,7 @@ const toggleFullscreen = () => {
   expandOverlay.value?.endForDiagramReplacement()
   return fullscreenPresentation.value?.toggle()
 }
+const hasRenderStarted = ref(false)
 const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
 const hasError = ref(false)
@@ -438,13 +439,16 @@ function getMermaidSvg(): SVGSVGElement | null {
 }
 
 function stopLazyObservation() {
-  observer?.disconnect()
+  const activeObserver = observer
   observer = null
+  activeObserver?.takeRecords()
+  activeObserver?.disconnect()
 }
 
 async function renderMermaid() {
   if (componentSource.value.kind === 'conflict') return
 
+  hasRenderStarted.value = true
   stopLazyObservation()
   isLoading.value = true
 
@@ -476,15 +480,17 @@ function setupMermaidContainer() {
     return
   }
 
-  observer = new IntersectionObserver(
+  const nextObserver = new IntersectionObserver(
     (entries) => {
+      if (observer !== nextObserver) return
       if (entries[0]?.isIntersecting && !hasRenderedOnce.value)
         renderMermaid()
     },
     { threshold: lazyThreshold },
   )
 
-  observer.observe(container)
+  observer = nextObserver
+  nextObserver.observe(container)
 }
 
 async function copyMermaidSource() {
@@ -584,7 +590,7 @@ watch(
 
     if (!isEnabled) return
     if (isCustomMermaidResolutionPending.value || customMermaidImpl.value) return
-    if (wasConflict || hasRenderedOnce.value) renderMermaid()
+    if (wasConflict || hasRenderStarted.value) renderMermaid()
   },
   { flush: 'post' },
 )
