@@ -11,10 +11,13 @@ describe('custom renderer fallback', async () => {
     browser: true,
   })
 
-  it('preserves pending Built-in markup and starts Built-in rendering after resolution failure', { timeout: 20000 }, async () => {
+  it('keeps pending neutral and starts Built-in rendering after resolution failure', { timeout: 20000 }, async () => {
     const html = await $fetch<string>('/')
-    expect(html).toContain('class="mermaid-block"')
+    expect(html).toContain('class="mermaid-outer-wrapper"')
     expect(html).toContain('graph TD;A--&gt;B;')
+    expect(html).not.toContain('class="mermaid-block"')
+    expect(html).not.toContain('class="mermaid-toolbar"')
+    expect(html).not.toContain('class="mermaid-wrapper"')
 
     const page = await createPage()
     const warnings: string[] = []

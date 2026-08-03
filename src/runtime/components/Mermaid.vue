@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useNuxtApp } from '#app'
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import type { Component } from 'vue'
 import type { MermaidComponentSource } from '../component-configuration'
 import {
@@ -34,10 +34,14 @@ const decodedCode = computed(() => props.code ? decodeURIComponent(props.code) :
 const configuredSpinnerName = computed(() => componentOptions.spinner?.trim() || '')
 const customSpinner = shallowRef<Component | null>(null)
 const configuredMermaidImplName = computed(() => componentOptions.renderer?.trim() || '')
-const customMermaidImpl = shallowRef<Component | null>(null)
-type RenderingOwnership = 'pending' | 'built-in'
-const renderingOwnership = ref<RenderingOwnership>(
-  configuredMermaidImplName.value ? 'pending' : 'built-in',
+type RendererSelectionState
+  = | { readonly status: 'pending', readonly component?: never }
+    | { readonly status: 'built-in', readonly component?: never }
+    | { readonly status: 'custom', readonly component: Component }
+const rendererSelectionState = shallowRef<RendererSelectionState>(
+  configuredMermaidImplName.value
+    ? { status: 'pending' }
+    : { status: 'built-in' },
 )
 const spinnerComponent = computed<Component | string>(() => customSpinner.value || Spinner)
 
@@ -120,19 +124,20 @@ if (import.meta.client) {
       })
 
       if (outcome.status === 'no-candidate') {
-        customMermaidImpl.value = null
-        renderingOwnership.value = 'built-in'
+        rendererSelectionState.value = { status: 'built-in' }
         return
       }
 
-      customMermaidImpl.value = null
-      renderingOwnership.value = 'pending'
+      rendererSelectionState.value = { status: 'pending' }
 
       const resolvedOutcome = await outcome.resolution
       if (requestId !== latestRendererSelectionRequestId) return
 
       if (resolvedOutcome.status === 'resolved') {
-        customMermaidImpl.value = resolvedOutcome.component
+        rendererSelectionState.value = {
+          status: 'custom',
+          component: resolvedOutcome.component,
+        }
       }
       else if (resolvedOutcome.status === 'not-found') {
         console.warn(
@@ -148,7 +153,7 @@ if (import.meta.client) {
       }
 
       if (resolvedOutcome.status !== 'resolved')
-        renderingOwnership.value = 'built-in'
+        rendererSelectionState.value = { status: 'built-in' }
     },
     { immediate: true },
   )
@@ -174,8 +179,8 @@ watch(
 <template>
   <div class="mermaid-outer-wrapper">
     <component
-      :is="customMermaidImpl"
-      v-if="customMermaidImpl"
+      :is="rendererSelectionState?.component"
+      v-if="rendererSelectionState?.status === 'custom'"
       :spinner="spinnerComponent"
       :code="decodedCode"
     >
@@ -184,11 +189,16 @@ watch(
       </slot>
     </component>
 
+    <template v-else-if="rendererSelectionState?.status === 'pending'">
+      <slot>
+        <pre v-if="decodedCode"><code>{{ decodedCode }}</code></pre>
+      </slot>
+    </template>
+
     <BuiltInRenderer
       v-else
       v-bind="props"
       :component-source="componentSource"
-      :rendering-ownership="renderingOwnership"
       :spinner-component="spinnerComponent"
     >
       <slot>

@@ -25,6 +25,7 @@ export default defineNuxtConfig({
     components: {
       renderer: 'TestRenderer',
       spinner: 'TestSpinner',
+      error: 'TestError',
     },
   },
 })
