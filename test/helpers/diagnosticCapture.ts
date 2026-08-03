@@ -30,6 +30,12 @@ export async function installDiagnosticCapture(page: BrowserPage) {
       originalLog(...args)
     }
 
+    const originalWarn = console.warn.bind(console)
+    console.warn = (...args: unknown[]) => {
+      capture(args)
+      originalWarn(...args)
+    }
+
     const originalError = console.error.bind(console)
     console.error = (...args: unknown[]) => {
       capture(args)
