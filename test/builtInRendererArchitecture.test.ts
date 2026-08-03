@@ -11,7 +11,7 @@ const builtInRenderer = existsSync(builtInRendererPath)
 
 describe('Built-in Renderer architecture ownership', () => {
   it('keeps Built-in rendering responsibilities in the internal deep module', () => {
-    expect(mermaidEntry).toContain("from '../built-in-renderer/BuiltInRenderer.vue'")
+    expect(mermaidEntry).toContain('from \'../built-in-renderer/BuiltInRenderer.vue\'')
 
     for (const responsibility of [
       'createMermaidRenderer',
