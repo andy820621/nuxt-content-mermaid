@@ -35,6 +35,8 @@ The public entry keeps only:
 
 The entry passes the already validated `MermaidComponentSource` to the internal renderer. This keeps validation ownership at the public interface while allowing the Built-in Renderer to own source materialization and rendering policy.
 
+Application-component filename matching remains ownership-local on both sides of the boundary: the entry uses it only for Custom Renderer and spinner routing, while the deep module uses it only for the Built-in error component. This small duplication is intentional for #46 because extracting a shared helper would add another module, while injecting a generic loader would widen the internal interface beyond the approved coordination inputs.
+
 ### Internal deep module: `src/runtime/built-in-renderer/BuiltInRenderer.vue`
 
 One internal component owns:
