@@ -43,7 +43,7 @@ export default defineNuxtConfig({
       // error: 'MermaidError',
     },
     toolbar: {
-      // title: 'Mermaid Diagram',
+      title: 'Snapshot at app initialization',
       // fontSize: '24px',
       // buttons: {
       //   copy: true,

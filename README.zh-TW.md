@@ -21,6 +21,7 @@
 - [使用前提](#使用前提)
 - [快速開始](#快速開始)
 - [設定](#設定)
+- [遷移至 v3](#遷移至-v3)
 - [樣式自訂（CSS 變數）](#樣式自訂css-變數)
 - [進階用法](#進階用法)
   - [Debug 模式](#debug-模式)
@@ -42,7 +43,7 @@
 - **效能優化**：支援 Lazy Loading，僅在元件掛載時載入 Mermaid 核心與資源。
 - **主題整合**：無縫整合 `@nuxtjs/color-mode`，自動切換 Light/Dark 對應主題。
 - **高度客製**：支援自訂渲染元件（Wrapper）、Loading Spinner、錯誤畫面以及 CDN 來源。
-- **Runtime Config**：支援透過環境變數動態覆寫設定。
+- **部署期設定**：可透過 public runtime config 傳遞純資料設定，並在每個 Nuxt 應用程式初始化時解析一次。
 
 ## 使用前提
 
@@ -124,8 +125,7 @@ graph LR
 
 ## 設定
 
-你可以透過 `contentMermaid` 選項進行全域設定。  
-（`mermaidContent` 仍會被接受以維持相容，但已棄用，未來版本會移除。）
+請透過正式的 `contentMermaid` 選項進行全域設定。舊的 `mermaidContent` alias 已在 v3 移除，使用時會得到遷移錯誤。
 
 ```ts
 // nuxt.config.ts
@@ -189,7 +189,7 @@ export default defineNuxtConfig({
 
 | 參數             | 類型                                   | 預設值                   | 說明                                                                  |
 | :--------------- | :------------------------------------- | :----------------------- | :---------------------------------------------------------------------- |
-| `loader.init`    | `MermaidConfig`                        | `{ startOnLoad: false }` | 直接傳遞給 `mermaid.initialize` 的原始設定。                            |
+| `loader.init`    | `RuntimeMermaidConfig`（嚴格純資料）   | `{ startOnLoad: false }` | 傳遞至 `mermaid.initialize` 的純資料 Mermaid 設定。                     |
 | `loader.lazy`    | `boolean \| { threshold?: number }` | `true`                  | 元件進入 viewport 時才載入 Mermaid；設為 `false` 會在前一刻就載入。 |
 
 **theme**
@@ -250,7 +250,11 @@ export default defineNuxtConfig({
 可透過 `toolbar.fullscreenToolbarScale` 調整 Fullscreen 工具列與縮放控制的尺寸。
 
 
-> **Note**: 所有設定皆可透過 `runtimeConfig.public.contentMermaid` 在部署時進行覆寫（`runtimeConfig.public.mermaidContent` 仍支援但已棄用）。
+> **注意**：`contentMermaid.enabled` 在 Nuxt setup 時決定模組啟用狀態，絕不是 public runtime 設定。`runtimeConfig.public.contentMermaid` 只能傳遞嚴格純資料，並在每個 Nuxt 應用程式初始化時解析一次；之後變更它不會更新既有的 Runtime Mermaid Snapshot。
+
+## 遷移至 v3
+
+[v3 遷移指南](./docs/ch/MIGRATION_V3.md)說明移除的設定 alias、建置期 activation、純資料 runtime transport、Page 與 Direct Mermaid Config、Property-Presence Merge、expand 重設語意，以及公開的診斷與渲染保證。Playground 的 `/migration` 路徑提供可操作的對照範例。
 
 ## 樣式自訂（CSS 變數）
 
