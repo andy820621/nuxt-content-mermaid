@@ -6,6 +6,11 @@ import { parse as parseYaml } from 'yaml'
 import { parseMarkdown } from '@nuxtjs/mdc/runtime'
 import type { MDCElement } from '@nuxtjs/mdc'
 import { transformMarkdownDiagrams } from '../src/markdown-diagram-transform'
+import {
+  resolveFenceInlineAttributes,
+  resolveMarkdownFrontmatter,
+  resolveMarkdownToolbar,
+} from '../src/markdown-diagram-transform/configuration'
 
 describe('transformMarkdownDiagrams', () => {
   const fixtureDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/transform')
@@ -41,7 +46,7 @@ describe('transformMarkdownDiagrams', () => {
     return (data && typeof data === 'object') ? data as Record<string, unknown> : null
   }
 
-  it('wraps mermaid code blocks with Mermaid component and config binding', () => {
+  it('wraps mermaid code blocks with Mermaid component and Page Mermaid Config binding', () => {
     const body = [
       '# Diagram',
       '```mermaid',
@@ -53,14 +58,15 @@ describe('transformMarkdownDiagrams', () => {
 
     const output = transformMarkdownDiagrams(body)
 
-    expect(output).toContain('<Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+    expect(output).toContain('<Mermaid :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+    expect(output).not.toContain(':config="config"')
   })
 
   it('transforms multiple mermaid blocks in a single document', () => {
     const body = loadFixture('multiple-blocks.md')
     const output = transformMarkdownDiagrams(body)
 
-    const matches = output.match(/<Mermaid :config="config" code="/g) || []
+    const matches = output.match(/<Mermaid :page-config="config" code="/g) || []
     expect(matches.length).toBe(2)
     expect(output).toContain('graph%20TD%0A%20%20A%5BStart%5D%20--%3E%20B%7BChoice%7D')
     expect(output).toContain('sequenceDiagram%0A%20%20participant%20Alice')
@@ -75,6 +81,18 @@ describe('transformMarkdownDiagrams', () => {
 
     const output = transformMarkdownDiagrams(body)
     expect(output).toBe(body)
+  })
+
+  it('preserves supported empty inline attribute syntax', () => {
+    const body = [
+      '```mermaid {}',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    expect(transformMarkdownDiagrams(body)).toContain('<Mermaid :page-config="config"')
   })
 
   it('preserves non-target Markdown exactly', () => {
@@ -146,7 +164,7 @@ describe('transformMarkdownDiagrams', () => {
     expect(() => transformMarkdownDiagrams(body)).toThrow()
   })
 
-  it('transforms mermaid fences with info string attributes', () => {
+  it('returns the original fence for unsupported info string attributes', () => {
     const body = [
       '# Diagram',
       '```mermaid {background:#ff0; border:2px solid #f00;}',
@@ -156,8 +174,7 @@ describe('transformMarkdownDiagrams', () => {
       '',
     ].join('\n')
 
-    const output = transformMarkdownDiagrams(body)
-    expect(output).toContain('<Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+    expect(transformMarkdownDiagrams(body)).toBe(body)
   })
 
   it('extracts toolbar props from mermaid YAML frontmatter', async () => {
@@ -202,7 +219,7 @@ describe('transformMarkdownDiagrams', () => {
     })
   })
 
-  it('falls back to raw code when mermaid YAML frontmatter is invalid', async () => {
+  it('returns the original fence when mermaid YAML frontmatter is invalid', () => {
     const body = [
       '```mermaid',
       '---',
@@ -215,16 +232,9 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    const decoded = extractDecodedCode(output)
 
-    expect(decoded).toBe([
-      '---',
-      'title: [invalid',
-      '---',
-      'graph TD',
-      '  A --> B',
-    ].join('\n'))
-    expect(await extractToolbarProp(output)).toBeNull()
+    expect(output).toBe(body)
+    expect(output).not.toContain('<Mermaid')
   })
 
   it('does not map YAML title to toolbar title', async () => {
@@ -246,7 +256,7 @@ describe('transformMarkdownDiagrams', () => {
     expect(await extractToolbarProp(output)).toBeNull()
   })
 
-  it('ignores unsafe inline attrs like __proto__ in toolbar overrides', async () => {
+  it('returns the original fence for unsafe inline attribute paths', () => {
     const body = [
       '```mermaid {toolbar.__proto__="polluted" toolbar.title="Safe Title"}',
       'graph TD',
@@ -256,9 +266,7 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(await extractToolbarProp(output)).toEqual({
-      title: 'Safe Title',
-    })
+    expect(output).toBe(body)
     expect(({} as { polluted?: unknown }).polluted).toBeUndefined()
   })
 
@@ -321,7 +329,7 @@ describe('transformMarkdownDiagrams', () => {
     })
   })
 
-  it('preserves metadata precedence while filtering unsafe inline paths', async () => {
+  it('returns the original fence instead of partially transforming unsafe metadata', () => {
     const body = [
       '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="18px" toolbar.constructor.polluted=true config=\'{"theme":"forest"}\'}',
       '---',
@@ -341,32 +349,7 @@ describe('transformMarkdownDiagrams', () => {
       '',
     ].join('\n')
 
-    const output = transformMarkdownDiagrams(body)
-
-    expect(await extractToolbarProp(output)).toEqual({
-      title: 'YAML Toolbar',
-      fontSize: '18px',
-      buttons: {
-        copy: false,
-      },
-    })
-    expect(extractFrontmatter(extractDecodedCode(output))).toEqual({
-      title: 'Inline Title',
-      displayMode: 'compact',
-      toolbar: {
-        title: 'YAML Toolbar',
-        fontSize: '18px',
-        buttons: {
-          copy: false,
-        },
-      },
-      config: {
-        theme: 'forest',
-        flowchart: {
-          htmlLabels: false,
-        },
-      },
-    })
+    expect(transformMarkdownDiagrams(body)).toBe(body)
   })
 
   it('moves frontmatter above mermaid directives before rendering', () => {
@@ -423,7 +406,7 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(output).toContain('  <Mermaid :config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+    expect(output).toContain('  <Mermaid :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
   })
 
   it('does not transform mermaid fences inside other fenced code blocks', () => {
@@ -472,5 +455,87 @@ describe('transformMarkdownDiagrams', () => {
     const output = transformMarkdownDiagrams(body)
     expect(output).toContain('graph%20TD%0D%0A%20%20A%20--%3E%20B')
     expect(output).not.toMatch(/(^|[^\r])\n/)
+  })
+
+  it('preserves open Markdown and Mermaid configuration keys with property-presence precedence', () => {
+    const body = [
+      '```mermaid {config=\'{"extension":{"array":["inline"],"enabled":false,"limit":0,"label":""}}\'}',
+      '---',
+      'unknownMarkdownKey: retained',
+      'config:',
+      '  unknownMermaidKey:',
+      '    preserved: true',
+      '  extension:',
+      '    array: [yaml]',
+      '    enabled: true',
+      '    limit: 1',
+      '    label: YAML',
+      '---',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    expect(extractFrontmatter(extractDecodedCode(transformMarkdownDiagrams(body)))).toEqual({
+      unknownMarkdownKey: 'retained',
+      config: {
+        unknownMermaidKey: { preserved: true },
+        extension: {
+          array: ['inline'],
+          enabled: false,
+          limit: 0,
+          label: '',
+        },
+      },
+    })
+  })
+
+  it.each([
+    ['unknown inline attributes', ['```mermaid {unknown=true}']],
+    ['unknown toolbar keys', ['```mermaid', '---', 'toolbar:', '  unsupported: true', '---']],
+    ['null toolbar values', ['```mermaid', '---', 'toolbar: null', '---']],
+  ])('returns the original fence for %s', (_name, openingLines) => {
+    const body = [
+      ...openingLines,
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
+  it('rejects accessor metadata without invoking it', () => {
+    let reads = 0
+    const inlineAttrs = Object.defineProperty({}, 'title', {
+      enumerable: true,
+      get() {
+        reads += 1
+        return 'never read'
+      },
+    })
+
+    expect(resolveFenceInlineAttributes(inlineAttrs)).toBeNull()
+    expect(reads).toBe(0)
+  })
+
+  it('exposes separate normalized Markdown metadata resolvers', () => {
+    const frontmatter = resolveMarkdownFrontmatter([
+      { config: { extension: { array: ['yaml'], enabled: true } } },
+      { config: { extension: { array: ['inline'], enabled: false } } },
+    ])
+
+    expect(frontmatter).toEqual({
+      config: { extension: { array: ['inline'], enabled: false } },
+    })
+    expect(resolveMarkdownToolbar([
+      { title: 'YAML Toolbar' },
+      { fontSize: '18px' },
+    ])).toEqual({
+      title: 'YAML Toolbar',
+      fontSize: '18px',
+    })
   })
 })

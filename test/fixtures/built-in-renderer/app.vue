@@ -1,7 +1,22 @@
 <script setup lang="ts">
+import { useAsyncData } from '#app'
 import { computed, onErrorCaptured, reactive, ref, resolveComponent, shallowRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { PageMermaidConfig } from '../../../src/types/config'
+
+type MarkdownPage = {
+  path: string
+  config?: PageMermaidConfig
+  body: unknown
+}
+
+declare const queryCollection: (collection: 'content') => {
+  path: (path: string) => {
+    select: (...fields: string[]) => {
+      first: () => Promise<MarkdownPage | null>
+    }
+  }
+}
 
 const primaryVersion = ref(0)
 const primaryCode = ref('graph TD;INITIAL-->DONE')
@@ -12,6 +27,7 @@ const showSkipped = ref(false)
 const showStrict = ref(false)
 const showSandbox = ref(false)
 const showPageConfig = ref(false)
+const showMarkdownPageConfig = ref(false)
 const showConflict = ref(false)
 const showReactiveConflict = ref(false)
 const componentErrorFingerprint = ref<{ name?: string, code?: string } | null>(null)
@@ -28,6 +44,9 @@ const reactiveConflictPageConfig = { theme: 'forest' } as const
 const reactiveConflictDirectConfig = shallowRef<MermaidConfig>()
 const reactiveConflictCode = ref('graph TD;REACTIVE_CONFLICT-->LEGAL')
 const MermaidComponent = resolveComponent('Mermaid')
+const { data: markdownPage } = await useAsyncData('markdown-page-config', () =>
+  queryCollection('content').path('/markdown-page-config').select('path', 'config', 'body').first(),
+)
 
 onErrorCaptured((error) => {
   const fingerprint = error as { name?: string, code?: string }
@@ -86,6 +105,10 @@ function mountSandbox() {
 
 function mountPageConfig() {
   showPageConfig.value = true
+}
+
+function mountMarkdownPageConfig() {
+  showMarkdownPageConfig.value = true
 }
 
 function invalidatePageConfig() {
@@ -202,6 +225,13 @@ function updateReactiveConflictCode() {
         Mount page config
       </button>
       <button
+        id="markdown-page-config-mount"
+        type="button"
+        @click="mountMarkdownPageConfig"
+      >
+        Mount Markdown page config
+      </button>
+      <button
         id="page-config-invalidate"
         type="button"
         @click="invalidatePageConfig"
@@ -299,6 +329,16 @@ function updateReactiveConflictCode() {
     </section>
 
     <section
+      v-if="showMarkdownPageConfig"
+      id="markdown-page-config"
+    >
+      <ContentRenderer
+        v-if="markdownPage"
+        :value="markdownPage"
+      />
+    </section>
+
+    <section
       v-if="showReactiveConflict"
       id="reactive-conflict"
     >
@@ -315,6 +355,11 @@ function updateReactiveConflictCode() {
       id="component-error"
       :data-name="componentErrorFingerprint.name"
       :data-code="componentErrorFingerprint.code"
+    />
+    <output
+      id="markdown-page-status"
+      :data-loaded="String(Boolean(markdownPage))"
+      :data-path="markdownPage?.path"
     />
   </main>
 </template>

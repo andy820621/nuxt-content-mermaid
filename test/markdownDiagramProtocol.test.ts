@@ -70,7 +70,8 @@ describe('Markdown Diagram Protocol', () => {
     const diagram = parseDiagramFrontmatter(protocol.source)
 
     expect(protocol.component?.tag).toBe('mermaid')
-    expect(protocol.props[':config']).toBe('config')
+    expect(protocol.props[':page-config']).toBe('config')
+    expect(protocol.props).not.toHaveProperty(':config')
     expect(protocol.parsed.data.config).toEqual({
       theme: 'neutral',
       flowchart: {
@@ -107,7 +108,7 @@ describe('Markdown Diagram Protocol', () => {
     ])
   })
 
-  it('preserves invalid Mermaid YAML Frontmatter as a local fallback', async () => {
+  it('preserves invalid Mermaid YAML Frontmatter as original Markdown', async () => {
     const markdown = [
       '```mermaid',
       '---',
@@ -119,16 +120,17 @@ describe('Markdown Diagram Protocol', () => {
       '',
     ].join('\n')
 
-    const protocol = await parseProtocol(markdown)
+    const parsed = await parseMarkdown(transformMarkdownDiagrams(markdown), { highlight: false })
 
-    expect(protocol.source.replace(/\r\n/g, '\n').split('\n').map(line => line.trim()).filter(Boolean)).toEqual([
-      '---',
-      'title: [invalid',
-      '---',
-      'graph TD',
-      'A --> B',
-    ])
-    expect(protocol.props[':config']).toBe('config')
-    expect(protocol.props).not.toHaveProperty(':toolbar')
+    expect(parsed.body.children).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'element',
+        tag: 'pre',
+        props: expect.objectContaining({ code: expect.stringContaining('title: [invalid') }),
+      }),
+    ]))
+    expect(parsed.body.children).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'element', tag: 'mermaid' }),
+    ]))
   })
 })
