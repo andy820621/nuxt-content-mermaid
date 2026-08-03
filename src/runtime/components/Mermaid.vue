@@ -21,6 +21,7 @@ import {
 } from '../component-configuration'
 import { materializeMermaidConfigForInvocation, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
+import { selectRenderer } from '../rendererSelection'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
@@ -300,10 +301,9 @@ function normalizeIdentifier(value: string) {
   )
 }
 
-async function resolveAppComponent(
+async function loadAppComponent(
   name: string,
   appComponents: Record<string, () => Promise<{ default: Component }>>,
-  label: string,
 ): Promise<Component | null> {
   const target = normalizeIdentifier(name)
   // Search the paths returned by import.meta.glob and return the file whose name matches the given one.
@@ -313,18 +313,28 @@ async function resolveAppComponent(
     return normalized === target
   })
 
-  if (!matchEntry) {
-    console.warn(
-      `[nuxt-content-mermaid] Cannot find ${label} component:`,
-      name,
-    )
-    return null
-  }
+  if (!matchEntry) return null
 
+  const [, componentLoader] = matchEntry
+  const mod = await componentLoader()
+  return mod.default || mod
+}
+
+async function resolveAuxiliaryAppComponent(
+  name: string,
+  appComponents: Record<string, () => Promise<{ default: Component }>>,
+  label: 'spinner' | 'error',
+): Promise<Component | null> {
   try {
-    const [, componentLoader] = matchEntry
-    const mod = await componentLoader()
-    return mod.default || mod
+    const component = await loadAppComponent(name, appComponents)
+    if (!component) {
+      console.warn(
+        `[nuxt-content-mermaid] Cannot find ${label} component:`,
+        name,
+      )
+    }
+
+    return component
   }
   catch (error) {
     console.error(
@@ -342,41 +352,71 @@ if (import.meta.client && isEnabled) {
   function watchCustomAppComponent(
     nameRef: ComputedRef<string>,
     targetRef: { value: Component | null },
-    label: 'spinner' | 'mermaid' | 'error',
-    onResolved?: (component: Component | null) => void,
+    label: 'spinner' | 'error',
   ) {
     watch(
       nameRef,
       async (name) => {
         if (!name) {
           targetRef.value = null
-          onResolved?.(null)
           return
         }
 
-        const component = await resolveAppComponent(
+        const component = await resolveAuxiliaryAppComponent(
           name,
           appComponents,
           label,
         )
         targetRef.value = component
-        onResolved?.(component)
       },
       { immediate: true },
     )
   }
 
   watchCustomAppComponent(configuredSpinnerName, customSpinner, 'spinner')
-  watchCustomAppComponent(
+  let latestRendererSelectionRequestId = 0
+  watch(
     configuredMermaidImplName,
-    customMermaidImpl,
-    'mermaid',
-    (component) => {
+    async (name) => {
+      const requestId = ++latestRendererSelectionRequestId
+      const outcome = selectRenderer(name, {
+        loadComponent: candidate => loadAppComponent(candidate, appComponents),
+      })
+
+      if (outcome.status === 'no-candidate') {
+        customMermaidImpl.value = null
+        isCustomMermaidResolutionPending.value = false
+        return
+      }
+
+      customMermaidImpl.value = null
+      isCustomMermaidResolutionPending.value = true
+
+      const resolvedOutcome = await outcome.resolution
+      if (requestId !== latestRendererSelectionRequestId) return
+
+      if (resolvedOutcome.status === 'resolved') {
+        customMermaidImpl.value = resolvedOutcome.component
+      }
+      else if (resolvedOutcome.status === 'not-found') {
+        console.warn(
+          '[nuxt-content-mermaid] Cannot find mermaid component:',
+          resolvedOutcome.candidate,
+        )
+      }
+      else {
+        console.error(
+          '[nuxt-content-mermaid] Failed to load mermaid component:',
+          resolvedOutcome.error,
+        )
+      }
+
       isCustomMermaidResolutionPending.value = false
       // A configured name that cannot resolve falls back to Built-in setup after refs settle.
-      if (!component && configuredMermaidImplName.value)
+      if (resolvedOutcome.status !== 'resolved')
         nextTick(() => setupMermaidContainer())
     },
+    { immediate: true },
   )
   watchCustomAppComponent(configuredErrorName, errorComponent, 'error')
 }
