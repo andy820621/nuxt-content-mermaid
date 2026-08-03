@@ -28,7 +28,7 @@ The change replaces those parallel failure branches with one attempt-scoped prot
 
 ### Attempt-scoped one-shot handoff coordinator — selected
 
-Each pending Renderer Selection attempt owns a one-shot failure commit. After its asynchronous outcome settles, the public entry first applies the existing current-attempt check. A current failure then invokes the commit exactly once. The commit synchronously reports the internal diagnostic and commits Built-in ownership.
+Each pending Renderer Selection attempt owns a one-shot failure commit. After its asynchronous outcome settles, the Mermaid orchestration coordinator first applies the current-attempt check. A current failure then invokes the commit exactly once. The commit synchronously reports the internal diagnostic and commits Built-in ownership.
 
 This keeps superseded attempts whose outcomes become stale outside the protocol, centralizes ordering and deduplication, and leaves the asynchronous component loader separate from the synchronous ownership commit.
 
@@ -46,7 +46,7 @@ One attempt begins when a normalized, non-empty Custom Renderer Candidate starts
 
 The one-shot commit records whether it has been consumed. Its observable rules are:
 
-1. A superseded attempt whose outcome becomes stale is ignored by the existing current-request check before the commit is invoked; it emits no diagnostic and assigns no Rendering Owner.
+1. A superseded attempt whose outcome becomes stale is ignored by the Mermaid orchestration current-attempt check before the commit is invoked; it emits no diagnostic and assigns no Rendering Owner.
 2. A current `resolved` outcome assigns Custom Renderer ownership and never enters the failure protocol.
 3. A current `not-found` or `load-failed` outcome invokes its attempt's failure commit.
 4. The first invocation reports the diagnostic and then commits Built-in ownership synchronously.
@@ -83,7 +83,7 @@ The production reporter emits one human-readable console diagnostic containing t
 
 `src/runtime/rendererSelection.ts` owns the attempt-scoped failure handoff seam because it is the deep module responsible for Renderer Selection outcomes and ownership protocol. The seam accepts injected reporting and ownership-commit effects so tests can observe semantics and ordering without asserting private Vue refs.
 
-`src/runtime/components/Mermaid.vue` remains responsible for the existing current-request check and for committing its rendering state. Its failure path delegates to the one-shot handoff. The old component lookup warning branches and independent `status !== 'resolved'` fallback assignment are removed.
+`src/runtime/rendererSelectionOrchestration.ts` owns the internal current-attempt coordinator on behalf of Mermaid orchestration, while `src/runtime/components/Mermaid.vue` commits its rendering state. A superseded outcome is discarded before either Custom or Built-in ownership can be committed. The current failure path delegates to the one-shot handoff. The old component lookup warning branches and independent `status !== 'resolved'` fallback assignment are removed.
 
 The established paths remain unchanged:
 
@@ -110,7 +110,7 @@ Focused Vitest tests use injected effects and semantic matching rather than a fi
 Public tests observe Package User-visible behavior and accepted instrumentation:
 
 - `debug: false` and `debug: true` both emit understandable output containing the package prefix, candidate, and reason;
-- a superseded attempt whose outcome becomes stale emits no diagnostic and does not enter Built-in fallback through the existing Mermaid orchestration current-request check;
+- a superseded attempt whose outcome becomes stale emits no diagnostic and does not enter Built-in fallback through the Mermaid orchestration current-attempt check;
 - `not-found` and `load-failed` both enter the same Built-in fallback lifecycle;
 - Built-in factory creation and Mermaid execution occur only after the diagnostic and only once;
 - repeated Vue updates or render cycles do not create a second Built-in owner or duplicate the diagnostic;
@@ -128,4 +128,4 @@ During TDD, run the focused Renderer Selection test after each RED and GREEN ste
 - Placeholder scan: no TBD, TODO, deferred decision, or unspecified error-handling requirement remains.
 - Consistency: attempt currency is checked before the one-shot commit; the commit reports before assigning Built-in ownership and is the sole failure fallback entry.
 - Scope: the design changes only resolution-failure diagnostics and handoff orchestration; successful selection and renderer execution semantics remain unchanged.
-- Ambiguity: an independent later selection is a new attempt, superseded/stale outcomes are discarded by the existing Mermaid current-request check, and no asynchronous boundary exists inside the failure commit.
+- Ambiguity: an independent later selection is a new attempt, superseded/stale outcomes are discarded by the Mermaid orchestration current-attempt check, and no asynchronous boundary exists inside the failure commit.

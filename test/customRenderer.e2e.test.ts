@@ -102,27 +102,33 @@ describe('custom renderer option', async () => {
     expect(diagnosticEvents).not.toContain('renderer:create')
   })
 
-  it('keeps ownership with the Custom Renderer after its mount fails', { timeout: 20000 }, async () => {
-    const page = await createPage()
-    await page.addInitScript(() => {
-      (window as Window & {
-        __customRendererFailureMode__?: 'mount'
-      }).__customRendererFailureMode__ = 'mount'
-    })
-    await installDiagnosticCapture(page)
-    await page.goto(url('/'), { waitUntil: 'domcontentloaded' })
-    await releaseCustomRenderer(page)
-    await page.waitForFunction(() => {
-      return (window as Window & {
-        __customRendererErrors__?: string[]
-      }).__customRendererErrors__?.includes('Custom Renderer mount failed')
-    })
+  it.each(['setup', 'mount', 'render'] as const)(
+    'keeps ownership with the Custom Renderer after its %s fails',
+    { timeout: 20000 },
+    async (failureMode) => {
+      const page = await createPage()
+      await page.addInitScript((mode) => {
+        (window as Window & {
+          __customRendererFailureMode__?: 'setup' | 'mount' | 'render'
+        }).__customRendererFailureMode__ = mode
+      }, failureMode)
+      await installDiagnosticCapture(page)
+      await page.goto(url('/'), { waitUntil: 'domcontentloaded' })
+      await releaseCustomRenderer(page)
+      await page.waitForFunction((message) => {
+        return (window as Window & {
+          __customRendererErrors__?: string[]
+        }).__customRendererErrors__?.includes(message)
+      }, `Custom Renderer ${failureMode} failed`)
 
-    expect(await page.locator('.mermaid-block').count()).toBe(0)
-    expect(await page.getByTestId('configured-error').count()).toBe(0)
-    expect(await page.evaluate(() => {
-      return (window as Window & { __builtInMermaidRunCount__?: number }).__builtInMermaidRunCount__ || 0
-    })).toBe(0)
-    expect(await readDiagnosticEvents(page)).not.toContain('renderer:create')
-  })
+      expect(await page.locator('.mermaid-block').count()).toBe(0)
+      expect(await page.getByTestId('configured-error').count()).toBe(0)
+      expect(await page.evaluate(() => {
+        return (window as Window & { __builtInMermaidRunCount__?: number }).__builtInMermaidRunCount__ || 0
+      })).toBe(0)
+      const diagnosticEvents = await readDiagnosticEvents(page)
+      expect(diagnosticEvents).not.toContain('resolution-failed')
+      expect(diagnosticEvents).not.toContain('renderer:create')
+    },
+  )
 })

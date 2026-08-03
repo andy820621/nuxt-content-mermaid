@@ -5,9 +5,12 @@ import './renderer-resolution-control'
 
 declare global {
   interface Window {
-    __customRendererFailureMode__?: 'mount'
+    __customRendererFailureMode__?: 'setup' | 'mount' | 'render'
   }
 }
+
+if (import.meta.client && window.__customRendererFailureMode__ === 'setup')
+  throw new Error('Custom Renderer setup failed')
 
 defineProps<{
   code?: string
@@ -19,6 +22,13 @@ const attrs = useAttrs()
 const slots = useSlots()
 
 const isLoading = ref(true)
+
+function renderFailure() {
+  if (import.meta.client && window.__customRendererFailureMode__ === 'render')
+    throw new Error('Custom Renderer render failed')
+
+  return ''
+}
 
 onMounted(() => {
   if (window.__customRendererFailureMode__ === 'mount')
@@ -32,6 +42,7 @@ onMounted(() => {
 
 <template>
   <div>
+    {{ renderFailure() }}
     <component
       :is="spinner"
       v-if="isLoading"

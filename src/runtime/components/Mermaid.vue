@@ -13,6 +13,7 @@ import {
   createRendererResolutionFailureHandoff,
   selectRenderer,
 } from '../rendererSelection'
+import { createRendererSelectionAttemptCoordinator } from '../rendererSelectionOrchestration'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 import type { MermaidComponentProps } from '../../types/config'
 import Spinner from './Spinner.vue'
@@ -118,11 +119,11 @@ if (import.meta.client) {
     { immediate: true },
   )
 
-  let latestRendererSelectionRequestId = 0
+  const beginRendererSelectionAttempt = createRendererSelectionAttemptCoordinator()
   watch(
     configuredMermaidImplName,
     async (name) => {
-      const requestId = ++latestRendererSelectionRequestId
+      const commitRendererSelectionAttempt = beginRendererSelectionAttempt()
       const outcome = selectRenderer(name, {
         loadComponent: candidate => loadAppComponent(candidate, appComponents),
       })
@@ -153,17 +154,15 @@ if (import.meta.client) {
       })
 
       const resolvedOutcome = await outcome.resolution
-      if (requestId !== latestRendererSelectionRequestId) return
-
-      if (resolvedOutcome.status === 'resolved') {
-        rendererSelectionState.value = {
-          status: 'custom',
-          component: resolvedOutcome.component,
-        }
-      }
-      else {
-        commitResolutionFailure(resolvedOutcome)
-      }
+      commitRendererSelectionAttempt(resolvedOutcome, {
+        commitCustomOwnership: (component) => {
+          rendererSelectionState.value = {
+            status: 'custom',
+            component,
+          }
+        },
+        commitResolutionFailure,
+      })
     },
     { immediate: true },
   )

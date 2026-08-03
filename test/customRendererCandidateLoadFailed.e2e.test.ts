@@ -4,9 +4,9 @@ import { createPage, setup, url } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 import { installDiagnosticCapture, readDiagnosticEvents } from './helpers/diagnosticCapture'
 
-const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/custom-renderer-load-failed')
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/custom-renderer-candidate-load-failed')
 
-describe('custom renderer load failure fallback', async () => {
+describe('custom renderer candidate load failure fallback', async () => {
   await setup({
     rootDir,
     browser: true,

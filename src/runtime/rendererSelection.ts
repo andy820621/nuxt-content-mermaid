@@ -24,7 +24,7 @@ type RendererSelectionFailureOutcome = Extract<
   { readonly status: 'not-found' | 'load-failed' }
 >
 
-type RendererSelectionDiagnostic = {
+type CustomRendererResolutionDiagnostic = {
   readonly event: 'resolution-failed'
   readonly candidate: string
   readonly reason: RendererSelectionFailureOutcome['status']
@@ -32,7 +32,7 @@ type RendererSelectionDiagnostic = {
 }
 
 interface RendererResolutionFailureHandoffDependencies {
-  readonly reportDiagnostic: (diagnostic: RendererSelectionDiagnostic) => void
+  readonly reportDiagnostic: (diagnostic: CustomRendererResolutionDiagnostic) => void
   readonly commitBuiltInOwnership: () => void
 }
 
@@ -46,7 +46,7 @@ export function createRendererResolutionFailureHandoff(
     if (committed) return
     committed = true
 
-    const diagnostic: RendererSelectionDiagnostic = outcome.status === 'load-failed'
+    const diagnostic: CustomRendererResolutionDiagnostic = outcome.status === 'load-failed'
       ? {
           event: 'resolution-failed',
           candidate: outcome.candidate,

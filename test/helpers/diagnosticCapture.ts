@@ -12,16 +12,20 @@ export async function installDiagnosticCapture(page: BrowserPage) {
     ;(window as DiagnosticWindow).__mermaidDiagnosticEvents__ = events
 
     const capture = (args: unknown[]) => {
-      for (const value of args) {
-        if (
-          typeof value === 'object'
-          && value !== null
-          && 'event' in value
-          && typeof value.event === 'string'
-        ) {
-          events.push(value.event)
+      const visited = new WeakSet<object>()
+      const collectSemanticValues = (value: unknown) => {
+        if (typeof value === 'string') {
+          events.push(value)
+          return
         }
+        if (value === null || typeof value !== 'object' || visited.has(value)) return
+
+        visited.add(value)
+        for (const nested of Object.values(value))
+          collectSemanticValues(nested)
       }
+
+      for (const value of args) collectSemanticValues(value)
     }
 
     const originalLog = console.log.bind(console)
