@@ -7,8 +7,13 @@ import {
   collectMermaidComponentSourceDependencies,
   resolveMermaidComponentSource,
 } from '../component-configuration'
+import { MERMAID_LOG_PREFIX } from '../constants'
 import BuiltInRenderer from '../built-in-renderer/BuiltInRenderer.vue'
-import { selectRenderer } from '../rendererSelection'
+import {
+  createRendererResolutionFailureHandoff,
+  selectRenderer,
+} from '../rendererSelection'
+import { createRendererSelectionAttemptCoordinator } from '../rendererSelectionOrchestration'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 import type { MermaidComponentProps } from '../../types/config'
 import Spinner from './Spinner.vue'
@@ -114,11 +119,11 @@ if (import.meta.client) {
     { immediate: true },
   )
 
-  let latestRendererSelectionRequestId = 0
+  const beginRendererSelectionAttempt = createRendererSelectionAttemptCoordinator()
   watch(
     configuredMermaidImplName,
     async (name) => {
-      const requestId = ++latestRendererSelectionRequestId
+      const commitRendererSelectionAttempt = beginRendererSelectionAttempt()
       const outcome = selectRenderer(name, {
         loadComponent: candidate => loadAppComponent(candidate, appComponents),
       })
@@ -130,30 +135,34 @@ if (import.meta.client) {
 
       rendererSelectionState.value = { status: 'pending' }
 
+      const commitResolutionFailure = createRendererResolutionFailureHandoff({
+        reportDiagnostic: (diagnostic) => {
+          const failureContext = diagnostic.reason === 'load-failed'
+            ? [diagnostic.error]
+            : []
+
+          console.warn(
+            MERMAID_LOG_PREFIX,
+            `Custom Renderer Candidate "${diagnostic.candidate}" resolution failed (${diagnostic.reason}).`,
+            diagnostic,
+            ...failureContext,
+          )
+        },
+        commitBuiltInOwnership: () => {
+          rendererSelectionState.value = { status: 'built-in' }
+        },
+      })
+
       const resolvedOutcome = await outcome.resolution
-      if (requestId !== latestRendererSelectionRequestId) return
-
-      if (resolvedOutcome.status === 'resolved') {
-        rendererSelectionState.value = {
-          status: 'custom',
-          component: resolvedOutcome.component,
-        }
-      }
-      else if (resolvedOutcome.status === 'not-found') {
-        console.warn(
-          '[nuxt-content-mermaid] Cannot find mermaid component:',
-          resolvedOutcome.candidate,
-        )
-      }
-      else {
-        console.error(
-          '[nuxt-content-mermaid] Failed to load mermaid component:',
-          resolvedOutcome.error,
-        )
-      }
-
-      if (resolvedOutcome.status !== 'resolved')
-        rendererSelectionState.value = { status: 'built-in' }
+      commitRendererSelectionAttempt(resolvedOutcome, {
+        commitCustomOwnership: (component) => {
+          rendererSelectionState.value = {
+            status: 'custom',
+            component,
+          }
+        },
+        commitResolutionFailure,
+      })
     },
     { immediate: true },
   )

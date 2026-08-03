@@ -18,12 +18,12 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-11-24',
   },
   contentMermaid: {
-    debug: false,
+    debug: true,
     loader: {
       lazy: false,
     },
     components: {
-      renderer: 'MissingRenderer',
+      renderer: 'BrokenRenderer',
       error: 'TestError',
     },
   },

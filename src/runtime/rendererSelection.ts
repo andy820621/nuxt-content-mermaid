@@ -19,6 +19,51 @@ export interface RendererSelectionDependencies {
   readonly loadComponent: (candidate: string) => Promise<Component | null>
 }
 
+type RendererSelectionFailureOutcome = Extract<
+  RendererSelectionSettledOutcome,
+  { readonly status: 'not-found' | 'load-failed' }
+>
+
+type CustomRendererResolutionDiagnostic = {
+  readonly event: 'resolution-failed'
+  readonly candidate: string
+  readonly reason: RendererSelectionFailureOutcome['status']
+  readonly error?: unknown
+}
+
+interface RendererResolutionFailureHandoffDependencies {
+  readonly reportDiagnostic: (diagnostic: CustomRendererResolutionDiagnostic) => void
+  readonly commitBuiltInOwnership: () => void
+}
+
+/** @internal */
+export function createRendererResolutionFailureHandoff(
+  dependencies: RendererResolutionFailureHandoffDependencies,
+) {
+  let committed = false
+
+  return (outcome: RendererSelectionFailureOutcome) => {
+    if (committed) return
+    committed = true
+
+    const diagnostic: CustomRendererResolutionDiagnostic = outcome.status === 'load-failed'
+      ? {
+          event: 'resolution-failed',
+          candidate: outcome.candidate,
+          reason: outcome.status,
+          error: outcome.error,
+        }
+      : {
+          event: 'resolution-failed',
+          candidate: outcome.candidate,
+          reason: outcome.status,
+        }
+
+    dependencies.reportDiagnostic(diagnostic)
+    dependencies.commitBuiltInOwnership()
+  }
+}
+
 async function resolveCandidate(
   candidate: string,
   loadComponent: RendererSelectionDependencies['loadComponent'],

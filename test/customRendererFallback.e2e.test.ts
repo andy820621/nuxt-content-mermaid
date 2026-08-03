@@ -2,6 +2,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { $fetch, createPage, setup, url } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
+import { installDiagnosticCapture, readDiagnosticEvents } from './helpers/diagnosticCapture'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/custom-renderer-fallback')
 
@@ -20,16 +21,26 @@ describe('custom renderer fallback', async () => {
     expect(html).not.toContain('class="mermaid-wrapper"')
 
     const page = await createPage()
-    const warnings: string[] = []
+    const messages: string[] = []
+    await installDiagnosticCapture(page)
     page.on('console', (message) => {
-      if (message.type() === 'warning') warnings.push(message.text())
+      messages.push(message.text())
     })
     await page.goto(url('/'))
 
     await page.locator('#diagram-container .mermaid > svg').waitFor({ state: 'visible', timeout: 5000 })
-    expect(await page.evaluate(() => {
+    const runCount = await page.evaluate(() => {
       return (window as Window & { __builtInMermaidRunCount__?: number }).__builtInMermaidRunCount__ || 0
-    })).toBe(1)
-    expect(warnings.some(message => message.includes('Cannot find mermaid component: MissingRenderer'))).toBe(true)
+    })
+    const events = await readDiagnosticEvents(page)
+
+    expect(messages.some(message => (
+      message.includes('[nuxt-content-mermaid]')
+      && message.includes('MissingRenderer')
+      && message.includes('not-found')
+    ))).toBe(true)
+    expect(events.filter(event => event === 'resolution-failed')).toHaveLength(1)
+    expect(runCount).toBe(1)
+    expect(await page.getByTestId('configured-error').count()).toBe(0)
   })
 })
