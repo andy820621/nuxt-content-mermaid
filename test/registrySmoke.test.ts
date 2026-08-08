@@ -19,6 +19,48 @@ describe('registry smoke failure classification', () => {
   ])('classifies %s as %s', (error, expected) => {
     expect(classifyRegistrySmokeFailure(error)).toBe(expected)
   })
+
+  it.each([
+    [
+      new ReleaseVerificationPackageUserError('SVG is empty', {
+        cause: Object.assign(new Error('permission denied'), { code: 'EACCES' }),
+      }),
+      'permission',
+    ],
+    [
+      new ReleaseVerificationPackageUserError('SVG is empty', {
+        cause: Object.assign(new Error('operation not permitted'), { code: 'EPERM' }),
+      }),
+      'permission',
+    ],
+    [
+      new ReleaseVerificationPackageUserError('SVG is empty', {
+        cause: Object.assign(new Error('network unreachable'), { code: 'ENETUNREACH' }),
+      }),
+      'network',
+    ],
+    [
+      new ReleaseVerificationPackageUserError('SVG is empty', {
+        cause: Object.assign(new Error('npm registry unavailable'), { code: 'E503' }),
+      }),
+      'registry',
+    ],
+    [
+      new ReleaseVerificationPackageUserError('SVG is empty', {
+        cause: Object.assign(new Error('spawn browser ENOENT'), { code: 'ENOENT' }),
+      }),
+      'runner',
+    ],
+  ])('prefers nested external %s over a Package User wrapper', (error, expected) => {
+    expect(classifyRegistrySmokeFailure(error)).toBe(expected)
+  })
+
+  it('treats an unknown cycle as a runner failure', () => {
+    const error = new Error('unknown external failure')
+    Object.assign(error, { cause: error })
+
+    expect(classifyRegistrySmokeFailure(error)).toBe('runner')
+  })
 })
 
 const actualLatestProfile = {
@@ -65,6 +107,48 @@ function createVerificationEvidence(success: boolean) {
 }
 
 describe('initial registry smoke health', () => {
+  it('rejects a forged pending object before calling the verifier', async () => {
+    const canonical = createRegistryHealth()
+    const registryHealth = {
+      ...canonical,
+      package: { ...canonical.package },
+      profile: {
+        ...canonical.profile,
+        requested: { ...canonical.profile.requested },
+        resolved: { ...canonical.profile.resolved },
+      },
+      attempts: [],
+    }
+    const verifyRegistryPackage = vi.fn(async () => createVerificationEvidence(true))
+
+    await expect(runInitialRegistrySmoke({
+      registryHealth,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T01:00:00.000Z',
+    })).rejects.toThrow('Initial registry smoke requires pending registry health evidence')
+
+    expect(verifyRegistryPackage).not.toHaveBeenCalled()
+  })
+
+  it('freezes factory pending evidence while keeping it usable', async () => {
+    const registryHealth = createRegistryHealth()
+    const verifyRegistryPackage = vi.fn(async () => createVerificationEvidence(true))
+
+    expect(Object.isFrozen(registryHealth)).toBe(true)
+    expect(Object.isFrozen(registryHealth.package)).toBe(true)
+    expect(Object.isFrozen(registryHealth.profile)).toBe(true)
+    expect(Object.isFrozen(registryHealth.profile.requested)).toBe(true)
+    expect(Object.isFrozen(registryHealth.profile.resolved)).toBe(true)
+    expect(Object.isFrozen(registryHealth.attempts)).toBe(true)
+    expect(() => Object.assign(registryHealth, { status: 'investigation' })).toThrow(TypeError)
+
+    await expect(runInitialRegistrySmoke({
+      registryHealth,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T01:00:00.000Z',
+    })).resolves.toMatchObject({ status: 'healthy' })
+  })
+
   it('records a successful clean attempt as healthy', async () => {
     const registryHealth = createRegistryHealth()
     const verification = createVerificationEvidence(true)
@@ -104,6 +188,7 @@ describe('initial registry smoke health', () => {
       packageVersion: '3.0.0',
       profile: actualLatestProfile,
     })
+    expect(verifyRegistryPackage).toHaveBeenCalledOnce()
   })
 
   it.each([

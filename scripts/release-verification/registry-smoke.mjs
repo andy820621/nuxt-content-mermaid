@@ -3,6 +3,7 @@ import { RegistrySmokeVerificationFailure } from './runner.mjs'
 import { parseVersionProfile } from './profiles.mjs'
 
 const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
+const PENDING_REGISTRY_HEALTH = new WeakSet()
 
 function requireNonEmptyString(value, label) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -38,7 +39,7 @@ function freezeRequestedProfile(requestedProfile) {
 
 function freezeRegistryHealth({ packageName, packageVersion, requestedProfile, profile }) {
   const exactProfile = parseVersionProfile(profile)
-  return Object.freeze({
+  const registryHealth = Object.freeze({
     status: 'pending',
     package: Object.freeze({
       name: requireNonEmptyString(packageName, 'package name'),
@@ -52,10 +53,13 @@ function freezeRegistryHealth({ packageName, packageVersion, requestedProfile, p
     attempts: Object.freeze([]),
     retryCommand: null,
   })
+  PENDING_REGISTRY_HEALTH.add(registryHealth)
+  return registryHealth
 }
 
 function assertPendingRegistryHealth(registryHealth) {
   if (!registryHealth || typeof registryHealth !== 'object'
+    || !PENDING_REGISTRY_HEALTH.has(registryHealth)
     || registryHealth.status !== 'pending'
     || !Array.isArray(registryHealth.attempts)
     || registryHealth.attempts.length !== 0

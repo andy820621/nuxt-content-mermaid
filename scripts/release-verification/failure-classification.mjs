@@ -103,19 +103,20 @@ export function isPackageUserFailure(error, seen = new Set()) {
 export function classifyRegistrySmokeFailure(error) {
   const seen = new Set()
   let current = error
+  let packageUserFailure = false
 
   while (current && typeof current === 'object' && !seen.has(current)) {
     seen.add(current)
     const code = errorCode(current)
+    packageUserFailure ||= isPackageUserFailure(current)
 
     if (PERMISSION_ERROR_CODES.has(code)) return 'permission'
     if (isRegistryDiagnostic(current, code)) return 'registry'
     if (NETWORK_ERROR_CODES.has(code)) return 'network'
     if (code === 'ENOENT' || isMissingRunnerDiagnostic(current)) return 'runner'
-    if (isPackageUserFailure(current)) return 'package-defect'
 
     current = current.cause
   }
 
-  return 'runner'
+  return packageUserFailure ? 'package-defect' : 'runner'
 }
