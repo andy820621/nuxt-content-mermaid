@@ -119,7 +119,9 @@ export async function runBrowserSmoke({ consumerDirectory }) {
       waitUntil: 'domcontentloaded',
       timeout: BROWSER_TIMEOUT_MS,
     })
-    const svg = page.locator('[data-release-mermaid-root] svg').first()
+    const svg = page.locator(
+      '[data-release-mermaid-root] .mermaid-block .mermaid-wrapper > .mermaid > svg',
+    ).first()
     await svg.waitFor({ state: 'visible', timeout: BROWSER_TIMEOUT_MS })
     const outcome = await svg.evaluate((element) => {
       const rect = element.getBoundingClientRect()

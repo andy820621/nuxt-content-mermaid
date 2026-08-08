@@ -88,6 +88,8 @@ async function assertTemplateIsClean(templateDirectory) {
   const files = await readTemplateFiles(templateDirectory)
   for (const file of files) {
     const content = await readFile(file.path, 'utf8')
+    const importsMermaid = /from\s+['"]mermaid(?:\/[^'"]*)?['"]/.test(content)
+      || /import\(\s*['"]mermaid(?:\/[^'"]*)?['"]/.test(content)
     if (/(?:^|\/)components(?:\/.*)?\/mermaid\.[^/]+$/i.test(file.relativePath)) {
       throw new Error(`Clean consumer template uses a Mermaid substitution in ${file.relativePath}`)
     }
@@ -100,7 +102,7 @@ async function assertTemplateIsClean(templateDirectory) {
     if (content.includes('mermaid-stub')
       || /\brenderer\s*:/.test(content)
       || /<svg(?:\s|>)/i.test(content)
-      || /(?:from\s+|import\s*\()\s*['"]mermaid(?:\/[^'"]*)?['"]/.test(content)) {
+      || importsMermaid) {
       throw new Error(`Clean consumer template uses a Mermaid substitution in ${file.relativePath}`)
     }
     if (/(?:^|[\s'"`])(?:\.\.\/)+src\/module(?:\.[cm]?[jt]s)?/.test(content)) {
