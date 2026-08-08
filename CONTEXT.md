@@ -179,3 +179,51 @@ _Avoid_: Render Outcome, cached diagram
 **Transactional Render**:
 The Built-in Renderer protocol that stages an attempt away from the live DOM and commits it only after success, latest-generation validation, and legal component configuration are all confirmed. It is the invariant that makes preservation of the Committed Diagram a guarantee rather than best effort.
 _Avoid_: DOM cleanup, optimistic render
+
+**Release Verification Contract**:
+The smallest repeatable body of evidence required to consider a package version safe to publish and healthy after publication. Required automated verification of the Publishable Package Artifact always blocks release; Manual Interaction Verification blocks only when the Release Impact Declaration identifies a relevant risk.
+_Avoid_: Test suite, release checklist
+
+**Publishable Package Artifact**:
+The exact package archive intended for npm publication, including only the files, exports, types, and runtime code a Package User will receive. Verification against repository source, a source-linked playground, or unpublished build output is not evidence about this artifact.
+_Avoid_: Source tree, dist directory, npm release
+
+**Core Runtime Path**:
+The representative Package User journey from Nuxt SSR through hydration to Mermaid rendering and fallback behavior. Release verification covers SVG rendering, theme handling, lazy rendering, and error fallback without claiming exhaustive coverage of every option, diagram type, or browser.
+_Avoid_: Full feature matrix, unit test coverage
+
+**Registry Smoke Test**:
+The intentionally small check run after a version is published as the default npm release. It installs that released version in a clean Package User context and confirms installation, production build, and basic rendering; it detects publication or registry-facing failures but does not replace pre-publication artifact verification.
+_Avoid_: Full release suite, local package test
+
+**Supported Nuxt Range**:
+The Nuxt 3 and Nuxt 4 versions publicly accepted by the package's peer dependency contract. The entire declared range is the Compatibility Contract; minimum and latest matrix entries are representative evidence rather than the only supported versions, and a new major enters the range only after explicit compatibility verification.
+_Avoid_: Tested Nuxt version, primary Nuxt version
+
+**Supported Dependency Major**:
+A major line of Nuxt or another peer dependency that has passed explicit compatibility verification and is included deliberately in the public peer range. Publication of a new upstream major does not make it supported automatically.
+_Avoid_: Installable dependency, future-compatible dependency
+
+**Known-Latest Version**:
+The most recent upstream version deliberately pinned after successful compatibility verification for reproducible pull-request evidence. It is distinct from the latest version currently available from the registry.
+_Avoid_: Current latest, minimum supported version
+
+**Compatibility Drift Check**:
+Scheduled verification that resolves the actual latest upstream versions to detect changes since the Known-Latest Version. A confirmed incompatibility inside the declared peer range creates a blocking issue for ordinary releases; a documented security emergency may proceed, but does not waive required artifact verification.
+_Avoid_: Pull-request matrix, dependency update
+
+**Representative Compatibility Matrix**:
+A deliberately small set of minimum, Known-Latest, and high-risk boundary combinations used as evidence for the broader peer-range Compatibility Contract. It does not redefine support as only the combinations that CI happens to execute.
+_Avoid_: Exhaustive version matrix, supported-version list
+
+**Unhealthy Release**:
+A version already published to npm that cannot reliably install, build, or complete basic rendering because of a confirmed package defect. A first Registry Smoke Test failure begins investigation; only a clean independent retry after infrastructure causes are excluded confirms the state, after which the version is deprecated and a corrective patch is prepared without unpublishing it.
+_Avoid_: Failed CI run, flaky test
+
+**Manual Interaction Verification**:
+Human evaluation reserved for fullscreen behavior, zoom, pan, drag, clipboard behavior, mobile interaction, and visual readability, with an explicit pass criterion for every check. It runs when the maintainer confirms a relevant Release Impact Declaration or when impact remains uncertain.
+_Avoid_: General regression testing, exploratory testing
+
+**Release Impact Declaration**:
+A release-time statement of whether the diff can affect package contents, runtime behavior, interaction, styling, browser APIs, or runtime dependencies. An agent recommends the classification from the diff, the maintainer confirms it, and uncertainty activates Manual Interaction Verification.
+_Avoid_: Changed-file classifier, informal release judgment
