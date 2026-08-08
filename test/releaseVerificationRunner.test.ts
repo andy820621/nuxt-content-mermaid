@@ -312,6 +312,18 @@ describe('package artifact verification runner', () => {
 describe('registry smoke verification runner', () => {
   it('runs the fixed registry plan in one clean consumer', async () => {
     const { operations, workspace } = createOperations()
+    const installResult = {
+      packageVersion: '3.0.7',
+      profileVersions: {
+        betterSqlite3: '12.11.1',
+        nuxt: '4.5.3',
+        nuxtContent: '3.15.2',
+        mermaid: '11.12.3',
+        typescript: '5.9.3',
+        vueTsc: '3.2.5',
+      },
+    }
+    operations.installConsumer.mockResolvedValueOnce(installResult)
 
     const evidence = await runRegistrySmokeVerification({
       packageName: '@barzhsieh/nuxt-content-mermaid',
@@ -336,21 +348,14 @@ describe('registry smoke verification runner', () => {
       package: {
         name: '@barzhsieh/nuxt-content-mermaid',
         requestedVersion: '3.0.0',
-        resolvedVersion: '2.2.3',
       },
       profile: {
         id: 'nuxt-4-known-latest',
         requested: knownLatestProfile.versions,
-        resolved: {
-          betterSqlite3: '12.11.1',
-          nuxt: '4.5.2',
-          nuxtContent: '3.15.2',
-          mermaid: '11.12.3',
-          typescript: '5.9.3',
-          vueTsc: '3.2.5',
-        },
       },
     })
+    expect(evidence.package.resolvedVersion).toBe(installResult.packageVersion)
+    expect(evidence.profile.resolved).toBe(installResult.profileVersions)
     expect(evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
       ['install', 'passed'],
       ['build', 'passed'],
