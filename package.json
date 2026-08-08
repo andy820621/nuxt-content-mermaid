@@ -58,7 +58,8 @@
     "release": "pnpm run release:patch",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:package-contract": "pnpm prepack && vue-tsc -p test/package-contract/tsconfig.json --noEmit",
+    "test:package-artifact": "node scripts/release-verification/package-artifact.mjs --package-source pack --profile nuxt-4-known-latest",
+    "test:package-contract": "pnpm prepack && vue-tsc -p test/release-verification/consumer-template/type-contracts/tsconfig.json --noEmit",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit"
   },

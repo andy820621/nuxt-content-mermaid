@@ -5,10 +5,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "ESNext",
-    "types": [
-      "node"
-    ]
+    "target": "ESNext"
   },
   "include": [
     "./package-user.ts",
