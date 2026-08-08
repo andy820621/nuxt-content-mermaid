@@ -1,5 +1,5 @@
 import type { MermaidConfig } from 'mermaid'
-import { assertStrictData, cloneOwnedData } from '../configuration/core'
+import { assertStrictData, cloneOwnedData } from './configuration/core'
 import type { PageMermaidConfig } from '../types/config'
 import { PAGE_MERMAID_CONFIG_PHASE } from './constants'
 import { createMermaidComponentConfigurationError } from './component-configuration-error'

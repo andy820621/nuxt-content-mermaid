@@ -3,13 +3,13 @@ import {
   mergeByPresence,
   type DeepReadonlyData,
   type ConfigurationValidationPhase,
-} from '../../configuration/core'
+} from './core'
 import {
   resolveExpandOptions,
   resolveToolbarOptions,
   validateRuntimeOptions,
   validateRuntimeOptionsInput,
-} from '../../configuration/module'
+} from './module'
 import type { JsonObject, JsonValue, RuntimeOptions } from '../../types/config'
 import { DEFAULT_RUNTIME_OPTIONS } from '../constants'
 

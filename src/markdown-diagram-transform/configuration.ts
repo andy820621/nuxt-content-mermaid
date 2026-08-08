@@ -4,7 +4,7 @@ import {
   cloneOwnedData,
   mergeByPresence,
   type ConfigurationValidationPhase,
-} from '../configuration/core'
+} from '../runtime/configuration/core'
 import type { JsonObject, JsonValue } from '../types/config'
 import type { MermaidToolbarOptions } from '../types/mermaid'
 

@@ -1,5 +1,5 @@
 import type { MermaidConfig } from 'mermaid'
-import { mergeByPresence } from '../configuration/core'
+import { mergeByPresence } from './configuration/core'
 import type { JsonObject } from '../types/config'
 import type { MermaidComponentSource } from './component-configuration'
 import { mergeDirectMermaidConfigForInvocation } from './direct-mermaid-config'
