@@ -66,9 +66,12 @@ function createEvidence(request) {
   }
 }
 
-function validateRequest(request) {
-  if (request.packageSource.kind !== 'pack') {
+function validateRequest(request, supportedKinds = ['pack']) {
+  if (!supportedKinds.includes(request.packageSource.kind)) {
     throw new Error(`Unsupported package source: ${request.packageSource.kind}`)
+  }
+  if (request.packageSource.kind === 'retained' && !request.packageSource.artifact) {
+    throw new Error('Retained package source requires an artifact')
   }
 }
 
@@ -319,7 +322,7 @@ export async function runPackageArtifactMatrixVerification(request, operations) 
 }
 
 export async function runPackageArtifactVerification(request, operations) {
-  validateRequest(request)
+  validateRequest(request, ['pack', 'retained'])
 
   const evidence = createEvidence(request)
   let workspace
@@ -329,6 +332,9 @@ export async function runPackageArtifactVerification(request, operations) {
   try {
     artifact = await runStage(evidence, 'artifact', async () => {
       workspace = await operations.createWorkspace()
+      if (request.packageSource.kind === 'retained') {
+        return request.packageSource.artifact
+      }
       return operations.createArtifact({
         repositoryRoot: request.packageSource.repositoryRoot,
         artifactDirectory: workspace.artifactDirectory,

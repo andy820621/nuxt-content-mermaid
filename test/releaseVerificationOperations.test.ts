@@ -29,6 +29,8 @@ function createArtifactFixture(overrides: Partial<PackageArtifact> = {}): Packag
     archivePath: '/tmp/package.tgz',
     filename: 'package.tgz',
     sha256: 'abc123',
+    integritySha512: 'sha512-Zml4dHVyZQ==',
+    packlist: ['dist/module.mjs', 'dist/types.d.mts', 'package.json'],
     packageName: '@barzhsieh/nuxt-content-mermaid',
     packageVersion: '2.2.3',
     ...overrides,
@@ -343,6 +345,11 @@ describe('package artifact creation', () => {
           name: '@barzhsieh/nuxt-content-mermaid',
           version: '2.2.3',
           filename: join(artifactDirectory, filename),
+          files: [
+            { path: 'dist/module.mjs' },
+            { path: 'dist/types.d.mts' },
+            { path: 'package.json' },
+          ],
         })}`,
       }
     })
@@ -358,6 +365,12 @@ describe('package artifact creation', () => {
       archivePath: join(artifactDirectory, filename),
       filename,
       sha256: createHash('sha256').update(archiveBytes).digest('hex'),
+      integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
+      packlist: [
+        'dist/module.mjs',
+        'dist/types.d.mts',
+        'package.json',
+      ],
       packageName: '@barzhsieh/nuxt-content-mermaid',
       packageVersion: '2.2.3',
     })

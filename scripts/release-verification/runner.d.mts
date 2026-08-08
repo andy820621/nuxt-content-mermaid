@@ -14,6 +14,8 @@ export interface PackageArtifact {
   archivePath: string
   filename: string
   sha256: string
+  integritySha512: string
+  packlist: string[]
   packageName: string
   packageVersion: string
 }
@@ -67,12 +69,18 @@ export interface PackageArtifactVerificationRequest {
   packageSource: {
     kind: 'pack'
     repositoryRoot: string
+  } | {
+    kind: 'retained'
+    artifact: PackageArtifact
   }
   profile: VersionProfile
 }
 
 export interface PackageArtifactMatrixVerificationRequest {
-  packageSource: PackageArtifactVerificationRequest['packageSource']
+  packageSource: Extract<
+    PackageArtifactVerificationRequest['packageSource'],
+    { kind: 'pack' }
+  >
   profiles: readonly VersionProfile[]
 }
 

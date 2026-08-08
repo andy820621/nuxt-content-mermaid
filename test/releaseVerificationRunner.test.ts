@@ -47,6 +47,8 @@ function createOperations() {
     archivePath,
     filename: 'barzhsieh-nuxt-content-mermaid-2.2.3.tgz',
     sha256: 'abc123',
+    integritySha512: 'sha512-Zml4dHVyZQ==',
+    packlist: ['dist/module.mjs', 'dist/types.d.mts', 'package.json'],
     packageName: '@barzhsieh/nuxt-content-mermaid',
     packageVersion: '2.2.3',
   }
@@ -193,6 +195,40 @@ describe('package artifact verification runner', () => {
       ['runtime', 'passed'],
       ['cleanup', 'passed'],
     ])
+  })
+
+  it('verifies a retained artifact without packing another archive', async () => {
+    const { artifact, operations, workspace } = createOperations()
+
+    const evidence = await runPackageArtifactVerification({
+      packageSource: {
+        kind: 'retained',
+        artifact,
+      },
+      profile: knownLatestProfile,
+    }, operations)
+
+    expect(operations.createArtifact).not.toHaveBeenCalled()
+    expect(operations.inspectArchive).toHaveBeenCalledWith({
+      archiveDirectory: workspace.archiveDirectory,
+      artifact,
+    })
+    expect(operations.installConsumer).toHaveBeenCalledWith({
+      artifact,
+      consumerDirectory: workspace.consumerDirectory,
+      profile: knownLatestProfile,
+    })
+    expect(evidence).toMatchObject({
+      success: true,
+      package: {
+        name: artifact.packageName,
+        version: artifact.packageVersion,
+      },
+      artifact: {
+        filename: artifact.filename,
+        sha256: artifact.sha256,
+      },
+    })
   })
 
   it('rejects a source-linked package before creating temporary state', async () => {

@@ -186,6 +186,15 @@ async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner
   if (typeof packResult.name !== 'string' || typeof packResult.version !== 'string') {
     throw new TypeError('pnpm pack artifact metadata is missing package name or version')
   }
+  if (!Array.isArray(packResult.files)
+    || packResult.files.some(file => (
+      !file
+      || typeof file !== 'object'
+      || typeof file.path !== 'string'
+      || file.path.length === 0
+    ))) {
+    throw new TypeError('pnpm pack artifact metadata is missing a valid packlist')
+  }
 
   const archivePath = resolve(artifactDirectory, tarballs[0])
   if (!isWithin(resolve(artifactDirectory), archivePath)) {
@@ -196,6 +205,8 @@ async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner
     archivePath,
     filename: tarballs[0],
     sha256: createHash('sha256').update(archiveBytes).digest('hex'),
+    integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
+    packlist: packResult.files.map(file => file.path),
     packageName: packResult.name,
     packageVersion: packResult.version,
   }

@@ -9,25 +9,7 @@ on:
       - main
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20
-
-      - run: npm i -g --force corepack@latest && corepack enable
-
-      - name: Install dependencies
-        run: npx nypm@latest i
-
-      - name: Lint
-        run: npm run lint
-
-  test:
+  source-verification:
     runs-on: ubuntu-latest
 
     steps:
@@ -45,14 +27,11 @@ jobs:
       - name: Playground prepare
         run: npm run dev:prepare
 
-      - name: Package contract
-        run: npm run test:package-contract
-
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Test
-        run: npm run test
+      - name: Verify source
+        run: pnpm verify:source
 
   representative-compatibility-matrix:
     runs-on: ubuntu-latest
