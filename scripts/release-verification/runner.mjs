@@ -167,11 +167,12 @@ async function runConsumerContract({
   try {
     profileEvidence.resolved = await runStage(evidence, 'install', async () => {
       workspace ??= await operations.createWorkspace()
-      return operations.installConsumer({
-        artifact,
+      const installation = await operations.installConsumer({
+        packageSource: { kind: 'artifact', artifact },
         consumerDirectory: workspace.consumerDirectory,
         profile,
       })
+      return installation.profileVersions
     })
     await runStage(evidence, 'exports', () => operations.verifyPackageExports({
       artifact,

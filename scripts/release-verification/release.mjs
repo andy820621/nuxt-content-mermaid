@@ -373,7 +373,7 @@ export function createReleaseEffects({
       let primaryFailure
       try {
         await verificationOperations.installConsumer({
-          artifact,
+          packageSource: { kind: 'artifact', artifact },
           consumerDirectory: workspace.consumerDirectory,
           profile,
         })

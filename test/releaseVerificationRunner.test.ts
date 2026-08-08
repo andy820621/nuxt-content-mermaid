@@ -61,12 +61,15 @@ function createOperations() {
       createArtifact: vi.fn(async () => artifact),
       inspectArchive: vi.fn(async () => undefined),
       installConsumer: vi.fn(async () => ({
-        betterSqlite3: '12.11.1',
-        nuxt: '4.5.2',
-        nuxtContent: '3.15.2',
-        mermaid: '11.12.3',
-        typescript: '5.9.3',
-        vueTsc: '3.2.5',
+        packageVersion: artifact.packageVersion,
+        profileVersions: {
+          betterSqlite3: '12.11.1',
+          nuxt: '4.5.2',
+          nuxtContent: '3.15.2',
+          mermaid: '11.12.3',
+          typescript: '5.9.3',
+          vueTsc: '3.2.5',
+        },
       })),
       verifyPackageExports: vi.fn(async () => undefined),
       verifyTypes: vi.fn(async () => undefined),
@@ -131,9 +134,10 @@ function createMatrixOperations() {
     }),
     createArtifact: vi.fn(async () => artifact),
     inspectArchive: vi.fn(async () => undefined),
-    installConsumer: vi.fn(async ({ profile }: { profile: typeof minimumProfile }) => (
-      resolvedVersions.get(profile.id)!
-    )),
+    installConsumer: vi.fn(async ({ profile }: { profile: typeof minimumProfile }) => ({
+      packageVersion: artifact.packageVersion,
+      profileVersions: resolvedVersions.get(profile.id)!,
+    })),
     verifyPackageExports: vi.fn(async () => undefined),
     verifyTypes: vi.fn(async () => undefined),
     buildConsumer: vi.fn(async () => undefined),
@@ -159,7 +163,7 @@ describe('package artifact verification runner', () => {
       artifact,
     })
     expect(operations.installConsumer).toHaveBeenCalledWith({
-      artifact,
+      packageSource: { kind: 'artifact', artifact },
       consumerDirectory: workspace.consumerDirectory,
       profile: knownLatestProfile,
     })
@@ -214,7 +218,7 @@ describe('package artifact verification runner', () => {
       artifact,
     })
     expect(operations.installConsumer).toHaveBeenCalledWith({
-      artifact,
+      packageSource: { kind: 'artifact', artifact },
       consumerDirectory: workspace.consumerDirectory,
       profile: knownLatestProfile,
     })
@@ -316,12 +320,12 @@ describe('Representative Compatibility Matrix runner', () => {
     expect(operations.inspectArchive).toHaveBeenCalledOnce()
     expect(operations.installConsumer).toHaveBeenCalledTimes(2)
     expect(operations.installConsumer).toHaveBeenNthCalledWith(1, {
-      artifact,
+      packageSource: { kind: 'artifact', artifact },
       consumerDirectory: workspaces[1]!.consumerDirectory,
       profile: minimumProfile,
     })
     expect(operations.installConsumer).toHaveBeenNthCalledWith(2, {
-      artifact,
+      packageSource: { kind: 'artifact', artifact },
       consumerDirectory: workspaces[2]!.consumerDirectory,
       profile: knownLatestProfile,
     })

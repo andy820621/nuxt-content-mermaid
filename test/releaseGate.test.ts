@@ -1210,7 +1210,10 @@ describe('production release effects', () => {
         root: '/tmp/manual-consumer-root',
         consumerDirectory: '/tmp/manual-consumer-root/consumer',
       })),
-      installConsumer: vi.fn(async () => actualLatestProfile.versions),
+      installConsumer: vi.fn(async () => ({
+        packageVersion: retainedArtifact.packageVersion,
+        profileVersions: actualLatestProfile.versions,
+      })),
       buildConsumer: vi.fn(async () => undefined),
       cleanupWorkspace: vi.fn(async () => undefined),
     }
@@ -1234,7 +1237,7 @@ describe('production release effects', () => {
       checks,
     })).resolves.toEqual(manualResults)
     expect(verificationOperations.installConsumer).toHaveBeenCalledWith({
-      artifact: retainedArtifact,
+      packageSource: { kind: 'artifact', artifact: retainedArtifact },
       consumerDirectory: '/tmp/manual-consumer-root/consumer',
       profile: actualLatestProfile,
     })

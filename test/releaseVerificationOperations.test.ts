@@ -72,8 +72,8 @@ async function createInstalledPackage(consumerDirectory: string, name: string, v
   await writeJson(join(packageDirectory, 'package.json'), { name, version })
 }
 
-async function populateInstalledPackages(consumerDirectory: string) {
-  await createInstalledPackage(consumerDirectory, '@barzhsieh/nuxt-content-mermaid', '2.2.3')
+async function populateInstalledPackages(consumerDirectory: string, packageVersion = '2.2.3') {
+  await createInstalledPackage(consumerDirectory, '@barzhsieh/nuxt-content-mermaid', packageVersion)
   await createInstalledPackage(consumerDirectory, 'better-sqlite3', profile.versions.betterSqlite3)
   await createInstalledPackage(consumerDirectory, 'nuxt', profile.versions.nuxt)
   await createInstalledPackage(consumerDirectory, '@nuxt/content', profile.versions.nuxtContent)
@@ -106,6 +106,93 @@ afterEach(async () => {
 })
 
 describe('clean consumer installation', () => {
+  it('installs only the exact registry version and reports the resolved identity', async () => {
+    const templateDirectory = await createTemplate()
+    const consumerDirectory = await createTemporaryDirectory('registry-consumer')
+    const commandRunner = vi.fn(async () => {
+      await populateInstalledPackages(consumerDirectory, '3.0.0')
+      return {}
+    })
+    const operations = createReleaseVerificationOperations({
+      templateDirectory,
+      commandRunner,
+    })
+
+    const result = await operations.installConsumer({
+      packageSource: {
+        kind: 'registry',
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+      },
+      consumerDirectory,
+      profile,
+    })
+
+    const manifest = JSON.parse(await readFile(join(consumerDirectory, 'package.json'), 'utf8'))
+    expect(manifest.dependencies['@barzhsieh/nuxt-content-mermaid']).toBe('3.0.0')
+    expect(JSON.stringify(manifest)).not.toContain('workspace:')
+    expect(JSON.stringify(manifest)).not.toContain('file:')
+    expect(result).toEqual({
+      packageVersion: '3.0.0',
+      profileVersions: profile.versions,
+    })
+    expect(commandRunner).toHaveBeenCalledWith({
+      command: 'npm',
+      args: ['install', '--no-audit', '--no-fund', '--package-lock=true'],
+      cwd: consumerDirectory,
+    })
+  })
+
+  it.each([
+    'latest',
+    '^3.0.0',
+    'workspace:*',
+    'file:../package.tgz',
+    '/tmp/package.tgz',
+  ])('rejects the registry fallback %s before installation', async (packageVersion) => {
+    const templateDirectory = await createTemplate()
+    const consumerDirectory = await createTemporaryDirectory('registry-consumer')
+    const commandRunner = vi.fn()
+    const operations = createReleaseVerificationOperations({
+      templateDirectory,
+      commandRunner,
+    })
+
+    await expect(operations.installConsumer({
+      packageSource: {
+        kind: 'registry',
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion,
+      },
+      consumerDirectory,
+      profile,
+    })).rejects.toThrow('Registry smoke requires an exact package version')
+    expect(commandRunner).not.toHaveBeenCalled()
+  })
+
+  it('rejects a registry package resolved to another version', async () => {
+    const templateDirectory = await createTemplate()
+    const consumerDirectory = await createTemporaryDirectory('registry-consumer')
+    const commandRunner = vi.fn(async () => {
+      await populateInstalledPackages(consumerDirectory, '3.0.1')
+      return {}
+    })
+    const operations = createReleaseVerificationOperations({
+      templateDirectory,
+      commandRunner,
+    })
+
+    await expect(operations.installConsumer({
+      packageSource: {
+        kind: 'registry',
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+      },
+      consumerDirectory,
+      profile,
+    })).rejects.toThrow('expected 3.0.0, received 3.0.1')
+  })
+
   it('installs the tarball with exact profile versions and reports resolved versions', async () => {
     const templateDirectory = await createTemplate()
     const consumerDirectory = await createTemporaryDirectory('clean-consumer')
@@ -121,7 +208,10 @@ describe('clean consumer installation', () => {
     })
 
     const resolved = await operations.installConsumer({
-      artifact: createArtifactFixture({ archivePath }),
+      packageSource: {
+        kind: 'artifact',
+        artifact: createArtifactFixture({ archivePath }),
+      },
       consumerDirectory,
       profile,
     })
@@ -138,7 +228,10 @@ describe('clean consumer installation', () => {
       'typescript': '5.9.3',
       'vue-tsc': '3.2.5',
     })
-    expect(resolved).toEqual(profile.versions)
+    expect(resolved).toEqual({
+      packageVersion: '2.2.3',
+      profileVersions: profile.versions,
+    })
     expect(commandRunner).toHaveBeenCalledOnce()
   })
 
@@ -155,7 +248,7 @@ export default defineNuxtConfig({ modules: [contentMermaid] })
     })
 
     await expect(operations.installConsumer({
-      artifact: createArtifactFixture(),
+      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
       consumerDirectory,
       profile,
     })).rejects.toThrow('repository-relative module path')
@@ -181,7 +274,7 @@ export default defineNuxtConfig({
     })
 
     await expect(operations.installConsumer({
-      artifact: createArtifactFixture(),
+      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
       consumerDirectory,
       profile,
     })).rejects.toThrow('Mermaid substitution')
@@ -204,7 +297,7 @@ export default defineNuxtConfig({
     })
 
     await expect(operations.installConsumer({
-      artifact: createArtifactFixture(),
+      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
       consumerDirectory,
       profile,
     })).rejects.toThrow('Mermaid substitution')
@@ -237,7 +330,7 @@ export default defineNuxtConfig({
     })
 
     await expect(operations.installConsumer({
-      artifact: createArtifactFixture(),
+      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
       consumerDirectory,
       profile,
     })).rejects.toThrow('outside the clean consumer')

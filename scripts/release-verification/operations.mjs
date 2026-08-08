@@ -22,6 +22,7 @@ import {
 
 const PACKAGE_NAME = '@barzhsieh/nuxt-content-mermaid'
 const COMMAND_OUTPUT_LIMIT = 8_000
+const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 const CONSUMER_TEMPLATE_FILES = new Set([
   'app.vue',
   'content.config.ts',
@@ -34,6 +35,35 @@ const CONSUMER_TEMPLATE_FILES = new Set([
   'type-contracts/v3-configuration.ts',
   'verify-package-root.mjs',
 ])
+
+function assertExactRegistryVersion(version) {
+  const match = typeof version === 'string'
+    ? EXACT_SEMVER_PATTERN.exec(version)
+    : null
+  const prerelease = match?.[4]?.split('.') ?? []
+  if (!match || prerelease.some(identifier => /^\d+$/.test(identifier) && /^0\d+/.test(identifier))) {
+    throw new Error('Registry smoke requires an exact package version')
+  }
+}
+
+function packageDependency(packageSource) {
+  if (packageSource?.kind === 'artifact') {
+    return {
+      name: packageSource.artifact.packageName,
+      version: packageSource.artifact.packageVersion,
+      dependency: pathToFileURL(packageSource.artifact.archivePath).href,
+    }
+  }
+  if (packageSource?.kind === 'registry') {
+    assertExactRegistryVersion(packageSource.packageVersion)
+    return {
+      name: packageSource.packageName,
+      version: packageSource.packageVersion,
+      dependency: packageSource.packageVersion,
+    }
+  }
+  throw new Error(`Unsupported consumer package source: ${packageSource?.kind}`)
+}
 const execFileAsync = promisify(execFile)
 
 function outputTail(output) {
@@ -306,12 +336,13 @@ async function inspectArchive({ archiveDirectory, artifact, commandRunner }) {
 }
 
 async function installConsumer({
-  artifact,
+  packageSource,
   consumerDirectory,
   profile,
   templateDirectory,
   commandRunner,
 }) {
+  const source = packageDependency(packageSource)
   await assertTemplateIsClean(templateDirectory)
   await assertEmptyConsumerDirectory(consumerDirectory)
 
@@ -332,7 +363,7 @@ async function installConsumer({
   await writeFile(join(consumerDirectory, 'package.json'), `${JSON.stringify({
     ...templateManifest,
     dependencies: {
-      [artifact.packageName]: pathToFileURL(artifact.archivePath).href,
+      [source.name]: source.dependency,
       '@nuxt/content': profile.versions.nuxtContent,
       'better-sqlite3': profile.versions.betterSqlite3,
       'mermaid': profile.versions.mermaid,
@@ -350,39 +381,42 @@ async function installConsumer({
     cwd: consumerDirectory,
   })
 
-  await installedPackageVersion(
+  const resolvedPackageVersion = await installedPackageVersion(
     consumerDirectory,
-    artifact.packageName,
-    artifact.packageVersion,
+    source.name,
+    source.version,
   )
 
   return {
-    betterSqlite3: await installedPackageVersion(
-      consumerDirectory,
-      'better-sqlite3',
-      profile.versions.betterSqlite3,
-    ),
-    nuxt: await installedPackageVersion(consumerDirectory, 'nuxt', profile.versions.nuxt),
-    nuxtContent: await installedPackageVersion(
-      consumerDirectory,
-      '@nuxt/content',
-      profile.versions.nuxtContent,
-    ),
-    mermaid: await installedPackageVersion(
-      consumerDirectory,
-      'mermaid',
-      profile.versions.mermaid,
-    ),
-    typescript: await installedPackageVersion(
-      consumerDirectory,
-      'typescript',
-      profile.versions.typescript,
-    ),
-    vueTsc: await installedPackageVersion(
-      consumerDirectory,
-      'vue-tsc',
-      profile.versions.vueTsc,
-    ),
+    packageVersion: resolvedPackageVersion,
+    profileVersions: {
+      betterSqlite3: await installedPackageVersion(
+        consumerDirectory,
+        'better-sqlite3',
+        profile.versions.betterSqlite3,
+      ),
+      nuxt: await installedPackageVersion(consumerDirectory, 'nuxt', profile.versions.nuxt),
+      nuxtContent: await installedPackageVersion(
+        consumerDirectory,
+        '@nuxt/content',
+        profile.versions.nuxtContent,
+      ),
+      mermaid: await installedPackageVersion(
+        consumerDirectory,
+        'mermaid',
+        profile.versions.mermaid,
+      ),
+      typescript: await installedPackageVersion(
+        consumerDirectory,
+        'typescript',
+        profile.versions.typescript,
+      ),
+      vueTsc: await installedPackageVersion(
+        consumerDirectory,
+        'vue-tsc',
+        profile.versions.vueTsc,
+      ),
+    },
   }
 }
 

@@ -20,6 +20,19 @@ export interface PackageArtifact {
   packageVersion: string
 }
 
+export type ConsumerPackageSource
+  = | { kind: 'artifact', artifact: PackageArtifact }
+    | {
+      kind: 'registry'
+      packageName: string
+      packageVersion: string
+    }
+
+export interface ConsumerInstallResult {
+  packageVersion: string
+  profileVersions: VersionProfile['versions']
+}
+
 export interface VerificationWorkspace {
   root: string
   artifactDirectory: string
@@ -119,10 +132,10 @@ export interface ReleaseVerificationOperations {
     artifact: PackageArtifact
   }) => Promise<void>
   installConsumer: (input: {
-    artifact: PackageArtifact
+    packageSource: ConsumerPackageSource
     consumerDirectory: string
     profile: VersionProfile
-  }) => Promise<VersionProfile['versions']>
+  }) => Promise<ConsumerInstallResult>
   verifyPackageExports: (input: {
     artifact: PackageArtifact
     consumerDirectory: string
