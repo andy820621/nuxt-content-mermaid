@@ -7,13 +7,11 @@ const VERIFICATION_STAGES = [
   'build',
   'runtime',
 ]
-const PROFILE_VERIFICATION_STAGES = [
-  'install',
-  'exports',
-  'types',
-  'build',
-  'runtime',
-]
+const CONSUMER_VERIFICATION_PLANS = Object.freeze({
+  artifact: Object.freeze(['install', 'exports', 'types', 'build', 'runtime']),
+  registry: Object.freeze(['install', 'build', 'runtime']),
+})
+const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 
 class StageExecutionFailure extends Error {
   constructor(stage, cause) {
@@ -28,6 +26,16 @@ export class ReleaseVerificationFailure extends Error {
   constructor(stage, cause, evidence) {
     super(`Release verification failed during ${stage}: ${errorMessage(cause)}`)
     this.name = 'ReleaseVerificationFailure'
+    this.stage = stage
+    this.cause = cause
+    this.evidence = evidence
+  }
+}
+
+export class RegistrySmokeVerificationFailure extends Error {
+  constructor(stage, cause, evidence) {
+    super(`Registry smoke verification failed during ${stage}: ${errorMessage(cause)}`)
+    this.name = 'RegistrySmokeVerificationFailure'
     this.stage = stage
     this.cause = cause
     this.evidence = evidence
@@ -66,12 +74,41 @@ function createEvidence(request) {
   }
 }
 
+function createRegistrySmokeEvidence(request) {
+  return {
+    schemaVersion: 1,
+    success: false,
+    mode: 'registry-smoke',
+    package: {
+      name: request.packageName,
+      requestedVersion: request.packageVersion,
+      resolvedVersion: null,
+    },
+    profile: {
+      id: request.profile.id,
+      requested: { ...request.profile.versions },
+      resolved: null,
+    },
+    stages: [],
+  }
+}
+
 function validateRequest(request, supportedKinds = ['pack']) {
   if (!supportedKinds.includes(request.packageSource.kind)) {
     throw new Error(`Unsupported package source: ${request.packageSource.kind}`)
   }
   if (request.packageSource.kind === 'retained' && !request.packageSource.artifact) {
     throw new Error('Retained package source requires an artifact')
+  }
+}
+
+function validateRegistrySmokeRequest(request) {
+  const match = typeof request.packageVersion === 'string'
+    ? EXACT_SEMVER_PATTERN.exec(request.packageVersion)
+    : null
+  const prerelease = match?.[4]?.split('.') ?? []
+  if (!match || prerelease.some(identifier => /^\d+$/.test(identifier) && /^0\d+/.test(identifier))) {
+    throw new Error('Registry smoke requires an exact package version')
   }
 }
 
@@ -153,40 +190,56 @@ async function cleanupVerificationWorkspace(evidence, workspace, operations) {
   }
 }
 
-async function runConsumerContract({
+async function runConsumerVerificationPlan({
   artifact,
   evidence,
   operations,
+  packageEvidence,
+  packageSource,
+  plan,
   profile,
   profileEvidence,
   workspace: initialWorkspace,
 }) {
   let workspace = initialWorkspace
   let primaryFailure
+  const stageNames = CONSUMER_VERIFICATION_PLANS[plan]
 
   try {
-    profileEvidence.resolved = await runStage(evidence, 'install', async () => {
+    const installation = await runStage(evidence, 'install', async () => {
       workspace ??= await operations.createWorkspace()
-      const installation = await operations.installConsumer({
-        packageSource: { kind: 'artifact', artifact },
+      return operations.installConsumer({
+        packageSource,
         consumerDirectory: workspace.consumerDirectory,
         profile,
       })
-      return installation.profileVersions
     })
-    await runStage(evidence, 'exports', () => operations.verifyPackageExports({
-      artifact,
-      consumerDirectory: workspace.consumerDirectory,
-    }))
-    await runStage(evidence, 'types', () => operations.verifyTypes({
-      consumerDirectory: workspace.consumerDirectory,
-    }))
-    await runStage(evidence, 'build', () => operations.buildConsumer({
-      consumerDirectory: workspace.consumerDirectory,
-    }))
-    await runStage(evidence, 'runtime', () => operations.smokeRuntime({
-      consumerDirectory: workspace.consumerDirectory,
-    }))
+    profileEvidence.resolved = installation.profileVersions
+    if (packageEvidence) packageEvidence.resolvedVersion = installation.packageVersion
+
+    for (const stage of stageNames.slice(1)) {
+      if (stage === 'exports') {
+        await runStage(evidence, stage, () => operations.verifyPackageExports({
+          artifact,
+          consumerDirectory: workspace.consumerDirectory,
+        }))
+      }
+      else if (stage === 'types') {
+        await runStage(evidence, stage, () => operations.verifyTypes({
+          consumerDirectory: workspace.consumerDirectory,
+        }))
+      }
+      else if (stage === 'build') {
+        await runStage(evidence, stage, () => operations.buildConsumer({
+          consumerDirectory: workspace.consumerDirectory,
+        }))
+      }
+      else if (stage === 'runtime') {
+        await runStage(evidence, stage, () => operations.smokeRuntime({
+          consumerDirectory: workspace.consumerDirectory,
+        }))
+      }
+    }
   }
   catch (error) {
     primaryFailure = error instanceof StageExecutionFailure
@@ -195,7 +248,7 @@ async function runConsumerContract({
     markRemainingStagesSkipped(
       evidence,
       primaryFailure.stage,
-      PROFILE_VERIFICATION_STAGES,
+      stageNames,
     )
   }
 
@@ -205,10 +258,12 @@ async function runConsumerContract({
 
 async function runMatrixProfile(artifact, profile, operations) {
   const evidence = createMatrixProfileEvidence(profile)
-  const failure = await runConsumerContract({
+  const failure = await runConsumerVerificationPlan({
     artifact,
     evidence,
     operations,
+    packageSource: { kind: 'artifact', artifact },
+    plan: 'artifact',
     profile,
     profileEvidence: evidence,
   })
@@ -219,7 +274,7 @@ async function runMatrixProfile(artifact, profile, operations) {
 
 function createSkippedMatrixProfileEvidence(profile, failedStage) {
   const evidence = createMatrixProfileEvidence(profile)
-  for (const name of PROFILE_VERIFICATION_STAGES) {
+  for (const name of CONSUMER_VERIFICATION_PLANS.artifact) {
     evidence.stages.push({
       name,
       status: 'skipped',
@@ -365,10 +420,12 @@ export async function runPackageArtifactVerification(request, operations) {
 
   const consumerFailure = primaryFailure
     ? await cleanupVerificationWorkspace(evidence, workspace, operations)
-    : await runConsumerContract({
+    : await runConsumerVerificationPlan({
         artifact,
         evidence,
         operations,
+        packageSource: { kind: 'artifact', artifact },
+        plan: 'artifact',
         profile: request.profile,
         profileEvidence: evidence.profile,
         workspace,
@@ -377,6 +434,32 @@ export async function runPackageArtifactVerification(request, operations) {
   const failure = primaryFailure ?? consumerFailure
   if (failure) {
     throw new ReleaseVerificationFailure(failure.stage, failure.cause, evidence)
+  }
+
+  evidence.success = true
+  return evidence
+}
+
+export async function runRegistrySmokeVerification(request, operations) {
+  validateRegistrySmokeRequest(request)
+
+  const evidence = createRegistrySmokeEvidence(request)
+  const failure = await runConsumerVerificationPlan({
+    evidence,
+    operations,
+    packageEvidence: evidence.package,
+    packageSource: {
+      kind: 'registry',
+      packageName: request.packageName,
+      packageVersion: request.packageVersion,
+    },
+    plan: 'registry',
+    profile: request.profile,
+    profileEvidence: evidence.profile,
+  })
+
+  if (failure) {
+    throw new RegistrySmokeVerificationFailure(failure.stage, failure.cause, evidence)
   }
 
   evidence.success = true

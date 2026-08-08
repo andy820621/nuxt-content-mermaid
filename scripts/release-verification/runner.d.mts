@@ -78,6 +78,29 @@ export interface PackageArtifactEvidence {
   stages: VerificationStageEvidence[]
 }
 
+export interface RegistrySmokeVerificationRequest {
+  packageName: string
+  packageVersion: string
+  profile: VersionProfile
+}
+
+export interface RegistrySmokeVerificationEvidence {
+  schemaVersion: 1
+  success: boolean
+  mode: 'registry-smoke'
+  package: {
+    name: string
+    requestedVersion: string
+    resolvedVersion: string | null
+  }
+  profile: {
+    id: string
+    requested: VersionProfile['versions']
+    resolved: VersionProfile['versions'] | null
+  }
+  stages: VerificationStageEvidence[]
+}
+
 export interface PackageArtifactVerificationRequest {
   packageSource: {
     kind: 'pack'
@@ -157,6 +180,17 @@ export class ReleaseVerificationFailure extends Error {
   readonly evidence: PackageArtifactEvidence
 }
 
+export class RegistrySmokeVerificationFailure extends Error {
+  constructor(
+    stage: VerificationStageName,
+    cause: unknown,
+    evidence: RegistrySmokeVerificationEvidence,
+  )
+  readonly stage: VerificationStageName
+  readonly cause: unknown
+  readonly evidence: RegistrySmokeVerificationEvidence
+}
+
 export class CompatibilityMatrixVerificationFailure extends Error {
   constructor(
     failures: CompatibilityMatrixFailure[],
@@ -175,3 +209,8 @@ export function runPackageArtifactMatrixVerification(
   request: PackageArtifactMatrixVerificationRequest,
   operations: ReleaseVerificationOperations,
 ): Promise<PackageArtifactMatrixEvidence>
+
+export function runRegistrySmokeVerification(
+  request: RegistrySmokeVerificationRequest,
+  operations: ReleaseVerificationOperations,
+): Promise<RegistrySmokeVerificationEvidence>

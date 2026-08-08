@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   CompatibilityMatrixVerificationFailure,
   ReleaseVerificationFailure,
+  RegistrySmokeVerificationFailure,
   runPackageArtifactVerification,
   runPackageArtifactMatrixVerification,
+  runRegistrySmokeVerification,
 } from '../scripts/release-verification/runner.mjs'
 import type {
   PackageArtifactMatrixVerificationRequest,
@@ -304,6 +306,148 @@ describe('package artifact verification runner', () => {
       status: 'failed',
       error: 'cleanup failed',
     })
+  })
+})
+
+describe('registry smoke verification runner', () => {
+  it('runs the fixed registry plan in one clean consumer', async () => {
+    const { operations, workspace } = createOperations()
+
+    const evidence = await runRegistrySmokeVerification({
+      packageName: '@barzhsieh/nuxt-content-mermaid',
+      packageVersion: '3.0.0',
+      profile: knownLatestProfile,
+    }, operations)
+
+    expect(operations.createArtifact).not.toHaveBeenCalled()
+    expect(operations.inspectArchive).not.toHaveBeenCalled()
+    expect(operations.verifyPackageExports).not.toHaveBeenCalled()
+    expect(operations.verifyTypes).not.toHaveBeenCalled()
+    expect(operations.installConsumer).toHaveBeenCalledWith({
+      packageSource: {
+        kind: 'registry',
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+      },
+      consumerDirectory: workspace.consumerDirectory,
+      profile: knownLatestProfile,
+    })
+    expect(evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['install', 'passed'],
+      ['build', 'passed'],
+      ['runtime', 'passed'],
+      ['cleanup', 'passed'],
+    ])
+  })
+
+  it.each([
+    'latest',
+    '^3.0.0',
+    'workspace:*',
+    'file:../package.tgz',
+    '/tmp/package.tgz',
+  ])('rejects the non-exact version %s before creating a workspace', async (packageVersion) => {
+    const { operations } = createOperations()
+
+    await expect(runRegistrySmokeVerification({
+      packageName: '@barzhsieh/nuxt-content-mermaid',
+      packageVersion,
+      profile: knownLatestProfile,
+    }, operations)).rejects.toThrow('Registry smoke requires an exact package version')
+
+    expect(operations.createWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('skips only build and runtime when installation fails', async () => {
+    const { operations } = createOperations()
+    operations.installConsumer.mockRejectedValueOnce(new Error('install failed'))
+
+    const failure: RegistrySmokeVerificationFailure
+      = await runRegistrySmokeVerification({
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+        profile: knownLatestProfile,
+      }, operations).then(
+        () => { throw new Error('expected verification to fail') },
+        (error: unknown) => error as RegistrySmokeVerificationFailure,
+      )
+
+    expect(failure).toBeInstanceOf(RegistrySmokeVerificationFailure)
+    expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['install', 'failed'],
+      ['build', 'skipped'],
+      ['runtime', 'skipped'],
+      ['cleanup', 'passed'],
+    ])
+  })
+
+  it('skips only runtime when the build fails', async () => {
+    const { operations } = createOperations()
+    operations.buildConsumer.mockRejectedValueOnce(new Error('build failed'))
+
+    const failure: RegistrySmokeVerificationFailure
+      = await runRegistrySmokeVerification({
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+        profile: knownLatestProfile,
+      }, operations).then(
+        () => { throw new Error('expected verification to fail') },
+        (error: unknown) => error as RegistrySmokeVerificationFailure,
+      )
+
+    expect(failure).toMatchObject({ stage: 'build' })
+    expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['install', 'passed'],
+      ['build', 'failed'],
+      ['runtime', 'skipped'],
+      ['cleanup', 'passed'],
+    ])
+  })
+
+  it('reports the runtime stage when the smoke test fails', async () => {
+    const { operations } = createOperations()
+    operations.smokeRuntime.mockRejectedValueOnce(new Error('runtime failed'))
+
+    const failure: RegistrySmokeVerificationFailure
+      = await runRegistrySmokeVerification({
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+        profile: knownLatestProfile,
+      }, operations).then(
+        () => { throw new Error('expected verification to fail') },
+        (error: unknown) => error as RegistrySmokeVerificationFailure,
+      )
+
+    expect(failure).toMatchObject({ stage: 'runtime' })
+    expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['install', 'passed'],
+      ['build', 'passed'],
+      ['runtime', 'failed'],
+      ['cleanup', 'passed'],
+    ])
+  })
+
+  it('treats cleanup failure as a required registry-stage failure', async () => {
+    const { operations } = createOperations()
+    operations.cleanupWorkspace.mockRejectedValueOnce(new Error('cleanup failed'))
+
+    const failure: RegistrySmokeVerificationFailure
+      = await runRegistrySmokeVerification({
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+        profile: knownLatestProfile,
+      }, operations).then(
+        () => { throw new Error('expected verification to fail') },
+        (error: unknown) => error as RegistrySmokeVerificationFailure,
+      )
+
+    expect(failure).toMatchObject({ stage: 'cleanup' })
+    expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['install', 'passed'],
+      ['build', 'passed'],
+      ['runtime', 'passed'],
+      ['cleanup', 'failed'],
+    ])
   })
 })
 
