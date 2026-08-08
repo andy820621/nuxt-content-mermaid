@@ -16,6 +16,9 @@ import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
 import { runBrowserSmoke } from './browser-smoke.mjs'
+import {
+  createReleaseVerificationFailure,
+} from './failure-classification.mjs'
 
 const PACKAGE_NAME = '@barzhsieh/nuxt-content-mermaid'
 const COMMAND_OUTPUT_LIMIT = 8_000
@@ -54,7 +57,8 @@ export async function runCommand({ command, args, cwd, env }) {
       ...(stdout ? [`stdout:\n${stdout}`] : []),
       ...(stderr ? [`stderr:\n${stderr}`] : []),
     ]
-    throw new Error(diagnostics.join('\n'), { cause: error })
+    const diagnostic = diagnostics.join('\n')
+    throw createReleaseVerificationFailure(diagnostic, { cause: error, diagnostic })
   }
 }
 

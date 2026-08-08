@@ -781,6 +781,57 @@ describe('release publication reconciliation', () => {
 })
 
 describe('production release effects', () => {
+  it('resolves a Nuxt 3 actual-latest profile for compatibility drift', async () => {
+    const commandRunner = vi.fn(async ({ command, args }: {
+      command: string
+      args: string[]
+    }) => {
+      expect(command).toBe('npm')
+      if (args[1] === 'nuxt@>=3.20.1 <4.0.0') {
+        return { stdout: JSON.stringify(['3.21.0', '3.22.1']) }
+      }
+      if (args[1] === '@nuxt/content@>=3.5.0 <4.0.0') {
+        return { stdout: JSON.stringify(['3.15.2', '3.16.0']) }
+      }
+      throw new Error(`Unexpected registry query: ${args[1]}`)
+    })
+    const createReleaseEffects = (releaseModule as unknown as {
+      createReleaseEffects: (options: unknown) => {
+        resolveCompatibilityProfile: (input: unknown) => Promise<unknown>
+      }
+    }).createReleaseEffects
+    const effects = createReleaseEffects({ commandRunner, repositoryRoot: '/repo' })
+
+    await expect(effects.resolveCompatibilityProfile({
+      nuxtMajor: 3,
+      profileId: 'nuxt-3-actual-latest-drift',
+    })).resolves.toEqual({
+      requested: {
+        nuxt: '>=3.20.1 <4.0.0',
+        nuxtContent: '>=3.5.0 <4.0.0',
+      },
+      resolved: {
+        betterSqlite3: '12.11.1',
+        mermaid: '11.12.3',
+        nuxt: '3.22.1',
+        nuxtContent: '3.16.0',
+        typescript: '5.9.3',
+        vueTsc: '3.2.5',
+      },
+      profile: {
+        id: 'nuxt-3-actual-latest-drift',
+        versions: {
+          betterSqlite3: '12.11.1',
+          mermaid: '11.12.3',
+          nuxt: '3.22.1',
+          nuxtContent: '3.16.0',
+          typescript: '5.9.3',
+          vueTsc: '3.2.5',
+        },
+      },
+    })
+  })
+
   it('prepares one local release commit and retains the single packed artifact', async () => {
     const commands: string[] = []
     const commandRunner = vi.fn(async ({ command, args, cwd }: {

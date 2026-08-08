@@ -134,12 +134,21 @@ export interface ReleaseVerificationOperations {
 }
 
 export class ReleaseVerificationFailure extends Error {
+  constructor(
+    stage: VerificationStageName,
+    cause: unknown,
+    evidence: PackageArtifactEvidence,
+  )
   readonly stage: VerificationStageName
   readonly cause: unknown
   readonly evidence: PackageArtifactEvidence
 }
 
 export class CompatibilityMatrixVerificationFailure extends Error {
+  constructor(
+    failures: CompatibilityMatrixFailure[],
+    evidence: PackageArtifactMatrixEvidence,
+  )
   readonly failures: CompatibilityMatrixFailure[]
   readonly evidence: PackageArtifactMatrixEvidence
 }

@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
+import {
+  createReleaseVerificationFailure,
+} from './failure-classification.mjs'
 
 const HOST = '127.0.0.1'
 const STARTUP_TIMEOUT_MS = 60_000
@@ -160,7 +163,7 @@ export async function runBrowserSmoke({ consumerDirectory }) {
   catch (error) {
     const logs = processState.logs ? `\nProduction server log tail:\n${processState.logs}` : ''
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`${message}${logs}`)
+    throw createReleaseVerificationFailure(`${message}${logs}`, { cause: error })
   }
   finally {
     await browser?.close()

@@ -81,6 +81,11 @@ export interface CompatibilityResolution {
   profile: VersionProfile
 }
 
+export interface CompatibilityResolutionOptions {
+  nuxtMajor?: 3 | 4
+  profileId?: string
+}
+
 export interface ReleaseEffects {
   now: () => string
   runCommand: (invocation: CommandInvocation) => Promise<CommandResult>
@@ -115,7 +120,9 @@ export interface ReleaseEffects {
     sourceCommit: string
     artifact: PackageArtifact
   }>
-  resolveCompatibilityProfile: () => Promise<CompatibilityResolution>
+  resolveCompatibilityProfile: (
+    options?: CompatibilityResolutionOptions,
+  ) => Promise<CompatibilityResolution>
   verifyArtifact: (input: {
     artifact: PackageArtifact
     profile: VersionProfile

@@ -6,7 +6,11 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createReleaseVerificationOperations } from '../scripts/release-verification/operations.mjs'
+import { createReleaseVerificationOperations, runCommand } from '../scripts/release-verification/operations.mjs'
+import {
+  classifyInfrastructureCause,
+  ReleaseVerificationInfrastructureError,
+} from '../scripts/release-verification/failure-classification.mjs'
 import type { PackageArtifact } from '../scripts/release-verification/runner.mjs'
 
 const temporaryDirectories: string[] = []
@@ -408,6 +412,34 @@ describe('package artifact creation', () => {
 })
 
 describe('command execution diagnostics', () => {
+  it('classifies runner, network, and missing-browser failures before they reach drift policy', () => {
+    const missingCommand = Object.assign(new Error('spawn vue-tsc ENOENT'), {
+      code: 'ENOENT',
+    })
+    const failedFetch = new Error('fetch failed', {
+      cause: Object.assign(new Error('network unreachable'), { code: 'ENETUNREACH' }),
+    })
+    const npmDownloadFailure = Object.assign(new Error('npm install failed'), {
+      code: 1,
+      stderr: 'npm error code ENETUNREACH\nnpm error network unreachable',
+    })
+    const missingBrowser = new Error('browserType.launch: Executable doesn\'t exist')
+
+    expect(classifyInfrastructureCause(missingCommand)).toBe(true)
+    expect(classifyInfrastructureCause(failedFetch)).toBe(true)
+    expect(classifyInfrastructureCause(npmDownloadFailure, npmDownloadFailure.stderr)).toBe(true)
+    expect(classifyInfrastructureCause(missingBrowser)).toBe(true)
+    expect(classifyInfrastructureCause(new Error('Type contract failed'))).toBe(false)
+  })
+
+  it('marks an unavailable executable as an infrastructure error', async () => {
+    await expect(runCommand({
+      command: join(process.cwd(), 'missing-release-verification-runner'),
+      args: [],
+      cwd: process.cwd(),
+    })).rejects.toBeInstanceOf(ReleaseVerificationInfrastructureError)
+  })
+
   it('includes stdout and stderr when a required command fails', async () => {
     const operationsModule = await import('../scripts/release-verification/operations.mjs') as typeof import('../scripts/release-verification/operations.mjs') & {
       runCommand: (input: {

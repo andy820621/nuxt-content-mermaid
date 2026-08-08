@@ -73,3 +73,32 @@ tarball integrity. It then queries the exact npm version:
 Do not use reconciliation for failures that occurred before push. If the
 registry result is still unknown, leave the evidence and tarball in place and
 retry reconciliation later.
+
+## Scheduled Compatibility Drift Check
+
+The weekly `compatibility-drift` workflow checks the current `main` archive in
+the same Clean Package User Consumer. It resolves actual latest versions within
+the supported Nuxt 3, Nuxt 4, and Nuxt Content ranges, then runs the existing
+artifact consumer matrix. Run the same check locally when investigating:
+
+```bash
+pnpm test:compatibility-drift
+```
+
+Registry resolution, dependency download, network, and runner failures are
+reported as infrastructure failures. They are not evidence that the declared
+Compatibility Contract has broken. A Package User failure is retried in a new
+clean consumer using the exact resolved Version Profile. Only an identical
+Package User stage that fails again is reported as confirmed drift. The JSON
+evidence includes the resolved versions, artifact identities, failure stage,
+and a `--retry-profile` command for an independent minimum reproduction. Check
+out the command's recorded source commit in a clean worktree before running it;
+the retry rejects a different or dirty checkout rather than packing an
+unrelated artifact.
+
+A confirmed drift blocks ordinary releases until the incompatibility is fixed
+or the peer range is honestly narrowed. A documented security emergency may
+override that policy decision, but it still must pass every required source and
+artifact verification in this guide. The scheduled check never updates the
+Known-Latest pins automatically; pin changes require an explicit reviewed
+change.
