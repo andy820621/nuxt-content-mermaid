@@ -71,6 +71,35 @@ export interface PackageArtifactVerificationRequest {
   profile: VersionProfile
 }
 
+export interface PackageArtifactMatrixVerificationRequest {
+  packageSource: PackageArtifactVerificationRequest['packageSource']
+  profiles: readonly VersionProfile[]
+}
+
+export interface CompatibilityMatrixProfileEvidence {
+  id: string
+  success: boolean
+  requested: VersionProfile['versions']
+  resolved: null | VersionProfile['versions']
+  stages: VerificationStageEvidence[]
+}
+
+export interface PackageArtifactMatrixEvidence {
+  schemaVersion: 1
+  success: boolean
+  mode: 'package-artifact-matrix'
+  package: PackageArtifactEvidence['package']
+  artifact: PackageArtifactEvidence['artifact']
+  profiles: CompatibilityMatrixProfileEvidence[]
+  stages: VerificationStageEvidence[]
+}
+
+export interface CompatibilityMatrixFailure {
+  profileId: string | null
+  stage: VerificationStageName
+  cause: unknown
+}
+
 export interface ReleaseVerificationOperations {
   createWorkspace: () => Promise<VerificationWorkspace>
   createArtifact: (input: {
@@ -102,7 +131,17 @@ export class ReleaseVerificationFailure extends Error {
   readonly evidence: PackageArtifactEvidence
 }
 
+export class CompatibilityMatrixVerificationFailure extends Error {
+  readonly failures: CompatibilityMatrixFailure[]
+  readonly evidence: PackageArtifactMatrixEvidence
+}
+
 export function runPackageArtifactVerification(
   request: PackageArtifactVerificationRequest,
   operations: ReleaseVerificationOperations,
 ): Promise<PackageArtifactEvidence>
+
+export function runPackageArtifactMatrixVerification(
+  request: PackageArtifactMatrixVerificationRequest,
+  operations: ReleaseVerificationOperations,
+): Promise<PackageArtifactMatrixEvidence>

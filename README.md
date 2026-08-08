@@ -582,6 +582,19 @@ export default defineNuxtConfig({
 })
 ```
 
+## Compatibility
+
+The public peer contract supports Nuxt `^3.20.1 || ^4.1.0` and Nuxt Content `>=3.5.0 <4.0.0`. Pull requests verify a pinned Representative Compatibility Matrix covering both minimum lines, deliberately pinned known-latest lines, and the two high-risk cross-boundary combinations.
+
+The matrix is evidence for the complete peer range, not a list of the only supported versions. If an allowed profile fails, the resolution is to fix compatibility, honestly narrow the shared peer range, or maintain a separate release line—not to remove that profile or weaken its Package User assertions.
+
+Run one profile or the same full pinned matrix used by CI:
+
+```bash
+pnpm test:package-artifact
+pnpm test:compatibility-matrix
+```
+
 ## Support
 
 If this module is useful to you, you can [support my open-source work on Ko-fi](https://ko-fi.com/barzhsieh). Your support helps fund maintenance, compatibility updates, testing, and documentation.
@@ -601,6 +614,7 @@ pnpm install        # Install dependencies
 pnpm dev:prepare    # Build module stubs & prepare playground
 pnpm dev            # Start playground
 pnpm test           # Run tests
+pnpm test:compatibility-matrix # Verify all pinned package-user profiles
 pnpm lint           # Run ESLint
 pnpm test:types     # Type checking
 ```

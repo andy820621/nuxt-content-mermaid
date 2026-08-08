@@ -59,6 +59,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:package-artifact": "node scripts/release-verification/package-artifact.mjs --package-source pack --profile nuxt-4-known-latest",
+    "test:compatibility-matrix": "node scripts/release-verification/package-artifact.mjs --package-source pack --matrix pinned",
     "test:package-contract": "pnpm prepack && vue-tsc -p test/release-verification/consumer-template/type-contracts/tsconfig.json --noEmit",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit"
@@ -71,7 +72,7 @@
     "yaml": "catalog:dev"
   },
   "peerDependencies": {
-    "@nuxt/content": ">=3.5.0",
+    "@nuxt/content": ">=3.5.0 <4.0.0",
     "nuxt": "^3.20.1 || ^4.1.0"
   },
   "devDependencies": {

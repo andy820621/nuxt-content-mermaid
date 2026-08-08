@@ -51,11 +51,29 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Verify publishable package artifact
-        run: npm run test:package-artifact
-
       - name: Test
         run: npm run test
+
+  representative-compatibility-matrix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - run: npm i -g --force corepack@latest && corepack enable
+
+      - name: Install dependencies
+        run: npx nypm@latest i
+
+      - name: Install Playwright browsers
+        run: npx playwright install
+
+      - name: Verify the pinned Representative Compatibility Matrix
+        run: npm run test:compatibility-matrix
 
   module-compatibility:
     runs-on: ubuntu-latest
