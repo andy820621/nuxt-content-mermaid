@@ -36,9 +36,10 @@ registry-specific evidence, and retry classification.
 
 The first registry smoke resolves the actual-latest Version Profile once and
 records both the requested ranges and exact resolved versions in release
-evidence. A retry receives that recorded profile as input and must not resolve
-new latest versions. This makes a retry an independent clean reproduction of
-the same package and dependency selection rather than a different test.
+evidence. The retry orchestrator loads that recorded profile from evidence and
+must not resolve new latest versions. This makes a retry an independent clean
+reproduction of the same package and dependency selection rather than a
+different test.
 
 Evidence records publication and registry health separately without changing
 the existing publication evidence contract:
