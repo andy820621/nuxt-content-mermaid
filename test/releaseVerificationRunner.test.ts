@@ -332,6 +332,25 @@ describe('registry smoke verification runner', () => {
       consumerDirectory: workspace.consumerDirectory,
       profile: knownLatestProfile,
     })
+    expect(evidence).toMatchObject({
+      package: {
+        name: '@barzhsieh/nuxt-content-mermaid',
+        requestedVersion: '3.0.0',
+        resolvedVersion: '2.2.3',
+      },
+      profile: {
+        id: 'nuxt-4-known-latest',
+        requested: knownLatestProfile.versions,
+        resolved: {
+          betterSqlite3: '12.11.1',
+          nuxt: '4.5.2',
+          nuxtContent: '3.15.2',
+          mermaid: '11.12.3',
+          typescript: '5.9.3',
+          vueTsc: '3.2.5',
+        },
+      },
+    })
     expect(evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
       ['install', 'passed'],
       ['build', 'passed'],
@@ -346,6 +365,8 @@ describe('registry smoke verification runner', () => {
     'workspace:*',
     'file:../package.tgz',
     '/tmp/package.tgz',
+    'https://registry.npmjs.org/@barzhsieh/nuxt-content-mermaid/-/nuxt-content-mermaid-3.0.0.tgz',
+    'git+https://github.com/barzhsieh/nuxt-content-mermaid.git',
   ])('rejects the non-exact version %s before creating a workspace', async (packageVersion) => {
     const { operations } = createOperations()
 
