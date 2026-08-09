@@ -7,46 +7,19 @@ const dependabotConfigPath = fileURLToPath(
   new URL('../.github/dependabot.yml', import.meta.url),
 )
 
-describe('proportional dependency update configuration', () => {
-  it('creates limited weekly candidates without expanding the public contract', async () => {
+describe('Dependabot security update configuration', () => {
+  it('keeps security PRs enabled while disabling unreliable version PRs', async () => {
     const config = parse(await readFile(dependabotConfigPath, 'utf8'))
 
-    expect(config).toMatchObject({
+    expect(config).toEqual({
       version: 2,
       updates: [{
         'package-ecosystem': 'npm',
         'directory': '/',
         'schedule': { interval: 'weekly' },
-        'open-pull-requests-limit': 3,
-        'versioning-strategy': 'increase-if-necessary',
+        'open-pull-requests-limit': 0,
         'assignees': ['andy820621'],
-        'allow': [
-          { 'dependency-name': 'nuxt' },
-          { 'dependency-name': '@nuxt/kit' },
-          { 'dependency-name': '@nuxt/schema' },
-          { 'dependency-name': '@nuxt/content' },
-          { 'dependency-name': 'mermaid' },
-        ],
-        'groups': {
-          'nuxt-toolchain': {
-            patterns: ['nuxt', '@nuxt/kit', '@nuxt/schema'],
-          },
-          'nuxt-content': {
-            patterns: ['@nuxt/content'],
-          },
-          'mermaid': {
-            patterns: ['mermaid'],
-          },
-        },
       }],
     })
-
-    expect(config.updates[0].ignore).toEqual(expect.arrayContaining([
-      { 'dependency-name': 'nuxt', 'update-types': ['version-update:semver-major'] },
-      { 'dependency-name': '@nuxt/content', 'update-types': ['version-update:semver-major'] },
-      { 'dependency-name': '@nuxt/kit', 'update-types': ['version-update:semver-major'] },
-      { 'dependency-name': '@nuxt/schema', 'update-types': ['version-update:semver-major'] },
-      { 'dependency-name': 'mermaid', 'update-types': ['version-update:semver-major'] },
-    ]))
   })
 })
