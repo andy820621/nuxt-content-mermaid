@@ -4,6 +4,7 @@ import {
   classifyRegistrySmokeFailure,
 } from '../scripts/release-verification/failure-classification.mjs'
 import { RegistrySmokeVerificationFailure } from '../scripts/release-verification/runner.mjs'
+import type { RegistrySmokeVerificationEvidence } from '../scripts/release-verification/runner.mjs'
 import type { LeanReleaseEvidence } from '../scripts/release-verification/release.mjs'
 import {
   createPendingRegistryHealth,
@@ -57,6 +58,35 @@ describe('registry smoke failure classification', () => {
     expect(classifyRegistrySmokeFailure(error)).toBe(expected)
   })
 
+  function createNpmTargetFailure(packageSpec: string) {
+    const stderr = [
+      'npm ERR! code ETARGET',
+      `npm ERR! notarget No matching version found for ${packageSpec}.`,
+      'npm ERR! notarget In most cases you or one of your dependencies are requesting',
+      'npm ERR! notarget a package version that does not exist.',
+    ].join('\n')
+    const executionFailure = Object.assign(
+      new Error(`Command failed: npm install --no-audit --no-fund --package-lock=true\n${stderr}`),
+      { code: 1, stdout: '', stderr },
+    )
+    return new ReleaseVerificationPackageUserError(
+      `npm install failed\nstderr:\n${stderr}`,
+      { cause: executionFailure },
+    )
+  }
+
+  it('classifies a wrapped npm ETARGET for the root exact version as registry', () => {
+    const error = createNpmTargetFailure('@barzhsieh/nuxt-content-mermaid@3.0.0')
+
+    expect(classifyRegistrySmokeFailure(error)).toBe('registry')
+  })
+
+  it('keeps a wrapped dependency ETARGET classified as a package defect', () => {
+    const error = createNpmTargetFailure('@nuxt/content@99.0.0')
+
+    expect(classifyRegistrySmokeFailure(error)).toBe('package-defect')
+  })
+
   it('treats an unknown cycle as a runner failure', () => {
     const error = new Error('unknown external failure')
     Object.assign(error, { cause: error })
@@ -89,7 +119,7 @@ function createRegistryHealth() {
   })
 }
 
-function createVerificationEvidence(success: boolean) {
+function createVerificationEvidence(success: boolean): RegistrySmokeVerificationEvidence {
   return {
     schemaVersion: 1 as const,
     success,
@@ -107,6 +137,39 @@ function createVerificationEvidence(success: boolean) {
     stages: [],
   }
 }
+
+const invalidSuccessfulVerificationCases: Array<[
+  string,
+  (verification: RegistrySmokeVerificationEvidence) => void,
+]> = [
+  ['success: false', (verification) => {
+    verification.success = false
+  }],
+  ['the wrong mode', (verification) => {
+    Object.assign(verification, { mode: 'package-artifact' })
+  }],
+  ['the wrong package name', (verification) => {
+    verification.package.name = '@example/wrong-package'
+  }],
+  ['the wrong requested package version', (verification) => {
+    verification.package.requestedVersion = '3.0.1'
+  }],
+  ['the wrong resolved package version', (verification) => {
+    verification.package.resolvedVersion = '3.0.1'
+  }],
+  ['the wrong requested profile', (verification) => {
+    verification.profile.requested = {
+      ...verification.profile.requested,
+      nuxt: '4.5.2',
+    }
+  }],
+  ['the wrong resolved profile', (verification) => {
+    verification.profile.resolved = {
+      ...actualLatestProfile.versions,
+      nuxt: '4.5.2',
+    }
+  }],
+]
 
 async function createPublishedInvestigationEvidence() {
   const registryHealth = await runInitialRegistrySmoke({
@@ -232,6 +295,20 @@ describe('initial registry smoke health', () => {
     expect(verifyRegistryPackage).toHaveBeenCalledOnce()
   })
 
+  it.each(invalidSuccessfulVerificationCases)(
+    'rejects a resolved verifier value with %s as a contract error',
+    async (_, mutateVerification) => {
+      const verification = structuredClone(createVerificationEvidence(true))
+      mutateVerification(verification)
+
+      await expect(runInitialRegistrySmoke({
+        registryHealth: createRegistryHealth(),
+        verifyRegistryPackage: async () => verification,
+        now: () => '2026-08-09T01:00:00.000Z',
+      })).rejects.toBeInstanceOf(TypeError)
+    },
+  )
+
   it.each([
     [Object.assign(new Error('network unreachable'), { code: 'ENETUNREACH' }), 'network'],
     [new ReleaseVerificationPackageUserError('SVG is empty'), 'package-defect'],
@@ -275,6 +352,83 @@ describe('initial registry smoke health', () => {
 })
 
 describe('registry smoke retry', () => {
+  it('retries an install failure before resolved package and profile identity exist', async () => {
+    const installFailureVerification = {
+      ...createVerificationEvidence(false),
+      package: {
+        name: '@barzhsieh/nuxt-content-mermaid',
+        requestedVersion: '3.0.0',
+        resolvedVersion: null,
+      },
+      profile: {
+        id: actualLatestProfile.id,
+        requested: actualLatestProfile.versions,
+        resolved: null,
+      },
+      stages: [
+        { name: 'install' as const, status: 'failed' as const, durationMs: 1, error: 'registry unavailable' },
+        { name: 'build' as const, status: 'skipped' as const, reason: 'required stage install failed' },
+        { name: 'runtime' as const, status: 'skipped' as const, reason: 'required stage install failed' },
+        { name: 'cleanup' as const, status: 'passed' as const, durationMs: 1 },
+      ],
+    }
+    const registryHealth = await runInitialRegistrySmoke({
+      registryHealth: createRegistryHealth(),
+      verifyRegistryPackage: async () => {
+        throw new RegistrySmokeVerificationFailure(
+          'install',
+          Object.assign(new Error('npm registry unavailable'), { code: 'E503' }),
+          installFailureVerification,
+        )
+      },
+      now: () => '2026-08-09T01:00:00.000Z',
+    })
+    const releaseEvidence = {
+      schemaVersion: 1 as const,
+      status: 'published' as const,
+      identity: { targetVersion: '3.0.0' },
+      artifact: { packageVersion: '3.0.0' },
+      registryHealth,
+    }
+    const readEvidence = vi.fn(async () => structuredClone(releaseEvidence))
+    const writeEvidence = vi.fn(async () => undefined)
+    const successfulVerification = createVerificationEvidence(true)
+    const verifyRegistryPackage = vi.fn(async () => successfulVerification)
+
+    const result = await runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })
+
+    expect(verifyRegistryPackage).toHaveBeenCalledWith({
+      packageName: '@barzhsieh/nuxt-content-mermaid',
+      packageVersion: '3.0.0',
+      profile: actualLatestProfile,
+    })
+    expect(result.registryHealth).toMatchObject({
+      status: 'healthy',
+      attempts: [
+        {
+          number: 1,
+          stage: 'install',
+          classification: 'registry',
+          verification: {
+            package: { resolvedVersion: null },
+            profile: { resolved: null },
+          },
+        },
+        { number: 2, success: true, verification: successfulVerification },
+      ],
+      retryCommand: null,
+    })
+    expect(writeEvidence).toHaveBeenCalledOnce()
+    expect(writeEvidence).toHaveBeenCalledWith(result)
+  })
+
   it('loads the frozen profile from the first investigation attempt', async () => {
     const releaseEvidence = await createPublishedInvestigationEvidence()
     const readEvidence = vi.fn(async () => structuredClone(releaseEvidence))
@@ -312,6 +466,28 @@ describe('registry smoke retry', () => {
     }))
   })
 
+  it.each(invalidSuccessfulVerificationCases)(
+    'does not write a settled retry for a resolved verifier value with %s',
+    async (_, mutateVerification) => {
+      const releaseEvidence = await createPublishedInvestigationEvidence()
+      const readEvidence = vi.fn(async () => structuredClone(releaseEvidence))
+      const writeEvidence = vi.fn(async () => undefined)
+      const verification = structuredClone(createVerificationEvidence(true))
+      mutateVerification(verification)
+
+      await expect(runRegistrySmokeRetry({
+        repositoryRoot: '/repo',
+        targetVersion: '3.0.0',
+        readEvidence,
+        writeEvidence,
+        verifyRegistryPackage: async () => verification,
+        now: () => '2026-08-09T02:00:00.000Z',
+      })).rejects.toBeInstanceOf(TypeError)
+
+      expect(writeEvidence).not.toHaveBeenCalled()
+    },
+  )
+
   it.each([
     ['release identity target version', (evidence: PublishedInvestigationEvidence) => {
       evidence.identity.targetVersion = '3.0.1'
@@ -321,6 +497,22 @@ describe('registry smoke retry', () => {
     }],
     ['registry health package version', (evidence: PublishedInvestigationEvidence) => {
       evidence.registryHealth.package.version = '3.0.1'
+    }],
+    ['first verification package name', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.attempts[0]!.verification.package.name = '@example/wrong-package'
+    }],
+    ['first verification requested package version', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.attempts[0]!.verification.package.requestedVersion = '3.0.1'
+    }],
+    ['first verification profile id', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.attempts[0]!.verification.profile.id = 'wrong-profile'
+    }],
+    ['first verification requested profile', (evidence: PublishedInvestigationEvidence) => {
+      const verification = evidence.registryHealth.attempts[0]!.verification
+      verification.profile.requested = {
+        ...verification.profile.requested,
+        nuxt: '4.5.2',
+      }
     }],
     ['frozen profile', (evidence: PublishedInvestigationEvidence) => {
       evidence.registryHealth.profile.resolved.nuxt = '4.5.2'

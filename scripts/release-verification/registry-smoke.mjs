@@ -85,6 +85,56 @@ function hasRegistrySmokeVerificationEvidence(error) {
     && error.evidence.mode === 'registry-smoke'
 }
 
+function invalidSuccessfulVerification(message) {
+  throw new TypeError(`Registry smoke verifier returned invalid successful evidence: ${message}`)
+}
+
+function parseReportedProfile(profile, versions, label) {
+  try {
+    return parseVersionProfile({
+      id: profile?.id,
+      versions,
+    })
+  }
+  catch {
+    invalidSuccessfulVerification(`${label} profile is malformed`)
+  }
+}
+
+function validateSuccessfulRegistryVerification(verification, request) {
+  if (!verification || typeof verification !== 'object') {
+    invalidSuccessfulVerification('expected an object')
+  }
+  if (verification.mode !== 'registry-smoke') {
+    invalidSuccessfulVerification('mode must be registry-smoke')
+  }
+  if (verification.success !== true) {
+    invalidSuccessfulVerification('success must be true')
+  }
+  if (verification.package?.name !== request.packageName
+    || verification.package?.requestedVersion !== request.packageVersion
+    || verification.package?.resolvedVersion !== request.packageVersion) {
+    invalidSuccessfulVerification('package identity must match the request')
+  }
+
+  const requestedProfile = parseReportedProfile(
+    verification.profile,
+    verification.profile?.requested,
+    'requested',
+  )
+  const resolvedProfile = parseReportedProfile(
+    verification.profile,
+    verification.profile?.resolved,
+    'resolved',
+  )
+  if (!isDeepStrictEqual(request.profile, requestedProfile)
+    || !isDeepStrictEqual(request.profile, resolvedProfile)) {
+    invalidSuccessfulVerification('requested and resolved profiles must match the request')
+  }
+
+  return verification
+}
+
 function invalidRetryEvidence(message) {
   throw new TypeError(`Registry smoke retry evidence ${message}`)
 }
@@ -145,23 +195,41 @@ function loadRetryRequest(evidence, targetVersion) {
     id: registryHealth.profile?.id,
     versions: registryHealth.profile?.resolved,
   })
-  const firstAttemptProfile = parseVersionProfile({
-    id: firstAttempt.verification?.profile?.id,
-    versions: firstAttempt.verification?.profile?.resolved,
-  })
-  if (!isDeepStrictEqual(resolvedProfile, firstAttemptProfile)) {
-    invalidRetryEvidence('frozen profile must match the first attempt')
-  }
+  const packageName = requireNonEmptyString(registryHealth.package.name, 'package name')
+  const packageVersion = parseExactPackageVersion(registryHealth.package.version)
   if (firstAttempt.verification?.mode !== 'registry-smoke'
-    || firstAttempt.verification?.package?.requestedVersion !== targetVersion
-    || firstAttempt.verification?.package?.resolvedVersion !== targetVersion) {
-    invalidRetryEvidence('first attempt must resolve the exact package version')
+    || firstAttempt.verification?.package?.name !== packageName
+    || firstAttempt.verification?.package?.requestedVersion !== targetVersion) {
+    invalidRetryEvidence('first attempt must request the exact package identity')
+  }
+  const firstAttemptRequestedProfile = parseVersionProfile({
+    id: firstAttempt.verification.profile?.id,
+    versions: firstAttempt.verification.profile?.requested,
+  })
+  if (!isDeepStrictEqual(resolvedProfile, firstAttemptRequestedProfile)) {
+    invalidRetryEvidence('frozen profile must match the first attempt request')
+  }
+
+  const installFailedBeforeResolution = firstAttempt.stage === 'install'
+    && firstAttempt.verification.package.resolvedVersion === null
+    && firstAttempt.verification.profile?.resolved === null
+  if (!installFailedBeforeResolution) {
+    if (firstAttempt.verification.package.resolvedVersion !== targetVersion) {
+      invalidRetryEvidence('first attempt must resolve the exact package version')
+    }
+    const firstAttemptProfile = parseVersionProfile({
+      id: firstAttempt.verification.profile?.id,
+      versions: firstAttempt.verification.profile?.resolved,
+    })
+    if (!isDeepStrictEqual(resolvedProfile, firstAttemptProfile)) {
+      invalidRetryEvidence('frozen profile must match the first attempt')
+    }
   }
 
   return Object.freeze({
-    packageName: requireNonEmptyString(registryHealth.package.name, 'package name'),
-    packageVersion: parseExactPackageVersion(registryHealth.package.version),
-    profile: firstAttemptProfile,
+    packageName,
+    packageVersion,
+    profile: resolvedProfile,
     registryHealth,
   })
 }
@@ -223,7 +291,10 @@ export async function runInitialRegistrySmoke({ registryHealth, verifyRegistryPa
   })
 
   try {
-    const verification = await verifyRegistryPackage(request)
+    const verification = validateSuccessfulRegistryVerification(
+      await verifyRegistryPackage(request),
+      request,
+    )
     return completeRegistryHealth(registryHealth, {
       number: 1,
       completedAt: now(),
@@ -278,7 +349,10 @@ export async function runRegistrySmokeRetry({
   })
 
   try {
-    const verification = await verifyRegistryPackage(request)
+    const verification = validateSuccessfulRegistryVerification(
+      await verifyRegistryPackage(request),
+      request,
+    )
     const cleanConsumer = cleanConsumerFromVerification(verification)
     const attempt = {
       number: registryHealth.attempts.length + 1,

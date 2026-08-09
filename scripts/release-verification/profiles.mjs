@@ -1,3 +1,5 @@
+import { parseExactSemver } from './exact-semver.mjs'
+
 const VERSION_KEYS = Object.freeze([
   'betterSqlite3',
   'nuxt',
@@ -6,8 +8,6 @@ const VERSION_KEYS = Object.freeze([
   'typescript',
   'vueTsc',
 ])
-const NUMERIC_IDENTIFIER_PATTERN = /^(?:0|[1-9]\d*)$/
-const IDENTIFIER_PATTERN = /^[0-9A-Z-]+$/i
 const RUNTIME_VERSIONS = Object.freeze({
   betterSqlite3: '12.11.1',
   mermaid: '11.12.3',
@@ -23,39 +23,6 @@ export const PINNED_MATRIX_PROFILE_IDS = Object.freeze([
   'nuxt-3-minimum-content-known-latest',
   'nuxt-4-known-latest-content-minimum',
 ])
-
-function isExactVersion(version) {
-  const buildSeparator = version.indexOf('+')
-  if (buildSeparator !== version.lastIndexOf('+')) return false
-
-  const versionWithoutBuild = buildSeparator < 0
-    ? version
-    : version.slice(0, buildSeparator)
-  const build = buildSeparator < 0 ? undefined : version.slice(buildSeparator + 1)
-  if (build !== undefined
-    && !build.split('.').every(identifier => IDENTIFIER_PATTERN.test(identifier))) {
-    return false
-  }
-
-  const prereleaseSeparator = versionWithoutBuild.indexOf('-')
-  const core = prereleaseSeparator < 0
-    ? versionWithoutBuild
-    : versionWithoutBuild.slice(0, prereleaseSeparator)
-  const prerelease = prereleaseSeparator < 0
-    ? undefined
-    : versionWithoutBuild.slice(prereleaseSeparator + 1)
-  if (prerelease !== undefined
-    && !prerelease.split('.').every(identifier => (
-      IDENTIFIER_PATTERN.test(identifier)
-      && (!/^\d+$/.test(identifier) || NUMERIC_IDENTIFIER_PATTERN.test(identifier))
-    ))) {
-    return false
-  }
-
-  const coreIdentifiers = core.split('.')
-  return coreIdentifiers.length === 3
-    && coreIdentifiers.every(identifier => NUMERIC_IDENTIFIER_PATTERN.test(identifier))
-}
 
 export function parseVersionProfile(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -78,7 +45,7 @@ export function parseVersionProfile(input) {
   const versions = {}
   for (const key of VERSION_KEYS) {
     const version = input.versions[key]
-    if (typeof version !== 'string' || !isExactVersion(version)) {
+    if (!parseExactSemver(version)) {
       throw new TypeError(`Invalid Version Profile: versions.${key} must be an exact version`)
     }
     versions[key] = version
