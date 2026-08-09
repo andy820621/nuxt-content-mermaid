@@ -210,7 +210,9 @@ function loadRetryRequest(evidence, targetVersion) {
     invalidRetryEvidence('frozen profile must match the first attempt request')
   }
 
-  const installFailedBeforeResolution = firstAttempt.stage === 'install'
+  const installFailedBeforeResolution = firstAttempt.success === false
+    && firstAttempt.verification.success === false
+    && firstAttempt.stage === 'install'
     && firstAttempt.verification.package.resolvedVersion === null
     && firstAttempt.verification.profile?.resolved === null
   if (!installFailedBeforeResolution) {
