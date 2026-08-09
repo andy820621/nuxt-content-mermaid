@@ -381,7 +381,7 @@ async function inspectArchive({ archiveDirectory, artifact, commandRunner }) {
     }
     catch (error) {
       if (error && typeof error === 'object' && error.code === 'ENOENT') {
-        throw new Error(`Archive target does not exist: ${target}`)
+        throw new Error(`Archive target does not exist: ${target}`, { cause: error })
       }
       throw error
     }

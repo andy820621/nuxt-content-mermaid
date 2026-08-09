@@ -379,6 +379,7 @@ export function createReleaseEffects({
           throw new AggregateError(
             [processError, error],
             `Release profile child ${profile.id} failed without result evidence`,
+            { cause: error },
           )
         }
         throw error
@@ -531,6 +532,7 @@ export function createReleaseEffects({
         throw new AggregateError(
           [primaryFailure, cleanupError],
           'Manual verification and workspace cleanup both failed',
+          { cause: cleanupError },
         )
       }
       if (primaryFailure) throw primaryFailure
