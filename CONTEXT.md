@@ -256,14 +256,6 @@ _Avoid_: Exact dependency, caret range, Known-Latest Version
 The most recent upstream version deliberately pinned after successful compatibility verification for reproducible pull-request evidence. It is distinct from the latest version currently available from the registry.
 _Avoid_: Current latest, minimum supported version
 
-**Compatibility Drift Check**:
-An optional scheduled canary that smoke-tests the highest non-prerelease versions within published dependency ranges when it remains quiet and inexpensive to maintain. Its failure is only a notification for best-effort investigation and creates no automatic issue, release block, or response obligation.
-_Avoid_: Release gate, maintenance commitment, dependency update
-
-**Representative Compatibility Matrix**:
-A deliberately small set of minimum, Known-Latest, and high-risk boundary combinations used as evidence for the broader peer-range Compatibility Contract. It does not redefine support as only the combinations that CI happens to execute.
-_Avoid_: Exhaustive version matrix, supported-version list
-
 **Unhealthy Release**:
 A version already published to npm that cannot reliably install, build, or complete basic rendering because of a confirmed package defect. A first Registry Smoke Test failure begins investigation; only a clean independent retry after infrastructure causes are excluded confirms the state, after which the version is deprecated and a corrective patch is prepared without unpublishing it.
 _Avoid_: Failed CI run, flaky test

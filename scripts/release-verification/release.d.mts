@@ -94,7 +94,6 @@ export interface CompatibilityResolution {
 }
 
 export interface CompatibilityResolutionOptions {
-  nuxtMajor?: 3 | 4
   profileId?: string
 }
 

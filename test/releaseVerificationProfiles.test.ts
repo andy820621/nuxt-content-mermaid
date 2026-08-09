@@ -1,23 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PINNED_MATRIX_PROFILE_IDS,
   VERSION_PROFILES,
-  expandVersionProfiles,
   parseVersionProfile,
   selectVersionProfile,
 } from '../scripts/release-verification/profiles.mjs'
 
 const runtimeVersions = {
   betterSqlite3: '12.11.1',
-  mermaid: '11.12.3',
+  mermaid: '11.16.1',
   typescript: '5.9.3',
   vueTsc: '3.2.5',
 }
 
 describe('release verification Version Profiles', () => {
   it('declares one exact Node runtime for every profile', () => {
-    expect(PINNED_MATRIX_PROFILE_IDS.map(profileId => VERSION_PROFILES[profileId]!.nodeVersion))
-      .toEqual(Array.from({ length: PINNED_MATRIX_PROFILE_IDS.length }, () => '22.21.1'))
+    expect(Object.values(VERSION_PROFILES).map(profile => profile.nodeVersion))
+      .toEqual(['22.19.0', '24.19.0'])
 
     expect(() => parseVersionProfile({
       id: 'missing-node-runtime',
@@ -40,12 +38,15 @@ describe('release verification Version Profiles', () => {
   })
 
   it('defines independently selectable final 3.x compatibility profiles', () => {
+    expect(Object.keys(VERSION_PROFILES)).toEqual([
+      'v3-minimum',
+      'v3-known-latest',
+    ])
     expect(VERSION_PROFILES['v3-minimum']).toEqual({
       id: 'v3-minimum',
       nodeVersion: '22.19.0',
       versions: {
         ...runtimeVersions,
-        mermaid: '11.16.1',
         nuxt: '4.1.0',
         nuxtContent: '3.5.0',
       },
@@ -59,7 +60,6 @@ describe('release verification Version Profiles', () => {
       nodeVersion: '24.19.0',
       versions: {
         ...runtimeVersions,
-        mermaid: '11.16.1',
         nuxt: '4.5.2',
         nuxtContent: '3.15.2',
       },
@@ -72,89 +72,8 @@ describe('release verification Version Profiles', () => {
     expect(selectVersionProfile('v3-known-latest')).toBe(VERSION_PROFILES['v3-known-latest'])
   })
 
-  it('defines the complete pinned Representative Compatibility Matrix', () => {
-    expect(PINNED_MATRIX_PROFILE_IDS).toEqual([
-      'nuxt-3-minimum',
-      'nuxt-4-minimum',
-      'nuxt-3-known-latest',
-      'nuxt-4-known-latest',
-      'nuxt-3-minimum-content-known-latest',
-      'nuxt-4-known-latest-content-minimum',
-    ])
-    expect(Object.fromEntries(
-      PINNED_MATRIX_PROFILE_IDS.map(profileId => [profileId, VERSION_PROFILES[profileId]]),
-    )).toEqual({
-      'nuxt-3-minimum': {
-        id: 'nuxt-3-minimum',
-        nodeVersion: '22.21.1',
-        versions: {
-          ...runtimeVersions,
-          nuxt: '3.20.1',
-          nuxtContent: '3.5.0',
-        },
-      },
-      'nuxt-4-minimum': {
-        id: 'nuxt-4-minimum',
-        nodeVersion: '22.21.1',
-        versions: {
-          ...runtimeVersions,
-          nuxt: '4.1.0',
-          nuxtContent: '3.5.0',
-        },
-      },
-      'nuxt-3-known-latest': {
-        id: 'nuxt-3-known-latest',
-        nodeVersion: '22.21.1',
-        versions: {
-          ...runtimeVersions,
-          nuxt: '3.21.11',
-          nuxtContent: '3.15.2',
-        },
-      },
-      'nuxt-4-known-latest': {
-        id: 'nuxt-4-known-latest',
-        nodeVersion: '22.21.1',
-        versions: {
-          ...runtimeVersions,
-          nuxt: '4.5.2',
-          nuxtContent: '3.15.2',
-        },
-      },
-      'nuxt-3-minimum-content-known-latest': {
-        id: 'nuxt-3-minimum-content-known-latest',
-        nodeVersion: '22.21.1',
-        versions: {
-          ...runtimeVersions,
-          nuxt: '3.20.1',
-          nuxtContent: '3.15.2',
-        },
-      },
-      'nuxt-4-known-latest-content-minimum': {
-        id: 'nuxt-4-known-latest-content-minimum',
-        nodeVersion: '22.21.1',
-        versions: {
-          ...runtimeVersions,
-          nuxt: '4.5.2',
-          nuxtContent: '3.5.0',
-        },
-      },
-    })
-  })
-
-  it('expands either one profile or the complete pinned matrix', () => {
-    expect(expandVersionProfiles({ profileId: 'nuxt-3-minimum' }))
-      .toEqual([VERSION_PROFILES['nuxt-3-minimum']])
-    expect(expandVersionProfiles({ matrixId: 'pinned' }).map(profile => profile.id))
-      .toEqual(PINNED_MATRIX_PROFILE_IDS)
-  })
-
-  it('rejects unknown or ambiguous profile selection', () => {
+  it('rejects an unknown profile selection', () => {
     expect(() => selectVersionProfile('missing')).toThrow('Unknown Version Profile: missing')
-    expect(() => expandVersionProfiles({ matrixId: 'latest' })).toThrow('Unknown Version Profile matrix: latest')
-    expect(() => expandVersionProfiles({
-      matrixId: 'pinned',
-      profileId: 'nuxt-3-minimum',
-    })).toThrow('Choose either one Version Profile or one matrix')
   })
 
   it.each([

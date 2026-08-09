@@ -22,6 +22,9 @@
   },
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "exports": {
     ".": {
       "types": "./dist/types.d.mts",
@@ -48,10 +51,8 @@
     "release": "node scripts/release-verification/release.mjs",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:package-artifact": "node scripts/release-verification/package-artifact.mjs --package-source pack --profile nuxt-4-known-latest",
+    "test:package-artifact": "node scripts/release-verification/package-artifact.mjs --package-source pack --profile v3-known-latest",
     "test:compatibility-profile": "node scripts/release-verification/package-artifact.mjs --package-source pack",
-    "test:compatibility-matrix": "node scripts/release-verification/package-artifact.mjs --package-source pack --matrix pinned",
-    "test:compatibility-drift": "node scripts/release-verification/compatibility-drift.mjs",
     "test:package-contract": "pnpm prepack && vue-tsc -p test/release-verification/consumer-template/type-contracts/tsconfig.json --noEmit",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit",
@@ -66,7 +67,7 @@
   },
   "peerDependencies": {
     "@nuxt/content": ">=3.5.0 <4.0.0",
-    "nuxt": "^3.20.1 || ^4.1.0"
+    "nuxt": "^4.1.0"
   },
   "devDependencies": {
     "@nuxt/content": "catalog:integrations",
@@ -87,7 +88,7 @@
     "vue-tsc": "catalog:dev"
   },
   "volta": {
-    "node": "22.21.1"
+    "node": "24.19.0"
   },
   "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a"
 }

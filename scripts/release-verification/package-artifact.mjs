@@ -2,15 +2,13 @@
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createReleaseVerificationOperations } from './operations.mjs'
-import { expandVersionProfiles } from './profiles.mjs'
+import { selectVersionProfile } from './profiles.mjs'
 import {
-  CompatibilityMatrixVerificationFailure,
   ReleaseVerificationFailure,
-  runPackageArtifactMatrixVerification,
   runPackageArtifactVerification,
 } from './runner.mjs'
 
-const OPTION_NAMES = new Set(['package-source', 'profile', 'matrix'])
+const OPTION_NAMES = new Set(['package-source', 'profile'])
 
 export function parseVerificationSelection(argv) {
   const options = new Map()
@@ -40,14 +38,13 @@ export function parseVerificationSelection(argv) {
   }
 
   const profileId = options.get('profile')
-  const matrixId = options.get('matrix')
-  if ((!profileId && !matrixId) || (profileId && matrixId)) {
-    throw new Error('Choose either one Version Profile or one matrix')
+  if (!profileId) {
+    throw new Error('Choose one Version Profile')
   }
 
   return {
     packageSource,
-    ...(profileId ? { profileId } : { matrixId }),
+    profileId,
   }
 }
 
@@ -65,19 +62,16 @@ export async function runReleaseVerificationCli({
   }),
   runners = {
     single: runPackageArtifactVerification,
-    matrix: runPackageArtifactMatrixVerification,
   },
   writeEvidence = evidence => console.log(JSON.stringify(evidence, null, 2)),
 }) {
   const selection = parseVerificationSelection(argv)
-  const profiles = expandVersionProfiles(selection)
+  const profile = selectVersionProfile(selection.profileId)
   const packageSource = {
     kind: selection.packageSource,
     repositoryRoot,
   }
-  const evidence = selection.profileId
-    ? await runners.single({ packageSource, profile: profiles[0] }, operations)
-    : await runners.matrix({ packageSource, profiles }, operations)
+  const evidence = await runners.single({ packageSource, profile }, operations)
   writeEvidence(evidence)
   return evidence
 }
@@ -87,8 +81,7 @@ async function main() {
     await runReleaseVerificationCli({ argv: process.argv.slice(2) })
   }
   catch (error) {
-    if (error instanceof ReleaseVerificationFailure
-      || error instanceof CompatibilityMatrixVerificationFailure) {
+    if (error instanceof ReleaseVerificationFailure) {
       console.error(error.message)
       console.error(JSON.stringify(error.evidence, null, 2))
     }

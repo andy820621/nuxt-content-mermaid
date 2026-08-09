@@ -1,9 +1,9 @@
 import type { MermaidConfig } from 'mermaid'
 import { createMermaidComponentConfigurationError } from './component-configuration-error'
 import {
-  DOMPURIFY_3_3_0_OPAQUE_CAPABILITY_PATHS,
-  MERMAID_11_12_3_FUNCTION_CAPABILITY_PATHS,
-  MERMAID_11_12_3_REGEXP_PATHS,
+  DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS,
+  MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS,
+  MERMAID_11_16_1_REGEXP_PATHS,
 } from './constants'
 
 type ConfigPath = readonly (string | number)[]
@@ -48,13 +48,13 @@ function matchesSupportedPath(
 
 function isFunctionCapability(value: unknown, path: ConfigPath): boolean {
   return typeof value === 'function'
-    && matchesSupportedPath(path, MERMAID_11_12_3_FUNCTION_CAPABILITY_PATHS)
+    && matchesSupportedPath(path, MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS)
 }
 
 function isOpaqueObjectCapability(value: unknown, path: ConfigPath): value is object {
   return value !== null
     && typeof value === 'object'
-    && matchesSupportedPath(path, DOMPURIFY_3_3_0_OPAQUE_CAPABILITY_PATHS)
+    && matchesSupportedPath(path, DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS)
 }
 
 function validateDirectValue(
@@ -66,14 +66,14 @@ function validateDirectValue(
     return
 
   if (typeof value === 'function')
-    invalidDirectConfig(path, 'a supported capability at its exact Mermaid 11.12.3 or DOMPurify 3.3.0 path')
+    invalidDirectConfig(path, 'a supported capability at its exact Mermaid 11.16.1 or DOMPurify 3.4.13 path')
   if (typeof value === 'symbol' || typeof value === 'bigint')
     invalidDirectConfig(path, 'structural data')
   if (value === null || typeof value !== 'object') return
 
   if (value instanceof RegExp) {
-    if (!matchesSupportedPath(path, MERMAID_11_12_3_REGEXP_PATHS))
-      invalidDirectConfig(path, 'a RegExp at an exact DOMPurify 3.3.0 RegExp path')
+    if (!matchesSupportedPath(path, MERMAID_11_16_1_REGEXP_PATHS))
+      invalidDirectConfig(path, 'a RegExp at an exact DOMPurify 3.4.13 RegExp path')
     if (Reflect.ownKeys(value).some(key => key !== 'lastIndex'))
       invalidDirectConfig(path, 'a RegExp without custom properties')
     return

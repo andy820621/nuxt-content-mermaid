@@ -10,25 +10,14 @@ const VERSION_KEYS = Object.freeze([
 ])
 const RUNTIME_VERSIONS = Object.freeze({
   betterSqlite3: '12.11.1',
-  mermaid: '11.12.3',
+  mermaid: '11.16.1',
   typescript: '5.9.3',
   vueTsc: '3.2.5',
 })
-const NODE_VERSION = '22.21.1'
-const FINAL_MERMAID_VERSION = '11.16.1'
 const FINAL_TOOLCHAIN_RESOLUTIONS = Object.freeze({
   nuxtKit: '4.5.2',
   nuxtSchema: '4.5.2',
 })
-
-export const PINNED_MATRIX_PROFILE_IDS = Object.freeze([
-  'nuxt-3-minimum',
-  'nuxt-4-minimum',
-  'nuxt-3-known-latest',
-  'nuxt-4-known-latest',
-  'nuxt-3-minimum-content-known-latest',
-  'nuxt-4-known-latest-content-minimum',
-])
 
 function parseExpectedResolutions(input) {
   if (input === undefined) return undefined
@@ -96,25 +85,12 @@ export function parseVersionProfile(input) {
   })
 }
 
-function defineVersionProfile(id, nuxt, nuxtContent) {
-  return parseVersionProfile({
-    id,
-    nodeVersion: NODE_VERSION,
-    versions: {
-      ...RUNTIME_VERSIONS,
-      nuxt,
-      nuxtContent,
-    },
-  })
-}
-
 function defineFinalVersionProfile(id, nodeVersion, nuxt, nuxtContent) {
   return parseVersionProfile({
     id,
     nodeVersion,
     versions: {
       ...RUNTIME_VERSIONS,
-      mermaid: FINAL_MERMAID_VERSION,
       nuxt,
       nuxtContent,
     },
@@ -123,20 +99,6 @@ function defineFinalVersionProfile(id, nodeVersion, nuxt, nuxtContent) {
 }
 
 export const VERSION_PROFILES = Object.freeze({
-  'nuxt-3-minimum': defineVersionProfile('nuxt-3-minimum', '3.20.1', '3.5.0'),
-  'nuxt-4-minimum': defineVersionProfile('nuxt-4-minimum', '4.1.0', '3.5.0'),
-  'nuxt-3-known-latest': defineVersionProfile('nuxt-3-known-latest', '3.21.11', '3.15.2'),
-  'nuxt-4-known-latest': defineVersionProfile('nuxt-4-known-latest', '4.5.2', '3.15.2'),
-  'nuxt-3-minimum-content-known-latest': defineVersionProfile(
-    'nuxt-3-minimum-content-known-latest',
-    '3.20.1',
-    '3.15.2',
-  ),
-  'nuxt-4-known-latest-content-minimum': defineVersionProfile(
-    'nuxt-4-known-latest-content-minimum',
-    '4.5.2',
-    '3.5.0',
-  ),
   'v3-minimum': defineFinalVersionProfile('v3-minimum', '22.19.0', '4.1.0', '3.5.0'),
   'v3-known-latest': defineFinalVersionProfile(
     'v3-known-latest',
@@ -150,15 +112,4 @@ export function selectVersionProfile(profileId) {
   const profile = VERSION_PROFILES[profileId]
   if (!profile) throw new Error(`Unknown Version Profile: ${profileId}`)
   return profile
-}
-
-export function expandVersionProfiles({ profileId, matrixId }) {
-  if (profileId && matrixId) {
-    throw new Error('Choose either one Version Profile or one matrix')
-  }
-  if (profileId) return Object.freeze([selectVersionProfile(profileId)])
-  if (matrixId === 'pinned') {
-    return Object.freeze(PINNED_MATRIX_PROFILE_IDS.map(selectVersionProfile))
-  }
-  throw new Error(`Unknown Version Profile matrix: ${matrixId}`)
 }

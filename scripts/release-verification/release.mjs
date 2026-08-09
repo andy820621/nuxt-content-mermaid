@@ -358,19 +358,11 @@ export function createReleaseEffects({
       }
     },
     async resolveCompatibilityProfile({
-      nuxtMajor = 4,
-      profileId = nuxtMajor === 4
-        ? 'nuxt-4-actual-latest-release'
-        : `nuxt-${nuxtMajor}-actual-latest-release`,
+      profileId = 'nuxt-4-actual-latest-release',
     } = {}) {
-      const baseProfile = VERSION_PROFILES[`nuxt-${nuxtMajor}-known-latest`]
-      if (!baseProfile || (nuxtMajor !== 3 && nuxtMajor !== 4)) {
-        throw new Error(`Unsupported Nuxt major for actual-latest verification: ${nuxtMajor}`)
-      }
+      const baseProfile = VERSION_PROFILES['v3-known-latest']
       const requested = {
-        nuxt: nuxtMajor === 3
-          ? '>=3.20.1 <4.0.0'
-          : '>=4.1.0 <5.0.0',
+        nuxt: '>=4.1.0 <5.0.0',
         nuxtContent: '>=3.5.0 <4.0.0',
       }
       const [nuxt, nuxtContent] = await Promise.all([

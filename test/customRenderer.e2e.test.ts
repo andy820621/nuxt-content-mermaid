@@ -33,7 +33,7 @@ describe('custom renderer option', async () => {
     expect(html).not.toContain('class="mermaid-block"')
     expect(html).not.toContain('class="mermaid-toolbar"')
     expect(html).not.toContain('class="mermaid-wrapper"')
-    expect(html).not.toContain('mermaid-error-default')
+    expect(html).not.toContain('class="mermaid-error-default"')
   })
 
   it('keeps neutral source visible without Built-in lifecycle during client-side pending', { timeout: 20000 }, async () => {

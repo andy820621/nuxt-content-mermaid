@@ -304,6 +304,26 @@ function publicPackageTargets(manifest) {
   return [...new Set(targets)]
 }
 
+function assertArchiveContractValue(field, received, expected) {
+  if (received !== expected) {
+    throw new Error(
+      `Archive dependency contract mismatch: ${field}; expected ${expected}, received ${received}`,
+    )
+  }
+}
+
+function assertArchiveDependencyContract(manifest) {
+  assertArchiveContractValue('engines.node', manifest.engines?.node, '>=22.19.0')
+  assertArchiveContractValue('peerDependencies.nuxt', manifest.peerDependencies?.nuxt, '^4.1.0')
+  assertArchiveContractValue(
+    'peerDependencies.@nuxt/content',
+    manifest.peerDependencies?.['@nuxt/content'],
+    '>=3.5.0 <4.0.0',
+  )
+  assertArchiveContractValue('dependencies.@nuxt/kit', manifest.dependencies?.['@nuxt/kit'], '^4.5.2')
+  assertArchiveContractValue('dependencies.mermaid', manifest.dependencies?.mermaid, '~11.16.1')
+}
+
 async function inspectArchive({ archiveDirectory, artifact, commandRunner }) {
   if ((await readdir(archiveDirectory)).length > 0) {
     throw new Error('Archive inspection directory contains pre-existing state')
@@ -343,6 +363,7 @@ async function inspectArchive({ archiveDirectory, artifact, commandRunner }) {
       `Archive package identity mismatch: expected ${artifact.packageName}@${artifact.packageVersion}, received ${manifest.name}@${manifest.version}`,
     )
   }
+  assertArchiveDependencyContract(manifest)
 
   const targets = publicPackageTargets(manifest)
   for (const target of targets) {

@@ -11,10 +11,6 @@ import {
   runReleaseReconciliation,
 } from '../scripts/release-verification/release.mjs'
 import { RegistrySmokeVerificationFailure } from '../scripts/release-verification/runner.mjs'
-import {
-  PINNED_MATRIX_PROFILE_IDS,
-  VERSION_PROFILES,
-} from '../scripts/release-verification/profiles.mjs'
 import * as releaseModule from '../scripts/release-verification/release.mjs'
 
 function createInertEffects() {
@@ -81,12 +77,12 @@ const retainedArtifact = {
 
 const actualLatestProfile = {
   id: 'nuxt-4-actual-latest-release',
-  nodeVersion: process.versions.node,
+  nodeVersion: '24.19.0',
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '4.99.0',
     nuxtContent: '3.99.0',
-    mermaid: '11.12.3',
+    mermaid: '11.16.1',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
   },
@@ -306,6 +302,7 @@ describe('release repository integration', () => {
     const manifest = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'))
     const workflow = await readFile(join(repositoryRoot, '.github/workflows/ci.yml'), 'utf8')
     const gitignore = await readFile(join(repositoryRoot, '.gitignore'), 'utf8')
+    const domainContext = await readFile(join(repositoryRoot, 'CONTEXT.md'), 'utf8')
 
     expect(manifest.scripts['verify:source'])
       .toBe('pnpm lint && pnpm test && pnpm test:types')
@@ -313,46 +310,28 @@ describe('release repository integration', () => {
       .toBe('node scripts/release-verification/release.mjs')
     expect(manifest.scripts['test:compatibility-profile'])
       .toBe('node scripts/release-verification/package-artifact.mjs --package-source pack')
+    expect(manifest.scripts['test:package-artifact'])
+      .toBe('node scripts/release-verification/package-artifact.mjs --package-source pack --profile v3-known-latest')
+    expect(manifest.scripts['test:compatibility-matrix']).toBeUndefined()
+    expect(manifest.scripts['test:compatibility-drift']).toBeUndefined()
+    expect(domainContext).not.toContain('Compatibility Drift Check')
     expect(Object.keys(manifest.scripts).filter(key => key.startsWith('release:'))).toEqual([])
-    expect(workflow).toContain('run: pnpm verify:source')
-
-    const matrixJobStart = workflow.indexOf('  representative-compatibility-matrix:')
-    const finalJobStart = workflow.indexOf('  final-compatibility-profiles:')
-    const moduleJobStart = workflow.indexOf('  module-compatibility:')
-
-    expect(matrixJobStart).toBeGreaterThan(-1)
-    expect(finalJobStart).toBeGreaterThan(matrixJobStart)
-    expect(moduleJobStart).toBeGreaterThan(finalJobStart)
-
-    const matrixJob = workflow.slice(matrixJobStart, finalJobStart)
-    const finalJob = workflow.slice(finalJobStart, moduleJobStart)
     const parsedWorkflow = parse(workflow)
-    const parsedMatrixJob = parsedWorkflow.jobs['representative-compatibility-matrix']
+    const sourceJob = parsedWorkflow.jobs['source-verification']
     const parsedFinalJob = parsedWorkflow.jobs['final-compatibility-profiles']
-    const expectedProfiles = PINNED_MATRIX_PROFILE_IDS.map(profileId => ({
-      'profile': profileId,
-      'node-version': VERSION_PROFILES[profileId]!.nodeVersion,
-    }))
 
-    expect(parsedMatrixJob.strategy).toMatchObject({
-      'fail-fast': false,
-      'matrix': { include: expectedProfiles },
-    })
-    expect(parsedMatrixJob.steps).toContainEqual({
+    expect(Object.keys(parsedWorkflow.jobs)).toEqual([
+      'source-verification',
+      'final-compatibility-profiles',
+    ])
+    expect(sourceJob.steps).toContainEqual({
       uses: 'actions/setup-node@v6',
-      with: { 'node-version': '${{ matrix.node-version }}' },
+      with: { 'node-version': '24.19.0' },
     })
-    const matrixInstall = matrixJob.indexOf('run: npx nypm@latest i')
-    const matrixPrepare = matrixJob.indexOf('run: npm run dev:prepare')
-    const matrixVerification = matrixJob.indexOf(
-      'run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}',
-    )
-
-    expect(matrixInstall).toBeGreaterThan(-1)
-    expect(matrixPrepare).toBeGreaterThan(-1)
-    expect(matrixVerification).toBeGreaterThan(-1)
-    expect(matrixPrepare).toBeGreaterThan(matrixInstall)
-    expect(matrixVerification).toBeGreaterThan(matrixPrepare)
+    expect(sourceJob.steps).toContainEqual({
+      name: 'Verify source',
+      run: 'pnpm verify:source',
+    })
 
     expect(parsedFinalJob.strategy).toMatchObject({
       'fail-fast': false,
@@ -367,15 +346,20 @@ describe('release repository integration', () => {
       uses: 'actions/setup-node@v6',
       with: { 'node-version': '${{ matrix.node-version }}' },
     })
-    const finalInstall = finalJob.indexOf('run: npx nypm@latest i')
-    const finalPrepare = finalJob.indexOf('run: npm run dev:prepare')
-    const finalVerification = finalJob.indexOf(
-      'run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}',
+    const finalCommands = parsedFinalJob.steps
+      .map((step: { run?: string }) => step.run)
+      .filter(Boolean)
+    const finalInstall = finalCommands.indexOf('npx nypm@latest i')
+    const finalPrepare = finalCommands.indexOf('npm run dev:prepare')
+    const finalBrowserInstall = finalCommands.indexOf('npx playwright install')
+    const finalVerification = finalCommands.indexOf(
+      'npm run test:compatibility-profile -- --profile ${{ matrix.profile }}',
     )
 
     expect(finalInstall).toBeGreaterThan(-1)
     expect(finalPrepare).toBeGreaterThan(finalInstall)
-    expect(finalVerification).toBeGreaterThan(finalPrepare)
+    expect(finalBrowserInstall).toBeGreaterThan(finalPrepare)
+    expect(finalVerification).toBeGreaterThan(finalBrowserInstall)
     expect(gitignore.split(/\r?\n/)).toContain('.release-evidence')
   })
 })
@@ -1125,17 +1109,17 @@ describe('release publication reconciliation', () => {
 })
 
 describe('production release effects', () => {
-  it('resolves a Nuxt 3 actual-latest profile for compatibility drift', async () => {
+  it('resolves a Nuxt 4 actual-latest release profile from the retained v3 baseline', async () => {
     const commandRunner = vi.fn(async ({ command, args }: {
       command: string
       args: string[]
     }) => {
       expect(command).toBe('npm')
-      if (args[1] === 'nuxt@>=3.20.1 <4.0.0') {
-        return { stdout: JSON.stringify(['3.21.0', '3.22.1']) }
+      if (args[1] === 'nuxt@>=4.1.0 <5.0.0') {
+        return { stdout: JSON.stringify(['4.9.0', '4.10.0']) }
       }
       if (args[1] === '@nuxt/content@>=3.5.0 <4.0.0') {
-        return { stdout: JSON.stringify(['3.15.2', '3.16.0']) }
+        return { stdout: JSON.stringify(['3.15.1', '3.15.2']) }
       }
       throw new Error(`Unexpected registry query: ${args[1]}`)
     })
@@ -1147,29 +1131,28 @@ describe('production release effects', () => {
     const effects = createReleaseEffects({ commandRunner, repositoryRoot: '/repo' })
 
     await expect(effects.resolveCompatibilityProfile({
-      nuxtMajor: 3,
-      profileId: 'nuxt-3-actual-latest-drift',
+      profileId: 'v3-actual-latest-release',
     })).resolves.toEqual({
       requested: {
-        nuxt: '>=3.20.1 <4.0.0',
+        nuxt: '>=4.1.0 <5.0.0',
         nuxtContent: '>=3.5.0 <4.0.0',
       },
       resolved: {
         betterSqlite3: '12.11.1',
-        mermaid: '11.12.3',
-        nuxt: '3.22.1',
-        nuxtContent: '3.16.0',
+        mermaid: '11.16.1',
+        nuxt: '4.10.0',
+        nuxtContent: '3.15.2',
         typescript: '5.9.3',
         vueTsc: '3.2.5',
       },
       profile: {
-        id: 'nuxt-3-actual-latest-drift',
-        nodeVersion: actualLatestProfile.nodeVersion,
+        id: 'v3-actual-latest-release',
+        nodeVersion: '24.19.0',
         versions: {
           betterSqlite3: '12.11.1',
-          mermaid: '11.12.3',
-          nuxt: '3.22.1',
-          nuxtContent: '3.16.0',
+          mermaid: '11.16.1',
+          nuxt: '4.10.0',
+          nuxtContent: '3.15.2',
           typescript: '5.9.3',
           vueTsc: '3.2.5',
         },

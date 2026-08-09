@@ -76,11 +76,11 @@ The Known-Latest Compatibility Profile is one atomic exact tuple of Node, Nuxt, 
 
 Known-Latest Versions are evidence baselines, not peer-range ceilings. Updating only repository pins, the lockfile, or fixed evidence without changing the publishable artifact or runtime code does not require an npm release.
 
-### Initial 3.x Expand Profiles
+### Fixed 3.x Compatibility Profiles
 
-Before the public 3.x contract replaces the existing matrix, two fixed profiles
-verify the actual package artifact through clean installation, public types,
-production build, and basic browser SVG rendering:
+The 3.x Compatibility Contract retains two fixed profiles that verify the
+Publishable Package Artifact through clean installation, public types, production build,
+and basic browser SVG rendering:
 
 | Profile | Node | Nuxt | Nuxt Content | Mermaid | Kit resolution | Schema resolution |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -90,10 +90,11 @@ production build, and basic browser SVG rendering:
 Each profile runs under its exact declared Node runtime. Kit and Schema remain
 one shallow pair of expected artifact resolutions rather than additional
 Compatibility Profile dimensions. Verification resolves Mermaid and Kit from
-the installed package artifact's dependency context and Schema from Nuxt's
-dependency context, so a matching top-level consumer package cannot mask a
-different version used by the artifact. The expand step may apply exact Kit and
-Schema overrides to the clean consumer without changing published metadata.
+the installed Publishable Package Artifact's dependency context and Schema from
+Nuxt's dependency context, so matching top-level dependencies in the Package
+User application cannot mask a different version used by the Publishable
+Package Artifact. Verification may apply exact Kit and Schema overrides to the
+clean Package User application without changing published metadata.
 
 These profiles are fixed release evidence. They do not introduce dynamic latest
 resolution, a scheduled canary, drift automation, or release-freeze state.

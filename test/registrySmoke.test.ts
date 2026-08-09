@@ -102,7 +102,7 @@ const actualLatestProfile = {
     betterSqlite3: '12.11.1',
     nuxt: '4.5.3',
     nuxtContent: '3.15.2',
-    mermaid: '11.12.3',
+    mermaid: '11.16.1',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
   },

@@ -132,7 +132,7 @@ describe('Direct Mermaid Config materialization', () => {
     expect(inspections).toBe(0)
   })
 
-  it('supports the exact Mermaid 11.12.3 font callback paths', () => {
+  it('supports the exact Mermaid 11.16.1 font callback paths', () => {
     const callback = () => ({ fontSize: 16 })
     const supportedPaths = [
       ['sequence', 'actorFont'],
@@ -170,7 +170,7 @@ describe('Direct Mermaid Config materialization', () => {
     }
   })
 
-  it('supports the exact DOMPurify 3.3.0 callback and RegExp paths', () => {
+  it('supports the exact DOMPurify 3.4.13 callback and RegExp paths', () => {
     const callback = () => true
     const callbackPaths = [
       ['dompurifyConfig', 'ADD_ATTR'],
@@ -194,6 +194,19 @@ describe('Direct Mermaid Config materialization', () => {
       expect(valueAtPath(copy, path), path.join('.')).toEqual(/supported/i)
       expect(valueAtPath(copy, path), path.join('.')).not.toBe(pattern)
     }
+  })
+
+  it('identifies the frozen Mermaid baseline in unsupported capability errors', () => {
+    const materializeUnsupportedCapability = () => materializeDirectMermaidConfigForInvocation({
+      flowchart: { curve: () => 'basis' },
+    } as unknown as MermaidConfig)
+
+    expect(materializeUnsupportedCapability).toThrowError(expect.objectContaining({
+      message: expect.stringContaining('exact Mermaid 11.16.1'),
+    }))
+    expect(materializeUnsupportedCapability).toThrowError(expect.objectContaining({
+      message: expect.stringContaining('DOMPurify 3.4.13'),
+    }))
   })
 
   it.each([

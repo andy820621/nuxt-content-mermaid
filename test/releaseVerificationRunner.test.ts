@@ -15,37 +15,36 @@ import type {
 } from '../scripts/release-verification/runner.mjs'
 
 const knownLatestProfile = {
-  id: 'nuxt-4-known-latest',
+  id: 'v3-known-latest',
   nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '4.5.2',
     nuxtContent: '3.15.2',
-    mermaid: '11.12.3',
+    mermaid: '11.16.1',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
   },
 }
 
 const minimumProfile = {
-  id: 'nuxt-3-minimum',
+  id: 'v3-minimum',
   nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
-    nuxt: '3.20.1',
+    nuxt: '4.1.0',
     nuxtContent: '3.5.0',
-    mermaid: '11.12.3',
+    mermaid: '11.16.1',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
   },
 }
 
-const finalProfile = {
+const knownLatestProfileWithExpectedResolutions = {
   id: 'v3-known-latest',
   nodeVersion: process.versions.node,
   versions: {
     ...knownLatestProfile.versions,
-    mermaid: '11.16.1',
   },
   expectedResolutions: {
     nuxtKit: '4.5.2',
@@ -84,7 +83,7 @@ function createOperations() {
           betterSqlite3: '12.11.1',
           nuxt: '4.5.2',
           nuxtContent: '3.15.2',
-          mermaid: '11.12.3',
+          mermaid: '11.16.1',
           typescript: '5.9.3',
           vueTsc: '3.2.5',
         },
@@ -128,16 +127,16 @@ function createMatrixOperations() {
       consumerDirectory: '/tmp/matrix-artifact/consumer',
     },
     {
-      root: '/tmp/matrix-nuxt-3-minimum',
-      artifactDirectory: '/tmp/matrix-nuxt-3-minimum/artifact',
-      archiveDirectory: '/tmp/matrix-nuxt-3-minimum/archive',
-      consumerDirectory: '/tmp/matrix-nuxt-3-minimum/consumer',
+      root: '/tmp/matrix-v3-minimum',
+      artifactDirectory: '/tmp/matrix-v3-minimum/artifact',
+      archiveDirectory: '/tmp/matrix-v3-minimum/archive',
+      consumerDirectory: '/tmp/matrix-v3-minimum/consumer',
     },
     {
-      root: '/tmp/matrix-nuxt-4-known-latest',
-      artifactDirectory: '/tmp/matrix-nuxt-4-known-latest/artifact',
-      archiveDirectory: '/tmp/matrix-nuxt-4-known-latest/archive',
-      consumerDirectory: '/tmp/matrix-nuxt-4-known-latest/consumer',
+      root: '/tmp/matrix-v3-known-latest',
+      artifactDirectory: '/tmp/matrix-v3-known-latest/artifact',
+      archiveDirectory: '/tmp/matrix-v3-known-latest/archive',
+      consumerDirectory: '/tmp/matrix-v3-known-latest/consumer',
     },
   ]
   const resolvedVersions = new Map([
@@ -229,8 +228,8 @@ describe('package artifact verification runner', () => {
     const { operations } = createOperations()
     operations.installConsumer.mockResolvedValueOnce({
       packageVersion: '2.2.3',
-      profileVersions: finalProfile.versions,
-      expectedResolutions: finalProfile.expectedResolutions,
+      profileVersions: knownLatestProfileWithExpectedResolutions.versions,
+      expectedResolutions: knownLatestProfileWithExpectedResolutions.expectedResolutions,
     })
 
     const evidence = await runPackageArtifactVerification({
@@ -238,16 +237,16 @@ describe('package artifact verification runner', () => {
         kind: 'pack',
         repositoryRoot: '/repo',
       },
-      profile: finalProfile,
+      profile: knownLatestProfileWithExpectedResolutions,
     }, operations)
 
     expect(evidence.profile).toEqual({
-      id: finalProfile.id,
-      requested: finalProfile.versions,
-      resolved: finalProfile.versions,
+      id: knownLatestProfileWithExpectedResolutions.id,
+      requested: knownLatestProfileWithExpectedResolutions.versions,
+      resolved: knownLatestProfileWithExpectedResolutions.versions,
       expectedResolutions: {
-        requested: finalProfile.expectedResolutions,
-        resolved: finalProfile.expectedResolutions,
+        requested: knownLatestProfileWithExpectedResolutions.expectedResolutions,
+        resolved: knownLatestProfileWithExpectedResolutions.expectedResolutions,
       },
     })
   })
@@ -256,7 +255,7 @@ describe('package artifact verification runner', () => {
     const { operations } = createOperations()
     operations.installConsumer.mockResolvedValueOnce({
       packageVersion: '2.2.3',
-      profileVersions: finalProfile.versions,
+      profileVersions: knownLatestProfileWithExpectedResolutions.versions,
     })
 
     const failure: ReleaseVerificationFailure
@@ -265,7 +264,7 @@ describe('package artifact verification runner', () => {
           kind: 'pack',
           repositoryRoot: '/repo',
         },
-        profile: finalProfile,
+        profile: knownLatestProfileWithExpectedResolutions,
       }, operations).then(
         () => { throw new Error('expected verification to fail') },
         (error: unknown) => error as ReleaseVerificationFailure,
@@ -274,7 +273,7 @@ describe('package artifact verification runner', () => {
     expect(failure.stage).toBe('install')
     expect(failure.evidence.profile).toMatchObject({
       expectedResolutions: {
-        requested: finalProfile.expectedResolutions,
+        requested: knownLatestProfileWithExpectedResolutions.expectedResolutions,
         resolved: null,
       },
     })
@@ -444,7 +443,7 @@ describe('registry smoke verification runner', () => {
         betterSqlite3: '12.11.1',
         nuxt: '4.5.3',
         nuxtContent: '3.15.2',
-        mermaid: '11.12.3',
+        mermaid: '11.16.1',
         typescript: '5.9.3',
         vueTsc: '3.2.5',
       },
@@ -476,7 +475,7 @@ describe('registry smoke verification runner', () => {
         requestedVersion: '3.0.0',
       },
       profile: {
-        id: 'nuxt-4-known-latest',
+        id: 'v3-known-latest',
         requested: knownLatestProfile.versions,
       },
       runtime: {
@@ -612,7 +611,7 @@ describe('registry smoke verification runner', () => {
   })
 })
 
-describe('Representative Compatibility Matrix runner', () => {
+describe('multi-profile package artifact runner', () => {
   it('reuses one artifact while running the complete consumer contract for every profile', async () => {
     const { artifact, operations, workspaces } = createMatrixOperations()
 

@@ -1,4 +1,5 @@
 import contentMermaidModule from '../../../src/module'
+import type { RuntimeMermaidConfig } from '../../../src/types/config'
 
 export default defineNuxtConfig({
   modules: [contentMermaidModule],
@@ -18,7 +19,7 @@ export default defineNuxtConfig({
         loader: {
           init: {
             unknownMermaidExtension: 'runtime-mermaid-extension',
-          },
+          } as RuntimeMermaidConfig,
         },
       },
     },

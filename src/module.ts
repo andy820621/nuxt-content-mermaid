@@ -91,7 +91,7 @@ export default defineNuxtModule<ModuleOptions>({
     name: MODULE_NAME,
     configKey: 'contentMermaid',
     compatibility: {
-      nuxt: '^3.20.1 || ^4.1.0',
+      nuxt: '^4.1.0',
     },
   },
   setup(options, nuxt) {

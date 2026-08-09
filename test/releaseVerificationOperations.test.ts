@@ -17,13 +17,13 @@ const temporaryDirectories: string[] = []
 const execFileAsync = promisify(execFile)
 
 const profile = {
-  id: 'nuxt-4-known-latest',
+  id: 'profile-without-resolution-evidence',
   nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '4.5.2',
     nuxtContent: '3.15.2',
-    mermaid: '11.12.3',
+    mermaid: '11.16.1',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
   },
@@ -156,6 +156,28 @@ async function createPackageArchive(manifest: Record<string, unknown>, files: st
   return archivePath
 }
 
+function createContractManifest(overrides: Record<string, unknown> = {}) {
+  return {
+    name: '@barzhsieh/nuxt-content-mermaid',
+    version: '2.2.3',
+    engines: {
+      node: '>=22.19.0',
+    },
+    peerDependencies: {
+      '@nuxt/content': '>=3.5.0 <4.0.0',
+      'nuxt': '^4.1.0',
+    },
+    dependencies: {
+      '@nuxt/kit': '^4.5.2',
+      'mermaid': '~11.16.1',
+    },
+    exports: {
+      '.': './dist/module.mjs',
+    },
+    ...overrides,
+  }
+}
+
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, {
     recursive: true,
@@ -279,7 +301,7 @@ describe('clean consumer installation', () => {
       '@barzhsieh/nuxt-content-mermaid': pathToFileURL(archivePath).href,
       '@nuxt/content': '3.15.2',
       'better-sqlite3': '12.11.1',
-      'mermaid': '11.12.3',
+      'mermaid': '11.16.1',
       'nuxt': '4.5.2',
     })
     expect(packageJson.devDependencies).toEqual({
@@ -483,9 +505,7 @@ describe('package archive inspection', () => {
   })
 
   it('accepts metadata, exports, and declarations that exist inside the archive', async () => {
-    const archivePath = await createPackageArchive({
-      name: '@barzhsieh/nuxt-content-mermaid',
-      version: '2.2.3',
+    const archivePath = await createPackageArchive(createContractManifest({
       main: './dist/module.mjs',
       exports: {
         '.': {
@@ -499,7 +519,7 @@ describe('package archive inspection', () => {
           '.': ['./dist/types.d.mts'],
         },
       },
-    }, [
+    }), [
       'dist/module.mjs',
       'dist/types.d.mts',
     ])
@@ -514,17 +534,57 @@ describe('package archive inspection', () => {
     })).resolves.toBeUndefined()
   })
 
+  it.each([
+    ['engines.node', { engines: { node: '>=20.0.0' } }],
+    ['peerDependencies.nuxt', {
+      peerDependencies: {
+        '@nuxt/content': '>=3.5.0 <4.0.0',
+        'nuxt': '^3.20.1 || ^4.1.0',
+      },
+    }],
+    ['peerDependencies.@nuxt/content', {
+      peerDependencies: {
+        '@nuxt/content': '^3.15.2',
+        'nuxt': '^4.1.0',
+      },
+    }],
+    ['dependencies.@nuxt/kit', {
+      dependencies: {
+        '@nuxt/kit': '4.5.2',
+        'mermaid': '~11.16.1',
+      },
+    }],
+    ['dependencies.mermaid', {
+      dependencies: {
+        '@nuxt/kit': '^4.5.2',
+        'mermaid': '^11.16.1',
+      },
+    }],
+  ])('rejects a packed artifact with the wrong %s contract', async (field, overrides) => {
+    const archivePath = await createPackageArchive(
+      createContractManifest(overrides),
+      ['dist/module.mjs'],
+    )
+    const archiveDirectory = await createTemporaryDirectory('archive-inspection')
+    const operations = createReleaseVerificationOperations({
+      templateDirectory: '/unused',
+    })
+
+    await expect(operations.inspectArchive({
+      archiveDirectory,
+      artifact: createArtifactFixture({ archivePath }),
+    })).rejects.toThrow(`Archive dependency contract mismatch: ${field}`)
+  })
+
   it('rejects a declaration target missing from the archive', async () => {
-    const archivePath = await createPackageArchive({
-      name: '@barzhsieh/nuxt-content-mermaid',
-      version: '2.2.3',
+    const archivePath = await createPackageArchive(createContractManifest({
       exports: {
         '.': {
           types: './dist/types.d.mts',
           import: './dist/module.mjs',
         },
       },
-    }, ['dist/module.mjs'])
+    }), ['dist/module.mjs'])
     const archiveDirectory = await createTemporaryDirectory('archive-inspection')
     const operations = createReleaseVerificationOperations({
       templateDirectory: '/unused',
@@ -537,13 +597,11 @@ describe('package archive inspection', () => {
   })
 
   it('rejects an export target that escapes the package boundary', async () => {
-    const archivePath = await createPackageArchive({
-      name: '@barzhsieh/nuxt-content-mermaid',
-      version: '2.2.3',
+    const archivePath = await createPackageArchive(createContractManifest({
       exports: {
         '.': '../outside.mjs',
       },
-    }, [])
+    }), [])
     const archiveDirectory = await createTemporaryDirectory('archive-inspection')
     const operations = createReleaseVerificationOperations({
       templateDirectory: '/unused',

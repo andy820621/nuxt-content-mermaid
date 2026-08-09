@@ -72,6 +72,13 @@ describe('module setup', () => {
     vi.resetModules()
   })
 
+  it('declares the Supported Nuxt Range in module metadata', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { meta?: { compatibility?: { nuxt?: string } } }
+
+    expect(moduleDef.meta?.compatibility?.nuxt).toBe('^4.1.0')
+  })
+
   it('skips registration when disabled', async () => {
     const mod = await import('../src/module')
     const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }

@@ -59,13 +59,13 @@ export const DEFAULT_RUNTIME_OPTIONS = {
 
 export const DEFAULT_FRONTMATTER_CONFIG_KEY = 'config'
 
-export const MERMAID_11_12_3_REGEXP_PATHS = [
+export const MERMAID_11_16_1_REGEXP_PATHS = [
   ['dompurifyConfig', 'ALLOWED_URI_REGEXP'],
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'attributeNameCheck'],
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'tagNameCheck'],
 ] as const
 
-export const MERMAID_11_12_3_FUNCTION_CAPABILITY_PATHS = [
+export const MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS = [
   ['sequence', 'actorFont'],
   ['sequence', 'messageFont'],
   ['sequence', 'noteFont'],
@@ -97,6 +97,6 @@ export const MERMAID_11_12_3_FUNCTION_CAPABILITY_PATHS = [
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'tagNameCheck'],
 ] as const
 
-export const DOMPURIFY_3_3_0_OPAQUE_CAPABILITY_PATHS = [
+export const DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS = [
   ['dompurifyConfig', 'TRUSTED_TYPES_POLICY'],
 ] as const
