@@ -15,6 +15,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 import {
   createReleaseVerificationOperations,
   runCommand,
@@ -22,7 +23,8 @@ import {
 import { parseExactSemver } from './exact-semver.mjs'
 import { parseVersionProfile, VERSION_PROFILES } from './profiles.mjs'
 import {
-  runPackageArtifactVerification,
+  CompatibilityMatrixVerificationFailure,
+  runPackageArtifactMatrixVerification,
   runRegistrySmokeVerification,
 } from './runner.mjs'
 import {
@@ -39,7 +41,37 @@ const MANUAL_CHECKS = Object.freeze([
   'visualReadability',
 ])
 const MODULE_DIRECTORY = dirname(fileURLToPath(import.meta.url))
-const RELEASE_REGISTRY_PROFILE_ID = 'nuxt-4-actual-latest-release'
+const RELEASE_PROFILE_IDS = Object.freeze(['v3-minimum', 'v3-known-latest'])
+const RELEASE_KNOWN_LATEST_PROFILE_ID = 'v3-known-latest'
+
+function frozenReleaseProfiles() {
+  return RELEASE_PROFILE_IDS.map(id => parseVersionProfile(VERSION_PROFILES[id]))
+}
+
+function snapshotReleaseManifest(manifest) {
+  const snapshot = {
+    engines: { node: manifest.engines?.node },
+    peerDependencies: {
+      '@nuxt/content': manifest.peerDependencies?.['@nuxt/content'],
+      'nuxt': manifest.peerDependencies?.nuxt,
+    },
+    dependencies: {
+      '@nuxt/kit': manifest.dependencies?.['@nuxt/kit'],
+      'mermaid': manifest.dependencies?.mermaid,
+    },
+  }
+  const missingField = [
+    ['engines.node', snapshot.engines.node],
+    ['peerDependencies.@nuxt/content', snapshot.peerDependencies['@nuxt/content']],
+    ['peerDependencies.nuxt', snapshot.peerDependencies.nuxt],
+    ['dependencies.@nuxt/kit', snapshot.dependencies['@nuxt/kit']],
+    ['dependencies.mermaid', snapshot.dependencies.mermaid],
+  ].find(([, value]) => typeof value !== 'string' || !value)
+  if (missingField) {
+    throw new Error(`Retained artifact manifest is missing ${missingField[0]}`)
+  }
+  return snapshot
+}
 
 function assertExactSemver(version) {
   if (!parseExactSemver(version)) {
@@ -105,16 +137,46 @@ async function recordBlockedEvidence({
 async function recordRegistryHealth({ effects, evidence }) {
   if (evidence.registryHealth !== undefined) return evidence
 
-  const compatibilityProfile = evidence.compatibilityProfile
-  const profile = {
-    id: compatibilityProfile?.id ?? RELEASE_REGISTRY_PROFILE_ID,
-    nodeVersion: compatibilityProfile?.nodeVersion,
-    versions: compatibilityProfile?.resolved,
+  const registryRelease = await effects.readRegistryRelease({
+    packageName: evidence.artifact?.packageName,
+    targetVersion: evidence.artifact?.packageVersion,
+  })
+  if (registryRelease?.state !== 'published'
+    || registryRelease.integrity !== evidence.identity?.artifactIntegritySha512) {
+    throw new Error('Registry smoke requires npm to match the frozen artifact identity')
+  }
+
+  const profile = evidence.releaseBaseline?.profiles?.find(candidate => (
+    candidate.id === RELEASE_KNOWN_LATEST_PROFILE_ID
+  ))
+  const verification = evidence.compatibilityProfiles?.find(candidate => (
+    candidate.id === RELEASE_KNOWN_LATEST_PROFILE_ID && candidate.success === true
+  ))
+  if (!profile || !verification) {
+    throw new Error('Registry smoke requires frozen Known-Latest Compatibility Profile evidence')
+  }
+  const coordinatesMatch = isDeepStrictEqual(verification.requested, profile.versions)
+    && isDeepStrictEqual(verification.resolved, profile.versions)
+    && verification.runtime?.requested === profile.nodeVersion
+    && verification.runtime?.observed === profile.nodeVersion
+    && isDeepStrictEqual(
+      verification.expectedResolutions?.requested,
+      profile.expectedResolutions,
+    )
+    && isDeepStrictEqual(
+      verification.expectedResolutions?.resolved,
+      profile.expectedResolutions,
+    )
+  if (!coordinatesMatch) {
+    throw new Error('Registry smoke Compatibility Profile evidence does not match the freeze')
   }
   evidence.registryHealth = createPendingRegistryHealth({
     packageName: evidence.artifact?.packageName,
     packageVersion: evidence.artifact?.packageVersion,
-    requestedProfile: compatibilityProfile?.requested,
+    requestedProfile: {
+      nuxt: profile.versions.nuxt,
+      nuxtContent: profile.versions.nuxtContent,
+    },
     profile,
   })
   await effects.writeEvidence(evidence)
@@ -172,6 +234,21 @@ async function stopConsumer(child) {
   if (!stopped && child.exitCode === null) child.kill('SIGKILL')
 }
 
+function runProfileProcess({ command, args, cwd }) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(command, args, { cwd, stdio: 'inherit' })
+    child.once('error', rejectPromise)
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolvePromise()
+        return
+      }
+      const reason = signal ? `signal ${signal}` : `exit code ${code}`
+      rejectPromise(new Error(`Release profile child failed with ${reason}`))
+    })
+  })
+}
+
 async function runManualInteractionChecks({ checks, consumerDirectory }) {
   const port = await availablePort()
   const url = `http://127.0.0.1:${port}`
@@ -203,11 +280,12 @@ async function runManualInteractionChecks({ checks, consumerDirectory }) {
 
 export function createReleaseEffects({
   artifactCreator,
-  artifactVerifier = runPackageArtifactVerification,
   clock = () => new Date(),
   commandRunner = runCommand,
   filesystem = {},
   manualInteractionRunner = runManualInteractionChecks,
+  matrixVerifier = runPackageArtifactMatrixVerification,
+  profileProcessRunner = runProfileProcess,
   registryVerifier = runRegistrySmokeVerification,
   repositoryRoot = process.cwd(),
   targetVersion,
@@ -234,6 +312,13 @@ export function createReleaseEffects({
     return join(root, '.release-evidence', version, 'release.json')
   }
 
+  async function writeEvidenceFile(evidence) {
+    const path = evidencePath(repositoryRoot, targetVersion)
+    const temporaryPath = `${path}.tmp`
+    await writeFile(temporaryPath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8')
+    await rename(temporaryPath, path)
+  }
+
   async function readRegistryVersions(packageName) {
     const result = await commandRunner({
       command: 'npm',
@@ -248,21 +333,67 @@ export function createReleaseEffects({
     return versions
   }
 
-  async function readLatestVersion(packageRange) {
-    const result = await commandRunner({
-      command: 'npm',
-      args: ['view', packageRange, 'version', '--json'],
-      cwd: repositoryRoot,
-    })
-    const parsed = JSON.parse(String(result?.stdout ?? ''))
-    const versions = Array.isArray(parsed) ? parsed : [parsed]
-    if (versions.length === 0 || versions.some(version => typeof version !== 'string')) {
-      throw new Error(`Registry returned invalid versions for ${packageRange}`)
-    }
-    for (const version of versions) assertExactSemver(version)
-    return versions.reduce((latest, version) => (
-      compareSemvers(version, latest) > 0 ? version : latest
+  async function verifyFrozenProfile({ artifact, profile }) {
+    const protocolDirectory = await mkdtemp(join(
+      temporaryRoot,
+      'nuxt-content-mermaid-release-profile-',
     ))
+    const requestPath = join(protocolDirectory, 'request.json')
+    const requestTemporaryPath = `${requestPath}.tmp`
+    const resultPath = join(protocolDirectory, 'result.json')
+    let processError
+    try {
+      await writeFile(requestTemporaryPath, `${JSON.stringify({
+        schemaVersion: 1,
+        artifact,
+        profile,
+      }, null, 2)}\n`, 'utf8')
+      await rename(requestTemporaryPath, requestPath)
+      try {
+        await profileProcessRunner({
+          command: 'volta',
+          args: [
+            'run',
+            '--node',
+            profile.nodeVersion,
+            'node',
+            join(MODULE_DIRECTORY, 'release-profile.mjs'),
+            '--request',
+            requestPath,
+            '--result',
+            resultPath,
+          ],
+          cwd: repositoryRoot,
+        })
+      }
+      catch (error) {
+        processError = error
+      }
+
+      let evidence
+      try {
+        evidence = JSON.parse(await readFile(resultPath, 'utf8'))
+      }
+      catch (error) {
+        if (processError) {
+          throw new AggregateError(
+            [processError, error],
+            `Release profile child ${profile.id} failed without result evidence`,
+          )
+        }
+        throw error
+      }
+      if (processError && evidence?.success === true) {
+        throw new AggregateError(
+          [processError],
+          `Release profile child ${profile.id} failed after reporting success`,
+        )
+      }
+      return evidence
+    }
+    finally {
+      await rm(protocolDirectory, { recursive: true, force: true })
+    }
   }
 
   return {
@@ -357,40 +488,19 @@ export function createReleaseEffects({
         }
       }
     },
-    async resolveCompatibilityProfile({
-      profileId = 'nuxt-4-actual-latest-release',
-    } = {}) {
-      const baseProfile = VERSION_PROFILES['v3-known-latest']
-      const requested = {
-        nuxt: '>=4.1.0 <5.0.0',
-        nuxtContent: '>=3.5.0 <4.0.0',
-      }
-      const [nuxt, nuxtContent] = await Promise.all([
-        readLatestVersion(`nuxt@${requested.nuxt}`),
-        readLatestVersion(`@nuxt/content@${requested.nuxtContent}`),
-      ])
-      const profile = parseVersionProfile({
-        id: profileId,
-        nodeVersion: baseProfile.nodeVersion,
-        versions: {
-          ...baseProfile.versions,
-          nuxt,
-          nuxtContent,
-        },
+    async readReleaseManifestSnapshot({ artifact }) {
+      const result = await commandRunner({
+        command: 'tar',
+        args: ['-xOf', artifact.archivePath, 'package/package.json'],
+        cwd: repositoryRoot,
       })
-      return {
-        requested,
-        resolved: { ...profile.versions },
-        profile,
-      }
+      const manifest = JSON.parse(String(result?.stdout ?? ''))
+      return snapshotReleaseManifest(manifest)
     },
-    verifyArtifact: ({ artifact, profile }) => artifactVerifier({
-      packageSource: {
-        kind: 'retained',
-        artifact,
-      },
-      profile,
-    }, verificationOperations),
+    verifyArtifactProfiles: ({ artifact, profiles }) => matrixVerifier({
+      artifact,
+      profiles,
+    }, verifyFrozenProfile),
     verifyRegistryPackage: request => registryVerifier(request, verificationOperations),
     async runManualCheck({ artifact, profile, checks }) {
       const workspace = await verificationOperations.createWorkspace()
@@ -432,6 +542,7 @@ export function createReleaseEffects({
       changeHeadCommit,
       identity,
       artifact,
+      releaseBaseline,
       tagName,
     }) {
       if (!['fast-forward', 'tag', 'push', 'publish', 'reconcile'].includes(phase)) {
@@ -463,6 +574,10 @@ export function createReleaseEffects({
       }
 
       const archiveBytes = await readFile(artifact.archivePath)
+      const actualSha256 = createHash('sha256').update(archiveBytes).digest('hex')
+      if (actualSha256 !== artifact.sha256) {
+        throw new Error('Retained tarball SHA-256 changed after verification')
+      }
       const actualIntegrity = `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`
       if (actualIntegrity !== identity.artifactIntegritySha512) {
         throw new Error('Retained tarball integrity changed after verification')
@@ -476,6 +591,15 @@ export function createReleaseEffects({
       if (archiveManifest.name !== artifact.packageName
         || archiveManifest.version !== identity.targetVersion) {
         throw new Error('Retained tarball manifest does not match release identity')
+      }
+      if (!isDeepStrictEqual(
+        snapshotReleaseManifest(archiveManifest),
+        releaseBaseline?.manifest,
+      )) {
+        throw new Error('Retained tarball manifest changed after the release baseline freeze')
+      }
+      if (!isDeepStrictEqual(releaseBaseline?.profiles, frozenReleaseProfiles())) {
+        throw new Error('Compatibility Profiles changed after the release baseline freeze')
       }
 
       const branchResult = await commandRunner({
@@ -546,17 +670,30 @@ export function createReleaseEffects({
         throw new Error('Release tag does not resolve to the prepared release commit')
       }
     },
+    async initializeEvidence(evidence) {
+      if (!targetVersion) {
+        throw new Error('Release effects require a target version to initialize evidence')
+      }
+      await mkdir(join(repositoryRoot, '.release-evidence'), { recursive: true })
+      try {
+        await mkdir(join(repositoryRoot, '.release-evidence', targetVersion))
+      }
+      catch (error) {
+        if (error && typeof error === 'object' && error.code === 'EEXIST') {
+          throw new Error(
+            `Release evidence directory already exists for ${targetVersion}; inspect and remove or move the entire directory before retrying`,
+            { cause: error },
+          )
+        }
+        throw error
+      }
+      await writeEvidenceFile(evidence)
+    },
     async writeEvidence(evidence) {
       if (!targetVersion) {
         throw new Error('Release effects require a target version to write evidence')
       }
-      const path = evidencePath(repositoryRoot, targetVersion)
-      await mkdir(join(repositoryRoot, '.release-evidence', targetVersion), {
-        recursive: true,
-      })
-      const temporaryPath = `${path}.tmp`
-      await writeFile(temporaryPath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8')
-      await rename(temporaryPath, path)
+      await writeEvidenceFile(evidence)
     },
     async readEvidence({ repositoryRoot: root, targetVersion: version }) {
       return JSON.parse(await readFile(evidencePath(root, version), 'utf8'))
@@ -720,11 +857,12 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     changeHeadCommit: repository.head,
     sourceChecks: null,
     identity: null,
-    compatibilityProfile: null,
+    releaseBaseline: null,
+    compatibilityProfiles: [],
     manualCheck: null,
     timestamps: { startedAt },
   }
-  await effects.writeEvidence(evidence)
+  await effects.initializeEvidence(evidence)
 
   try {
     const result = await effects.runCommand({
@@ -777,6 +915,17 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
       || prepared.artifact?.packageVersion !== request.targetVersion) {
       throw new Error('Prepared tarball version or package name does not match the release target')
     }
+    if (typeof prepared.artifact.archivePath !== 'string'
+      || !prepared.artifact.archivePath
+      || typeof prepared.artifact.filename !== 'string'
+      || !prepared.artifact.filename
+      || basename(prepared.artifact.archivePath) !== prepared.artifact.filename) {
+      throw new Error('Prepared tarball archive path or filename is invalid')
+    }
+    if (typeof prepared.artifact.sha256 !== 'string'
+      || !/^[a-f0-9]{64}$/.test(prepared.artifact.sha256)) {
+      throw new Error('Prepared tarball does not have a valid SHA-256 digest')
+    }
     if (typeof prepared.artifact.integritySha512 !== 'string'
       || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(prepared.artifact.integritySha512)) {
       throw new Error('Prepared tarball does not have valid npm SHA-512 integrity')
@@ -803,43 +952,53 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
   evidence.artifact = {
     archivePath: prepared.artifact.archivePath,
     filename: prepared.artifact.filename,
+    sha256: prepared.artifact.sha256,
     packageName: prepared.artifact.packageName,
     packageVersion: prepared.artifact.packageVersion,
     packlist: [...prepared.artifact.packlist],
   }
-  evidence.timestamps.preparedAt = effects.now()
-  await effects.writeEvidence(evidence)
-
-  let compatibility
+  const profiles = frozenReleaseProfiles()
   try {
-    compatibility = await effects.resolveCompatibilityProfile()
-    const verification = await effects.verifyArtifact({
+    const manifest = await effects.readReleaseManifestSnapshot({
       artifact: prepared.artifact,
-      profile: compatibility.profile,
+    })
+    evidence.releaseBaseline = {
+      manifest,
+      profiles,
+    }
+    evidence.timestamps.preparedAt = effects.now()
+    await effects.writeEvidence(evidence)
+  }
+  catch (error) {
+    await recordBlockedEvidence({
+      effects,
+      evidence,
+      error,
+      stage: 'baseline-freeze',
+    })
+    throw new Error(`Release blocked during baseline freeze: ${errorMessage(error)}`, {
+      cause: error,
+    })
+  }
+
+  try {
+    const verification = await effects.verifyArtifactProfiles({
+      artifact: prepared.artifact,
+      profiles,
     })
     if (!verification || verification.success !== true) {
       throw new Error('artifact verification returned an indeterminate result')
     }
-    evidence.compatibilityProfile = {
-      id: compatibility.profile.id,
-      nodeVersion: compatibility.profile.nodeVersion,
-      requested: { ...compatibility.requested },
-      resolved: { ...compatibility.resolved },
-      passed: true,
-    }
+    evidence.compatibilityProfiles = verification.profiles.map(profile => structuredClone(profile))
     evidence.timestamps.compatibilityVerifiedAt = effects.now()
     await effects.writeEvidence(evidence)
   }
   catch (error) {
-    evidence.compatibilityProfile = compatibility
-      ? {
-          id: compatibility.profile.id,
-          nodeVersion: compatibility.profile.nodeVersion,
-          requested: { ...compatibility.requested },
-          resolved: { ...compatibility.resolved },
-          passed: false,
-        }
-      : null
+    if (error instanceof CompatibilityMatrixVerificationFailure) {
+      evidence.compatibilityProfiles = error.evidence.profiles.map(profile => (
+        structuredClone(profile)
+      ))
+    }
     await recordBlockedEvidence({
       effects,
       evidence,
@@ -856,7 +1015,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     try {
       results = await effects.runManualCheck({
         artifact: prepared.artifact,
-        profile: compatibility.profile,
+        profile: profiles.find(profile => profile.id === RELEASE_KNOWN_LATEST_PROFILE_ID),
         checks: [...MANUAL_CHECKS],
       })
       evidence.manualCheck = {
@@ -904,6 +1063,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     changeHeadCommit: repository.head,
     identity: evidence.identity,
     artifact: prepared.artifact,
+    releaseBaseline: evidence.releaseBaseline,
     tagName,
   })
 
@@ -994,6 +1154,7 @@ export async function runReleaseReconciliation({ request, repositoryRoot, effect
     changeHeadCommit: evidence.changeHeadCommit,
     identity: evidence.identity,
     artifact,
+    releaseBaseline: evidence.releaseBaseline,
     tagName: `v${request.targetVersion}`,
   }
   try {

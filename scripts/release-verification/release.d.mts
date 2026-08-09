@@ -1,10 +1,12 @@
 import type {
+  CompatibilityMatrixProfileEvidence,
   PackageArtifact,
-  PackageArtifactEvidence,
+  PackageArtifactMatrixEvidence,
   RegistrySmokeVerificationEvidence,
   RegistrySmokeVerificationRequest,
   ReleaseVerificationOperations,
   VersionProfile,
+  runPackageArtifactMatrixVerification,
   runRegistrySmokeVerification,
 } from './runner.mjs'
 import type { RegistryHealthEvidence } from './registry-smoke.mjs'
@@ -31,6 +33,23 @@ export interface ReleaseIdentity {
   artifactIntegritySha512: string
 }
 
+export interface ReleaseManifestSnapshot {
+  engines: { node: string }
+  peerDependencies: {
+    '@nuxt/content': string
+    'nuxt': string
+  }
+  dependencies: {
+    '@nuxt/kit': string
+    'mermaid': string
+  }
+}
+
+export interface ReleaseBaseline {
+  manifest: ReleaseManifestSnapshot
+  profiles: VersionProfile[]
+}
+
 export type ManualCheckName
   = | 'fullscreen'
     | 'zoomPanDrag'
@@ -51,17 +70,13 @@ export interface LeanReleaseEvidence {
   artifact?: {
     archivePath: string
     filename: string
+    sha256: string
     packageName: string
     packageVersion: string
     packlist: string[]
   }
-  compatibilityProfile: null | {
-    id?: string
-    nodeVersion: string
-    requested: Record<string, string>
-    resolved: Record<string, string>
-    passed: boolean
-  }
+  releaseBaseline: ReleaseBaseline | null
+  compatibilityProfiles: CompatibilityMatrixProfileEvidence[]
   manualCheck: null | {
     required: boolean
     reason: string
@@ -87,19 +102,10 @@ export interface CommandResult {
   stderr?: string
 }
 
-export interface CompatibilityResolution {
-  requested: Record<string, string>
-  resolved: VersionProfile['versions']
-  profile: VersionProfile
-}
-
-export interface CompatibilityResolutionOptions {
-  profileId?: string
-}
-
 export interface ReleaseEffects {
   now: () => string
   runCommand: (invocation: CommandInvocation) => Promise<CommandResult>
+  initializeEvidence: (evidence: LeanReleaseEvidence) => Promise<void>
   writeEvidence: (evidence: LeanReleaseEvidence) => Promise<void>
   readEvidence: (input: {
     repositoryRoot: string
@@ -131,13 +137,13 @@ export interface ReleaseEffects {
     sourceCommit: string
     artifact: PackageArtifact
   }>
-  resolveCompatibilityProfile: (
-    options?: CompatibilityResolutionOptions,
-  ) => Promise<CompatibilityResolution>
-  verifyArtifact: (input: {
+  readReleaseManifestSnapshot: (input: {
     artifact: PackageArtifact
-    profile: VersionProfile
-  }) => Promise<PackageArtifactEvidence>
+  }) => Promise<ReleaseManifestSnapshot>
+  verifyArtifactProfiles: (input: {
+    artifact: PackageArtifact
+    profiles: VersionProfile[]
+  }) => Promise<PackageArtifactMatrixEvidence>
   verifyRegistryPackage: (
     request: RegistrySmokeVerificationRequest,
   ) => Promise<RegistrySmokeVerificationEvidence>
@@ -152,6 +158,7 @@ export interface ReleaseEffects {
     changeHeadCommit: string
     identity: ReleaseIdentity
     artifact: PackageArtifact
+    releaseBaseline: ReleaseBaseline
     tagName: string
   }) => Promise<void>
   fastForward: (input: {
@@ -176,17 +183,10 @@ export interface ReleaseEffects {
 
 export interface CreateReleaseEffectsOptions {
   artifactCreator?: ReleaseVerificationOperations['createArtifact']
-  artifactVerifier?: (
-    request: {
-      packageSource: { kind: 'retained', artifact: PackageArtifact }
-      profile: VersionProfile
-    },
-    operations: ReleaseVerificationOperations,
-  ) => Promise<PackageArtifactEvidence>
   clock?: () => Date
   commandRunner?: (invocation: CommandInvocation) => Promise<CommandResult>
   filesystem?: Partial<{
-    mkdir: (path: string, options: { recursive: true }) => Promise<unknown>
+    mkdir: (path: string, options?: { recursive?: boolean }) => Promise<unknown>
     mkdtemp: (prefix: string) => Promise<string>
     readFile: (
       path: string,
@@ -203,6 +203,12 @@ export interface CreateReleaseEffectsOptions {
     checks: ManualCheckName[]
     consumerDirectory: string
   }) => Promise<Record<string, boolean>>
+  matrixVerifier?: typeof runPackageArtifactMatrixVerification
+  profileProcessRunner?: (invocation: {
+    command: string
+    args: string[]
+    cwd: string
+  }) => Promise<void>
   registryVerifier?: typeof runRegistrySmokeVerification
   repositoryRoot?: string
   targetVersion?: string

@@ -10,8 +10,10 @@ import {
 } from '../scripts/release-verification/runner.mjs'
 import type {
   ConsumerInstallResult,
-  PackageArtifactMatrixVerificationRequest,
+  PackageArtifact,
+  PackageArtifactEvidence,
   PackageArtifactVerificationRequest,
+  VersionProfile,
 } from '../scripts/release-verification/runner.mjs'
 
 const knownLatestProfile = {
@@ -107,61 +109,41 @@ function createRequest(): PackageArtifactVerificationRequest {
   }
 }
 
-function createMatrixRequest(): PackageArtifactMatrixVerificationRequest {
+function createChildEvidence(
+  artifact: PackageArtifact,
+  profile: VersionProfile,
+): PackageArtifactEvidence {
   return {
-    packageSource: {
-      kind: 'pack',
-      repositoryRoot: '/repo',
+    schemaVersion: 1,
+    success: true,
+    mode: 'package-artifact',
+    package: {
+      name: artifact.packageName,
+      version: artifact.packageVersion,
     },
-    profiles: [minimumProfile, knownLatestProfile],
+    artifact: {
+      filename: artifact.filename,
+      sha256: artifact.sha256,
+    },
+    profile: {
+      id: profile.id,
+      requested: profile.versions,
+      resolved: profile.versions,
+      ...(profile.expectedResolutions
+        ? {
+            expectedResolutions: {
+              requested: profile.expectedResolutions,
+              resolved: profile.expectedResolutions,
+            },
+          }
+        : {}),
+    },
+    runtime: {
+      requested: profile.nodeVersion,
+      observed: profile.nodeVersion,
+    },
+    stages: [{ name: 'runtime', status: 'passed' }],
   }
-}
-
-function createMatrixOperations() {
-  const { artifact } = createOperations()
-  const workspaces = [
-    {
-      root: '/tmp/matrix-artifact',
-      artifactDirectory: '/tmp/matrix-artifact/artifact',
-      archiveDirectory: '/tmp/matrix-artifact/archive',
-      consumerDirectory: '/tmp/matrix-artifact/consumer',
-    },
-    {
-      root: '/tmp/matrix-v3-minimum',
-      artifactDirectory: '/tmp/matrix-v3-minimum/artifact',
-      archiveDirectory: '/tmp/matrix-v3-minimum/archive',
-      consumerDirectory: '/tmp/matrix-v3-minimum/consumer',
-    },
-    {
-      root: '/tmp/matrix-v3-known-latest',
-      artifactDirectory: '/tmp/matrix-v3-known-latest/artifact',
-      archiveDirectory: '/tmp/matrix-v3-known-latest/archive',
-      consumerDirectory: '/tmp/matrix-v3-known-latest/consumer',
-    },
-  ]
-  const resolvedVersions = new Map([
-    [minimumProfile.id, minimumProfile.versions],
-    [knownLatestProfile.id, knownLatestProfile.versions],
-  ])
-  const operations = {
-    createWorkspace: vi.fn(async () => {
-      const workspace = workspaces[operations.createWorkspace.mock.calls.length - 1]
-      if (!workspace) throw new Error('unexpected workspace request')
-      return workspace
-    }),
-    createArtifact: vi.fn(async () => artifact),
-    inspectArchive: vi.fn(async () => undefined),
-    installConsumer: vi.fn(async ({ profile }: { profile: typeof minimumProfile }) => ({
-      packageVersion: artifact.packageVersion,
-      profileVersions: resolvedVersions.get(profile.id)!,
-    })),
-    verifyPackageExports: vi.fn(async () => undefined),
-    verifyTypes: vi.fn(async () => undefined),
-    buildConsumer: vi.fn(async () => undefined),
-    smokeRuntime: vi.fn(async () => undefined),
-    cleanupWorkspace: vi.fn(async () => undefined),
-  }
-  return { artifact, operations, workspaces }
 }
 
 describe('package artifact verification runner', () => {
@@ -612,32 +594,26 @@ describe('registry smoke verification runner', () => {
 })
 
 describe('multi-profile package artifact runner', () => {
-  it('reuses one artifact while running the complete consumer contract for every profile', async () => {
-    const { artifact, operations, workspaces } = createMatrixOperations()
+  it('aggregates sequential child evidence for one retained artifact', async () => {
+    const { artifact } = createOperations()
+    const profiles = [minimumProfile, knownLatestProfile]
+    const verifyProfile = vi.fn(async ({ profile }: { profile: VersionProfile }) => (
+      createChildEvidence(artifact, profile)
+    ))
 
-    const evidence = await runPackageArtifactMatrixVerification(
-      createMatrixRequest(),
-      operations,
-    )
+    const evidence = await runPackageArtifactMatrixVerification({
+      artifact,
+      profiles,
+    }, verifyProfile)
 
-    expect(operations.createArtifact).toHaveBeenCalledOnce()
-    expect(operations.inspectArchive).toHaveBeenCalledOnce()
-    expect(operations.installConsumer).toHaveBeenCalledTimes(2)
-    expect(operations.installConsumer).toHaveBeenNthCalledWith(1, {
-      packageSource: { kind: 'artifact', artifact },
-      consumerDirectory: workspaces[1]!.consumerDirectory,
+    expect(verifyProfile).toHaveBeenNthCalledWith(1, {
+      artifact,
       profile: minimumProfile,
     })
-    expect(operations.installConsumer).toHaveBeenNthCalledWith(2, {
-      packageSource: { kind: 'artifact', artifact },
-      consumerDirectory: workspaces[2]!.consumerDirectory,
+    expect(verifyProfile).toHaveBeenNthCalledWith(2, {
+      artifact,
       profile: knownLatestProfile,
     })
-    expect(operations.verifyPackageExports).toHaveBeenCalledTimes(2)
-    expect(operations.verifyTypes).toHaveBeenCalledTimes(2)
-    expect(operations.buildConsumer).toHaveBeenCalledTimes(2)
-    expect(operations.smokeRuntime).toHaveBeenCalledTimes(2)
-    expect(operations.cleanupWorkspace).toHaveBeenCalledTimes(3)
     expect(evidence).toMatchObject({
       success: true,
       mode: 'package-artifact-matrix',
@@ -667,11 +643,36 @@ describe('multi-profile package artifact runner', () => {
   })
 
   it('continues after a profile fails and rejects with complete matrix evidence', async () => {
-    const { operations } = createMatrixOperations()
-    operations.verifyTypes.mockRejectedValueOnce(new Error('minimum type contract failed'))
+    const { artifact } = createOperations()
+    const failedEvidence: PackageArtifactEvidence = {
+      ...createChildEvidence(artifact, minimumProfile),
+      success: false,
+      stages: [
+        { name: 'node-runtime', status: 'passed' },
+        { name: 'install', status: 'passed' },
+        { name: 'exports', status: 'passed' },
+        { name: 'types', status: 'failed', error: 'minimum type contract failed' },
+        { name: 'build', status: 'skipped', reason: 'required stage types failed' },
+        { name: 'runtime', status: 'skipped', reason: 'required stage types failed' },
+        { name: 'cleanup', status: 'passed' },
+      ],
+    }
+    const verifyProfile = vi.fn(async ({ profile }: { profile: VersionProfile }) => {
+      if (profile.id === minimumProfile.id) {
+        throw new ReleaseVerificationFailure(
+          'types',
+          new Error('minimum type contract failed'),
+          failedEvidence,
+        )
+      }
+      return createChildEvidence(artifact, profile)
+    })
 
     const failure: CompatibilityMatrixVerificationFailure
-      = await runPackageArtifactMatrixVerification(createMatrixRequest(), operations)
+      = await runPackageArtifactMatrixVerification({
+        artifact,
+        profiles: [minimumProfile, knownLatestProfile],
+      }, verifyProfile)
         .then(
           () => { throw new Error('expected matrix verification to fail') },
           (error: unknown) => error as CompatibilityMatrixVerificationFailure,
@@ -682,6 +683,7 @@ describe('multi-profile package artifact runner', () => {
       profileId: minimumProfile.id,
       stage: 'types',
     }])
+    expect(verifyProfile).toHaveBeenCalledTimes(2)
     expect(failure.evidence.success).toBe(false)
     expect(failure.evidence.profiles.map(profile => ({
       id: profile.id,
@@ -704,64 +706,56 @@ describe('multi-profile package artifact runner', () => {
       {
         id: knownLatestProfile.id,
         success: true,
-        stages: [
-          ['node-runtime', 'passed'],
-          ['install', 'passed'],
-          ['exports', 'passed'],
-          ['types', 'passed'],
-          ['build', 'passed'],
-          ['runtime', 'passed'],
-          ['cleanup', 'passed'],
-        ],
+        stages: [['runtime', 'passed']],
       },
     ])
   })
 
-  it('rejects a profile whose declared Node runtime does not match the matrix process', async () => {
-    const { operations } = createMatrixOperations()
-    const mismatchedProfile = {
-      ...knownLatestProfile,
-      nodeVersion: '0.0.1',
-    }
+  it('rejects child requested coordinates that differ from the frozen profile', async () => {
+    const { artifact } = createOperations()
+    const verifyProfile = vi.fn(async ({ profile }: { profile: VersionProfile }) => {
+      const evidence = createChildEvidence(artifact, profile)
+      if (profile.id !== knownLatestProfile.id) return evidence
+      return {
+        ...evidence,
+        profile: {
+          ...evidence.profile,
+          requested: {
+            ...evidence.profile.requested,
+            nuxt: '4.9.0',
+          },
+        },
+      }
+    })
 
     const failure: CompatibilityMatrixVerificationFailure
       = await runPackageArtifactMatrixVerification({
-        ...createMatrixRequest(),
-        profiles: [minimumProfile, mismatchedProfile],
-      }, operations).then(
+        artifact,
+        profiles: [minimumProfile, knownLatestProfile],
+      }, verifyProfile).then(
         () => { throw new Error('expected matrix verification to fail') },
         (error: unknown) => error as CompatibilityMatrixVerificationFailure,
       )
 
     expect(failure.failures).toMatchObject([{
-      profileId: mismatchedProfile.id,
-      stage: 'node-runtime',
+      profileId: knownLatestProfile.id,
+      stage: 'artifact',
     }])
-    expect(operations.installConsumer).toHaveBeenCalledTimes(1)
-    expect(failure.evidence.profiles[1]).toMatchObject({
-      runtime: {
-        requested: mismatchedProfile.nodeVersion,
-        observed: process.versions.node,
-      },
-      stages: [
-        { name: 'node-runtime', status: 'failed' },
-        { name: 'install', status: 'skipped' },
-        { name: 'exports', status: 'skipped' },
-        { name: 'types', status: 'skipped' },
-        { name: 'build', status: 'skipped' },
-        { name: 'runtime', status: 'skipped' },
-        { name: 'cleanup', status: 'skipped' },
-      ],
+    expect(failure.failures[0]?.cause).toMatchObject({
+      message: expect.stringContaining('mismatched requested coordinates'),
     })
+    expect(failure.evidence.profiles).toHaveLength(1)
+    expect(failure.evidence.profiles[0]?.id).toBe(minimumProfile.id)
   })
 
-  it('rejects an empty matrix before creating temporary state', async () => {
-    const { operations } = createMatrixOperations()
+  it('rejects an empty matrix before invoking the outer verifier', async () => {
+    const { artifact } = createOperations()
+    const verifyProfile = vi.fn()
 
     await expect(runPackageArtifactMatrixVerification({
-      ...createMatrixRequest(),
+      artifact,
       profiles: [],
-    }, operations)).rejects.toThrow('at least one Version Profile')
-    expect(operations.createWorkspace).not.toHaveBeenCalled()
+    }, verifyProfile)).rejects.toThrow('at least one Version Profile')
+    expect(verifyProfile).not.toHaveBeenCalled()
   })
 })
