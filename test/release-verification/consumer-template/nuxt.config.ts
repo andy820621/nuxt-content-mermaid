@@ -1,8 +1,5 @@
 export default defineNuxtConfig({
-  modules: [
-    '@barzhsieh/nuxt-content-mermaid',
-    '@nuxt/content',
-  ],
+  modules: ['@barzhsieh/nuxt-content-mermaid'],
   srcDir: '.',
   compatibilityDate: '2025-11-24',
   nitro: {
