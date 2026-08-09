@@ -6,7 +6,7 @@ Accepted for the 3.x release line. This specification is the source of truth for
 
 ## Release Boundary
 
-Version 3.0 keeps the existing Nuxt compatibility range (`^3.20.1 || ^4.1.0`) while Nuxt Content supports Nuxt 3. It preserves the public `$mermaid: () => Promise<Mermaid>` injection, current Custom Renderer interface, styling hooks, manual theme control, and Mermaid configuration capability available through direct application code.
+Version 3.0 supports Nuxt `^4.1.0` with Nuxt Content `>=3.5.0 <4.0.0`. It preserves the public `$mermaid: () => Promise<Mermaid>` injection, current Custom Renderer interface, styling hooks, manual theme control, and Mermaid configuration capability available through direct application code.
 
 Version 3.0 deliberately breaks the legacy aliases and configuration behaviors listed under [Public Interface and Breaking Changes](#public-interface-and-breaking-changes).
 
@@ -199,7 +199,7 @@ Browser verification against Mermaid 11.12.3 established that a truly disconnect
 | Invalid configuration | Fail fast without fallback and expose diagnostic fingerprints | Invalid transport or config props stop their owning phase |
 | Rendering | Only the latest legal successful generation commits | Stale or failing renders no longer clear the Committed Diagram |
 
-Unchanged public contracts include the Nuxt compatibility range, `$mermaid` injection, Direct Mermaid Config capability, Custom Renderer inputs, CSS hooks, lazy-loading behavior, and manual theme composable.
+Other preserved public contracts include the `$mermaid` injection, Direct Mermaid Config capability, Custom Renderer inputs, CSS hooks, lazy-loading behavior, and manual theme composable.
 
 ## Derived Behavior
 
@@ -233,7 +233,7 @@ These choices are internal, reversible, and not public contracts:
 ## Out of Scope
 
 - physical cancellation, `AbortSignal`, queue coalescing, queue replacement, and other wasted-work optimizations;
-- Nuxt 4.3 native `contentMermaid: false` while the package supports Nuxt 3;
+- Nuxt 4.3 native `contentMermaid: false` while the minimum supported Nuxt version remains 4.1;
 - reactive runtime configuration with specified Mermaid reinitialization and rerender behavior;
 - a new client-only extension seam for capabilities not carried by Direct Mermaid Config;
 - a versioned public structured-diagnostics interface;
@@ -249,7 +249,7 @@ Implementation is complete only when tests cover:
 - public type regressions for recursive pure data, removed aliases, and mutually exclusive props;
 - every validation category, phase-local aggregation, issue cap, sorting, path formatting, descriptor safety, cycles, and shared references;
 - Property-Presence Merge and the complete expand transformation matrix;
-- build resolver priority, separated activation, Nuxt 3-compatible disable behavior, alias migration failure, and final runtime transport;
+- build resolver priority, separated activation, Nuxt 4.1-compatible disable behavior, alias migration failure, and final runtime transport;
 - per-NuxtApp snapshot ownership, proxy detachment, deep freeze, fail-fast behavior, and non-live runtime mutation;
 - Page and Direct source validation, capability materialization, open-key preservation, and per-invocation isolation;
 - Markdown metadata ownership, Selective Fallback, and the Page Mermaid Config protocol;
