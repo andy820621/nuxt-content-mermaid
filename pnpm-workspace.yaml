@@ -18,7 +18,7 @@ catalogs:
     yaml: ^2.8.2
   integrations:
     '@nuxt/content': 3.15.2
-    '@nuxt/kit': ^4.5.2
+    '@nuxt/kit': ^3.21.11
     '@nuxt/schema': 4.5.2
     '@nuxtjs/mdc': ^0.20.1
     mermaid: ~11.16.1
