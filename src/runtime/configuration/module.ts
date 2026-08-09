@@ -10,10 +10,10 @@ import {
   DEFAULT_EXPAND_OPTIONS,
   DEFAULT_RUNTIME_OPTIONS,
   DEFAULT_TOOLBAR_OPTIONS,
-} from '../runtime/constants'
-import type { JsonObject, JsonValue, RuntimeOptions } from '../types/config'
-import type { MermaidToolbarOptions } from '../types/mermaid'
-import type { ExpandOptions } from '../runtime/types/expand'
+} from '../constants'
+import type { ExpandOptions } from '../types/expand'
+import type { JsonObject, JsonValue, RuntimeOptions } from '../../types/config'
+import type { MermaidToolbarOptions } from '../../types/mermaid'
 
 export interface ModuleConfigurationInput {
   readonly nuxtResolvedOptions: unknown

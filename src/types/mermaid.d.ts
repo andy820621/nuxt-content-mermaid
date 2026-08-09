@@ -30,7 +30,7 @@ declare module 'vue' {
   }
 }
 
-declare module 'nuxt/schema' {
+declare module '@nuxt/schema' {
   interface NuxtConfig {
     contentMermaid?: ModuleOptions
   }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   resolveRuntimeOptionsSnapshot,
 } from '../src/runtime/configuration/runtime-options'
-import { resolveExpandOptions, resolveModuleConfiguration } from '../src/configuration/module'
+import { resolveExpandOptions, resolveModuleConfiguration } from '../src/runtime/configuration/module'
 
 describe('runtime options snapshot resolver', () => {
   it('applies runtime and debug defaults before deeply freezing the owned result', () => {

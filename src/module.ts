@@ -8,8 +8,8 @@ import {
   addImports,
 } from '@nuxt/kit'
 import type { FileBeforeParseHook } from '@nuxt/content'
-import { ContentMermaidConfigurationError } from './configuration/core'
-import { resolveModuleConfiguration } from './configuration/module'
+import { ContentMermaidConfigurationError } from './runtime/configuration/core'
+import { resolveModuleConfiguration } from './runtime/configuration/module'
 import { transformMarkdownDiagrams } from './markdown-diagram-transform'
 import type { ModuleOptions } from './types/config'
 

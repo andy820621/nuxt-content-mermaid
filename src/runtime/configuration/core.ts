@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from '../types/config'
+import type { JsonObject, JsonValue } from '../../types/config'
 
 export interface ConfigurationValidationPhase {
   readonly name: string

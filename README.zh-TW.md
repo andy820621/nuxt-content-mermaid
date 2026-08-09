@@ -582,6 +582,19 @@ export default defineNuxtConfig({
 })
 ```
 
+## 相容性
+
+公開 peer contract 支援 Nuxt `^3.20.1 || ^4.1.0` 與 Nuxt Content `>=3.5.0 <4.0.0`。Pull request 會驗證固定版本的 Representative Compatibility Matrix，涵蓋兩條 Nuxt 支援線的最低版本、刻意固定的 known-latest 版本，以及兩個高風險交叉邊界組合。
+
+這份矩陣是完整 peer range 的代表性證據，不是唯一支援版本清單。如果 metadata 允許的 profile 失敗，必須修復相容性、誠實收窄共同 peer range，或維護不同 release line；不能靠刪除 profile 或降低 Package User assertions 取得綠燈。
+
+本機可執行單一 profile，或執行與 CI 相同的完整 pinned matrix：
+
+```bash
+pnpm test:package-artifact
+pnpm test:compatibility-matrix
+```
+
 ## 支持專案
 
 如果這個模組對你有幫助，歡迎透過 [Ko-fi 支持我的開源工作](https://ko-fi.com/barzhsieh)。你的支持將協助專案持續維護、相容性更新、測試與文件撰寫。
@@ -601,6 +614,7 @@ pnpm install        # 安裝依賴
 pnpm dev:prepare    # 建置模組 stub 並準備 playground
 pnpm dev            # 啟動 playground
 pnpm test           # 執行測試
+pnpm test:compatibility-matrix # 驗證所有固定版本的 Package User profiles
 pnpm lint           # 執行 ESLint
 pnpm test:types     # 型別檢查
 ```

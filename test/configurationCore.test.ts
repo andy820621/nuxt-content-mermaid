@@ -6,7 +6,7 @@ import {
   cloneAndDeepFreezeOwnedData,
   cloneOwnedData,
   mergeByPresence,
-} from '../src/configuration/core'
+} from '../src/runtime/configuration/core'
 
 const runtimeOptionsPhase = {
   name: 'Runtime Mermaid Options',
