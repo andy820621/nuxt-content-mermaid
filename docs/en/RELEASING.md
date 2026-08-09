@@ -1,174 +1,168 @@
 # Releasing
 
-The release command is a blocking gate. It publishes only the tarball that has
-already passed automated and, by default, manual verification.
+Release preparation, Git publication, and npm publication are separate boundaries.
+The program owns reproducible verification and exact-tarball npm reconciliation;
+the maintainer owns the ordinary Git handoff.
 
 ## Before starting
 
 - Check out `main` and leave its worktree clean.
 - Install dependencies and ensure npm authentication can publish
   `@barzhsieh/nuxt-content-mermaid`.
-- Ensure [Volta](https://volta.sh/) is available. The gate uses it to run each
-  frozen Compatibility Profile under that profile's exact Node runtime.
-- Choose an exact SemVer greater than the version in `package.json`. The target
-  must not already exist in npm.
-- Do not create the release tag or change the package version by hand.
-- Ensure `.release-evidence/<version>/` does not exist. The gate never
-  overwrites release evidence.
+- Ensure [Volta](https://volta.sh/) is available. Preparation runs each frozen
+  Compatibility Profile under its exact Node runtime.
+- Choose an exact SemVer greater than `package.json`. It must not already exist
+  in npm.
+- Ensure `.release-evidence/<version>/` does not exist. Release evidence is
+  ephemeral and is never overwritten or migrated.
+- Do not change the package version, create the final tag, or publish manually.
 
-## Run a release
+## Prepare and verify
 
-```bash
-pnpm release 3.0.0
-```
-
-The gate runs `pnpm verify:source`, prepares version and changelog changes in an
-isolated worktree, creates one local release commit, and packs exactly once. It
-retains that tarball under `.release-evidence/3.0.0/`, freezes the tarball
-identity, shallow package manifest contract, and the exact `v3-minimum` and
-`v3-known-latest` Version Profiles, then verifies both profiles sequentially
-through independent clean Package User applications. Each verifier runs under
-its profile's exact Node runtime. The gate then starts a second Package User
-application with the frozen `v3-known-latest` profile for the manual checks.
-
-If any automated or manual gate fails, inspect the evidence, then move or
-remove the entire `.release-evidence/<version>/` directory and rerun the same
-release command from the beginning. There is no resume or partial-profile
-retry. If the directory already exists, the release command refuses to start
-until the maintainer handles it explicitly.
-
-Inspect `.release-evidence/<version>/release.json` without editing it. The
-`releaseBaseline` records the five shallow manifest values and both complete
-profiles; `identity` and `artifact` identify the prepared source and retained
-tarball; `compatibilityProfiles` records requested and observed coordinates,
-Node runtimes, stages, and failures.
-
-Any release-code, manifest-range, Version Profile, prepared-source, or artifact
-change after the freeze invalidates all prior evidence. Move or remove the
-whole evidence directory, rebuild the artifact, and rerun both profiles. A
-security exception follows the same rule and cannot reuse evidence produced
-before reopening the baseline. Ordinary upstream releases discovered after the
-freeze are deferred to a later package release; they do not silently alter the
-current release candidate.
-
-Answer every manual prompt after checking the displayed Package User
-application URL:
-
-1. enter and exit fullscreen without losing the SVG or page state;
-2. zoom, pan, and drag, then recover the viewport;
-3. verify clipboard content and feedback;
-4. verify controls and interactions in a narrow viewport; and
-5. check labels, connectors, and controls for clipping, overlap, or runaway
-   sizing.
-
-A missing or failed answer stops the release. For a release that genuinely
-does not need interaction verification, provide an explicit non-empty reason:
+Run the complete pre-publication gate:
 
 ```bash
-pnpm release 3.0.1 --skip-manual "documentation-only release"
+pnpm release:prepare 3.0.0
 ```
 
-After all gates pass, the command fast-forwards `main` to the prepared commit,
-creates `v<version>`, atomically pushes `main` and the tag, and publishes the
-retained tarball to `latest` with lifecycle scripts disabled. It revalidates
-Git, the tag, frozen manifest and profile values, and tarball SHA-256/SHA-512
-identity before every external effect.
+Preparation runs `pnpm verify:source`, creates an isolated release commit, packs
+exactly once, retains that tarball under `.release-evidence/3.0.0/`, freezes the
+`v3-minimum` and `v3-known-latest` profiles, verifies both profiles, and performs
+the required manual interaction checks. It stops at `status: verified`; it does
+not change formal `main`, create the final tag, contact a Git remote, or publish
+to npm.
 
-## Registry health after publication
-
-Publication and registry health are separate. `status: published` means npm
-accepted the release; before Registry Smoke begins, the gate requires npm's
-published integrity to match the frozen tarball. `registryHealth.status`
-reports whether a clean Package User application installed and ran that exact
-version with the frozen `v3-known-latest` Version Profile.
-
-A successful first smoke check records `registryHealth.status: healthy`. A
-first failure records `registryHealth.status: investigation`; it is not yet a
-package defect. Use this one and only retry command:
+For a release that genuinely does not need interaction verification, record an
+explicit non-empty reason:
 
 ```bash
-pnpm release registry-smoke 3.0.0
+pnpm release:prepare 3.0.1 --skip-manual "documentation-only release"
 ```
 
-It reads the frozen profile from `.release-evidence/3.0.0/release.json`; do not
-change the package version or profile while investigating.
+Inspect `.release-evidence/3.0.0/release.json` without editing it. Record these
+values for the handoff:
 
-### Recovery sequence for an unhealthy release
+- `identity.sourceCommit`: the prepared commit that produced the artifact;
+- `preparationBranch`: normally `release-prep/v3.0.0`;
+- `identity.artifactIntegritySha512`: the retained tarball's npm SHA-512; and
+- `artifact.archivePath`: the only tarball publication may use.
 
-1. Inspect the first attempt with this read-only command. It prints its stage,
-   classification, requested profile, resolved profile, and diagnostics without
-   changing the evidence; preserve the evidence before retrying.
+Any release-code, evidence-schema, manifest-range, Version Profile, source, or
+artifact change invalidates the evidence. Inspect and move or remove the whole
+evidence directory, then prepare again; never migrate or reuse stale evidence.
 
-   ```bash
-   node --input-type=module -e '
-   import { readFileSync } from "node:fs"
-   const evidence = JSON.parse(readFileSync(".release-evidence/3.0.0/release.json", "utf8"))
-   const health = evidence.registryHealth
-   const attempt = health.attempts[0]
-   console.log(JSON.stringify({
-     stage: attempt.stage,
-     classification: attempt.classification,
-     requestedProfile: health.profile.requested,
-     resolvedProfile: health.profile.resolved,
-     diagnostics: attempt.verification.stages
-       .filter(stage => stage.error || stage.reason)
-       .map(({ name, status, error, reason }) => ({ name, status, error, reason })),
-   }, null, 2))
-   '
-   ```
-2. If the classification is `registry`, `network`, `runner`, or `permission`,
-   fix that infrastructure issue without changing the package version or the
-   frozen profile.
-3. From an independent clean environment, run:
+## Perform the Git handoff
 
-   ```bash
-   pnpm release registry-smoke 3.0.0
-   ```
-
-4. Treat only `registryHealth.status: unhealthy` as a confirmed package
-   defect. A result of `investigation` still needs investigation; it is not a
-   reason to withdraw the release.
-5. For a confirmed defect, manually deprecate only the exact affected version:
-
-   ```bash
-   npm deprecate "@barzhsieh/nuxt-content-mermaid@3.0.0" "Use <known-good-version>; fix tracked in <issue-or-version>"
-   ```
-
-6. Prepare a normal corrective patch, then verify its registry health:
-
-   ```bash
-   pnpm release <patch-version>
-   ```
-
-Never use `npm unpublish`. Never create or use candidate dist-tags, move tags,
-auto-promote, auto-deprecate, auto-publish a patch, or perform automatic
-rollback. Deprecation is a manual maintainer action only.
-
-## Evidence and failures
-
-`.release-evidence/<version>/release.json` is a local journal, not an approval
-token. It records source checks, the prepared commit, both frozen Compatibility
-Profiles and their requested/observed evidence, manual results or skip reason,
-status, timestamps, and failure details. The retained tarball remains beside
-it. Both are gitignored.
-
-If a failure occurs before push, fix the cause and start a fresh release. Never
-reuse an unverified tarball or publish it manually.
-
-If the atomic push succeeded but npm publish failed or returned an ambiguous
-result, use the one narrow recovery command:
+With `<sourceCommit>` copied from the frozen evidence, run:
 
 ```bash
-pnpm release reconcile 3.0.0
+git merge --ff-only <sourceCommit>
+git tag -a v3.0.0 <sourceCommit> -m "v3.0.0"
+git push --atomic origin main v3.0.0
+git ls-remote origin refs/heads/main refs/tags/v3.0.0 'refs/tags/v3.0.0^{}'
 ```
 
-Reconciliation revalidates the local commit, tag, manifests, path, and retained
-tarball integrity. It then queries the exact npm version:
+Visually compare both the remote `main` object and the peeled
+`refs/tags/v3.0.0^{}` object with `identity.sourceCommit`. Do not proceed unless
+both match. The direct tag object may differ because an annotated tag has its
+own object; the peeled target must equal the source commit.
 
-- absent: publish the same retained tarball again;
-- present with matching integrity: finish without republishing; or
-- present with different integrity: stop with a fatal conflict.
+These are explicit maintainer-owned Git operations, not release-journal states.
+Never force-update the branch or tag through the release program.
 
-Do not use reconciliation for failures that occurred before push. If the
-registry result is still unknown, leave the evidence and tarball in place and
-retry reconciliation later.
+## Publish the frozen tarball
+
+After the local and remote refs have been verified, run:
+
+```bash
+pnpm release:publish 3.0.0
+```
+
+Publication independently revalidates the clean local `main`, local tag, remote
+`main`, peeled remote tag, manifests, retained archive path, SHA-256, and npm
+SHA-512 before npm access. It queries the exact registry version first:
+
+- absent: publish the retained tarball with lifecycle scripts disabled, then
+  query the exact version again before recording `published`;
+- present with matching `dist.integrity`: record `published` without
+  republishing; or
+- present with different `dist.integrity`: stop with a fatal artifact conflict.
+
+It never rebuilds, repacks, accepts another tarball, or infers success merely
+from the npm command response.
+
+After publication and Registry Smoke complete successfully, remove the local
+reachability anchor:
+
+```bash
+git branch -d release-prep/v3.0.0
+```
+
+## Narrow recovery rules
+
+### Preparation failure
+
+The program removes the disposable worktree and preparation branch after a
+failed preparation. Inspect the invalid evidence directory, then move or remove
+that whole directory and rerun `pnpm release:prepare 3.0.0`. Do not reuse any
+partial artifact or profile result.
+
+### Local handoff completed but push not confirmed
+
+If local `main` was fast-forwarded but push has not succeeded, do not rerun
+preparation. Correct the local annotated tag if needed and continue from the
+frozen evidence.
+
+If the atomic push reports an error or its response is lost, run:
+
+```bash
+git ls-remote origin refs/heads/main refs/tags/v3.0.0 'refs/tags/v3.0.0^{}'
+```
+
+- If both remote targets resolve to `sourceCommit`, proceed to npm publication.
+- If neither ref exists, rerun the same atomic push.
+- If only one ref matches, or either points elsewhere, stop for manual Git
+  diagnosis. Do not force-update, roll back, replace a tag, or start a new
+  release through the program.
+
+### npm result is ambiguous
+
+Rerun the same idempotent command:
+
+```bash
+pnpm release:publish 3.0.0
+```
+
+It rechecks local and remote identity and the exact npm `dist.integrity` before
+deciding whether publication is still necessary. Indeterminate lookup or
+publication evidence remains `verified` with `lastFailure`; keep the frozen
+evidence and retained tarball in place.
+
+### Registry Smoke failure
+
+Publication and registry health are independent. A first Registry Smoke failure
+records `registryHealth.status: investigation` without reversing publication.
+After infrastructure diagnosis, use only this one retry:
+
+```bash
+pnpm release:registry-smoke 3.0.0
+```
+
+The first attempt and retry both use the complete frozen `v3-known-latest`
+profile stored in the release evidence. They never resolve current registry
+latest versions or accept a profile override.
+
+Treat only `registryHealth.status: unhealthy` after the independent retry as a
+confirmed package defect. A maintainer may then manually deprecate only that
+exact version and prepare a normal corrective release. Never unpublish,
+auto-deprecate, auto-publish a patch, move a dist-tag, or perform automatic
+rollback.
+
+## Evidence boundary
+
+`.release-evidence/<version>/release.json` and the retained tarball are local,
+gitignored, ephemeral evidence. The journal records facts proven by the script:
+`verified` means the source and retained artifact passed every gate; `published`
+means the exact npm version has matching integrity. Git publication remains a
+human-owned boundary that `release:publish` rechecks rather than inferring from
+a timestamp.

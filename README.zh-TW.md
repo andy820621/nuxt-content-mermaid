@@ -56,30 +56,22 @@
 
 ## 快速開始
 
-### 1. 安裝模組
+### 1. 安裝套件
 
-您的應用程式擁有 Nuxt 與 Nuxt Content 這兩個 peer dependencies：請在應用程式內安裝與更新它們。Mermaid 則是本模組綁定的 Module-Owned Dependency，因此不必為了本模組另行安裝。
-
-**自動設定（自動寫入 `modules`）：**
-
-```bash
-npx nuxi module add @barzhsieh/nuxt-content-mermaid
-```
-
-> Nuxt CLI 對第三方模組預設會裝到 `dependencies`。若你偏好放在 `devDependencies`，請安裝完後移動或改用下方的方式手動安裝。
-
-**裝到 `devDependencies`（需手動加入 `modules`）：**
+套件管理器安裝與 Nuxt 模組初始化是兩個不同步驟。您的應用程式擁有 Nuxt 與 Nuxt Content 這兩個 peer dependencies，因此必須自行安裝、鎖定與更新它們。請一併安裝本模組與支援範圍內的 Nuxt Content peer：
 
 ```bash
 # pnpm
-pnpm add -D @barzhsieh/nuxt-content-mermaid
+pnpm add @barzhsieh/nuxt-content-mermaid @nuxt/content
 
 # npm
-npm install -D @barzhsieh/nuxt-content-mermaid
+npm install @barzhsieh/nuxt-content-mermaid @nuxt/content
 
 # yarn
-yarn add -D @barzhsieh/nuxt-content-mermaid
+yarn add @barzhsieh/nuxt-content-mermaid @nuxt/content
 ```
+
+Mermaid 是本模組綁定的 Module-Owned Dependency，因此不必為了本模組另行安裝。
 
 > [!NOTE]
 > **`better-sqlite3`** — `@nuxt/content` v3+ 需要 `better-sqlite3` 才能運作。若你的專案尚未安裝，Nuxt 會在首次啟動時提示安裝。你也可以預先安裝：
@@ -102,15 +94,19 @@ yarn add -D @barzhsieh/nuxt-content-mermaid
 > }
 > ```
 
-### 2. 配置 `nuxt.config.ts`
+### 2. 初始化 Nuxt 模組
 
-確保模組已加入 `modules` 清單（若使用 `nuxi module add` 則可略過）：
+標準 `modules` 設定只需列出本模組：
 
 ```ts
 export default defineNuxtConfig({
-  modules: ["@barzhsieh/nuxt-content-mermaid", "@nuxt/content"],
+  modules: ["@barzhsieh/nuxt-content-mermaid"],
 });
 ```
+
+本模組透過 `moduleDependencies` 宣告必要的 Nuxt Content 關係與相容版本，因此 Nuxt 會依必要順序初始化已安裝的 `@nuxt/content` 模組。這項宣告不會安裝、鎖定或更新 Nuxt Content；這些套件管理器責任仍由您的應用程式承擔。
+
+若您的應用程式已在 `modules` 中手動列出 `@nuxt/content`，可以保留該項設定。手動列出仍受支援，但不再是標準設定。
 
 ### 3. 在 Markdown 中使用
 
@@ -256,7 +252,7 @@ export default defineNuxtConfig({
 可透過 `toolbar.fullscreenToolbarScale` 調整 Fullscreen 工具列與縮放控制的尺寸。
 
 
-> **注意**：`contentMermaid.enabled` 在 Nuxt setup 時決定模組啟用狀態，絕不是 public runtime 設定。`runtimeConfig.public.contentMermaid` 只能傳遞嚴格純資料，並在每個 Nuxt 應用程式初始化時解析一次；之後變更它不會更新既有的 Runtime Mermaid Snapshot。
+> **注意**：`contentMermaid.enabled` 在 Nuxt setup 時決定模組啟用狀態。設為 `false` 只會停用 Mermaid 的 Content／runtime integration，不會停用 Nuxt Content。它絕不是 public runtime 設定。`runtimeConfig.public.contentMermaid` 只能傳遞嚴格純資料，並在每個 Nuxt 應用程式初始化時解析一次；之後變更它不會更新既有的 Runtime Mermaid Snapshot。
 
 ## 遷移至 v3
 
@@ -590,15 +586,15 @@ export default defineNuxtConfig({
 
 ## 相容性
 
-公開 peer contract 支援 Nuxt `^3.20.1 || ^4.1.0` 與 Nuxt Content `>=3.5.0 <4.0.0`。Pull request 會驗證固定版本的 Representative Compatibility Matrix，涵蓋兩條 Nuxt 支援線的最低版本、刻意固定的 known-latest 版本，以及兩個高風險交叉邊界組合。
+公開 peer contract 支援 Nuxt `^4.1.0` 與 Nuxt Content `>=3.5.0 <4.0.0`。發布前會驗證兩個固定的 package artifact profiles：位於公開最低版本的 `v3-minimum`，以及刻意固定已知最新版本的 `v3-known-latest`。兩者都會在各自的精確 Node runtime 下驗證 clean installation、公開型別、production build 與基本瀏覽器 SVG rendering。
 
-這份矩陣是完整 peer range 的代表性證據，不是唯一支援版本清單。如果 metadata 允許的 profile 失敗，必須修復相容性、誠實收窄共同 peer range，或維護不同 release line；不能靠刪除 profile 或降低 Package User assertions 取得綠燈。
+這兩個 profiles 是完整 peer range 的代表性證據，不是唯一支援版本清單。如果 profile 失敗，必須診斷並修復相容性邊界；不能靠刪除 profile 或降低 Package User assertions 取得綠燈。
 
-本機可執行單一 profile，或執行與 CI 相同的完整 pinned matrix：
+請在各 profile 的精確 Node runtime 下執行：
 
 ```bash
-pnpm test:package-artifact
-pnpm test:compatibility-matrix
+volta run --node 22.19.0 pnpm test:compatibility-profile --profile v3-minimum
+volta run --node 24.19.0 pnpm test:package-artifact
 ```
 
 ## 支持專案
@@ -620,7 +616,7 @@ pnpm install        # 安裝依賴
 pnpm dev:prepare    # 建置模組 stub 並準備 playground
 pnpm dev            # 啟動 playground
 pnpm test           # 執行測試
-pnpm test:compatibility-matrix # 驗證所有固定版本的 Package User profiles
+pnpm test:package-artifact # 驗證 known-latest package artifact profile
 pnpm lint           # 執行 ESLint
 pnpm test:types     # 型別檢查
 ```

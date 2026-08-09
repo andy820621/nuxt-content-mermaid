@@ -179,6 +179,7 @@ function createContractManifest(overrides: Record<string, unknown> = {}) {
 }
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, {
     recursive: true,
     force: true,
@@ -186,6 +187,50 @@ afterEach(async () => {
 })
 
 describe('clean consumer installation', () => {
+  it('keeps pnpm lifecycle-only config out of the consumer npm install', async () => {
+    const templateDirectory = await createTemplate()
+    const consumerDirectory = await createTemporaryDirectory('lifecycle-isolated-consumer')
+    vi.stubEnv('npm_config_allow_scripts', 'esbuild')
+    vi.stubEnv('npm_config_globalconfig', '/pnpm/lifecycle/npmrc')
+    vi.stubEnv('NPM_CONFIG_REGISTRY', 'https://registry.example.test/')
+    const commandRunner = vi.fn(async (invocation) => {
+      await runCommand({
+        command: process.execPath,
+        args: [
+          '-e',
+          `
+if (process.env.npm_config_allow_scripts || process.env.npm_config_globalconfig) {
+  console.error('pnpm lifecycle-only config reached the consumer install')
+  process.exit(1)
+}
+if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
+  console.error('unrelated npm registry config was removed')
+  process.exit(1)
+}
+`,
+        ],
+        cwd: invocation.cwd,
+        env: invocation.env,
+      })
+      await populateInstalledPackages(consumerDirectory, '3.0.0')
+      return {}
+    })
+    const operations = createReleaseVerificationOperations({
+      templateDirectory,
+      commandRunner,
+    })
+
+    await expect(operations.installConsumer({
+      packageSource: {
+        kind: 'registry',
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+      },
+      consumerDirectory,
+      profile,
+    })).resolves.toMatchObject({ packageVersion: '3.0.0' })
+  })
+
   it('installs only the exact registry version and reports the resolved identity', async () => {
     const templateDirectory = await createTemplate()
     const consumerDirectory = await createTemporaryDirectory('registry-consumer')
@@ -220,6 +265,10 @@ describe('clean consumer installation', () => {
       command: 'npm',
       args: ['install', '--no-audit', '--no-fund', '--package-lock=true'],
       cwd: consumerDirectory,
+      env: {
+        npm_config_allow_scripts: undefined,
+        npm_config_globalconfig: undefined,
+      },
     })
   })
 

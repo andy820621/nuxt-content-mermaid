@@ -94,6 +94,11 @@ export default defineNuxtModule<ModuleOptions>({
       nuxt: '^4.1.0',
     },
   },
+  moduleDependencies: {
+    '@nuxt/content': {
+      version: '>=3.5.0 <4.0.0',
+    },
+  },
   setup(options, nuxt) {
     assertNoLegacyModuleAlias(nuxt.options)
     const publicRuntimeConfig = nuxt.options.runtimeConfig.public

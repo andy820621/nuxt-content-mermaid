@@ -57,33 +57,26 @@ snapshot limits, see the [Dependency and Migration Contract](./docs/en/DEPENDENC
 
 ## Quick Setup
 
-### 1. Install the module
+### 1. Install the packages
 
-Your application owns the Nuxt and Nuxt Content peer dependencies: install and
-update them in the application. Mermaid is bundled as this module's
-Module-Owned Dependency, so you do not need to install it separately for this
-module.
-
-**Auto-setup (adds to `modules` automatically):**
-
-```bash
-npx nuxi module add @barzhsieh/nuxt-content-mermaid
-```
-
-> Nuxt CLI installs third-party modules as regular `dependencies` by default. If you prefer `devDependencies`, move it after install or use the manual option below.
-
-**Install as dev dependency (manual modules entry):**
+Package-manager installation and Nuxt module initialization are separate
+steps. Your application owns the Nuxt and Nuxt Content peer dependencies, so it
+must install, pin, and update them. Install this module together with the
+supported Nuxt Content peer:
 
 ```bash
 # pnpm
-pnpm add -D @barzhsieh/nuxt-content-mermaid
+pnpm add @barzhsieh/nuxt-content-mermaid @nuxt/content
 
 # npm
-npm install -D @barzhsieh/nuxt-content-mermaid
+npm install @barzhsieh/nuxt-content-mermaid @nuxt/content
 
 # yarn
-yarn add -D @barzhsieh/nuxt-content-mermaid
+yarn add @barzhsieh/nuxt-content-mermaid @nuxt/content
 ```
+
+Mermaid is bundled as this module's Module-Owned Dependency, so you do not need
+to install it separately for this module.
 
 > [!NOTE]
 > **`better-sqlite3`** — `@nuxt/content` v3+ requires `better-sqlite3` at runtime. If it is not already in your project, Nuxt will prompt you to install it on first launch. You can also install it ahead of time:
@@ -106,15 +99,25 @@ yarn add -D @barzhsieh/nuxt-content-mermaid
 > }
 > ```
 
-### 2. Configure `nuxt.config.ts`
+### 2. Initialize the Nuxt module
 
-Make sure the module is included in the `modules` array (skip if you used `nuxi module add`):
+List only this module in the standard `modules` configuration:
 
 ```ts
 export default defineNuxtConfig({
-  modules: ["@barzhsieh/nuxt-content-mermaid", "@nuxt/content"],
+  modules: ["@barzhsieh/nuxt-content-mermaid"],
 });
 ```
+
+The module declares the required Nuxt Content relationship and compatible
+version through `moduleDependencies`, so Nuxt initializes the installed
+`@nuxt/content` module in the required order. This does not install, pin, or
+update Nuxt Content; those package-manager responsibilities remain with your
+application.
+
+If your application already lists `@nuxt/content` manually in `modules`, you
+may keep that entry. Manual listing remains supported, but it is no longer the
+standard configuration.
 
 ### 3. Use Mermaid in Markdown
 
@@ -260,7 +263,7 @@ A zoom toolbar appears with +/−/Reset buttons and a percentage display.
 Use `toolbar.fullscreenToolbarScale` to scale the fullscreen toolbar and zoom controls.
 
 
-> **Note**: `contentMermaid.enabled` controls Module Activation during Nuxt setup. It is never a public runtime setting. `runtimeConfig.public.contentMermaid` carries only strict pure data and is resolved once during each Nuxt application initialization; mutating it later does not update the established Runtime Mermaid Snapshot.
+> **Note**: `contentMermaid.enabled` controls Module Activation during Nuxt setup. Setting it to `false` disables only the Mermaid Content/runtime integration; it does not disable Nuxt Content. It is never a public runtime setting. `runtimeConfig.public.contentMermaid` carries only strict pure data and is resolved once during each Nuxt application initialization; mutating it later does not update the established Runtime Mermaid Snapshot.
 
 ## Migrating to v3
 
@@ -594,15 +597,15 @@ export default defineNuxtConfig({
 
 ## Compatibility
 
-The public peer contract supports Nuxt `^3.20.1 || ^4.1.0` and Nuxt Content `>=3.5.0 <4.0.0`. Pull requests verify a pinned Representative Compatibility Matrix covering both minimum lines, deliberately pinned known-latest lines, and the two high-risk cross-boundary combinations.
+The public peer contract supports Nuxt `^4.1.0` and Nuxt Content `>=3.5.0 <4.0.0`. Releases verify two fixed package artifact profiles: `v3-minimum` at the public floors and `v3-known-latest` at the deliberately pinned known-latest versions. Both profiles cover clean installation, public types, production build, and basic browser SVG rendering under their exact Node runtimes.
 
-The matrix is evidence for the complete peer range, not a list of the only supported versions. If an allowed profile fails, the resolution is to fix compatibility, honestly narrow the shared peer range, or maintain a separate release line—not to remove that profile or weaken its Package User assertions.
+These profiles are evidence for the complete peer range, not a list of the only supported versions. If a profile fails, the resolution is to diagnose and fix the compatibility boundary—not to remove that profile or weaken its Package User assertions.
 
-Run one profile or the same full pinned matrix used by CI:
+Run each profile under its exact Node runtime:
 
 ```bash
-pnpm test:package-artifact
-pnpm test:compatibility-matrix
+volta run --node 22.19.0 pnpm test:compatibility-profile --profile v3-minimum
+volta run --node 24.19.0 pnpm test:package-artifact
 ```
 
 ## Support
@@ -626,7 +629,7 @@ pnpm install        # Install dependencies
 pnpm dev:prepare    # Build module stubs & prepare playground
 pnpm dev            # Start playground
 pnpm test           # Run tests
-pnpm test:compatibility-matrix # Verify all pinned package-user profiles
+pnpm test:package-artifact # Verify the known-latest package artifact profile
 pnpm lint           # Run ESLint
 pnpm test:types     # Type checking
 ```

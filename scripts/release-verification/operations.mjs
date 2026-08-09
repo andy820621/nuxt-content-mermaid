@@ -447,6 +447,11 @@ async function installConsumer({
     command: 'npm',
     args: ['install', '--no-audit', '--no-fund', '--package-lock=true'],
     cwd: consumerDirectory,
+    env: {
+      // pnpm exposes pnpm-only lifecycle config that nested npm 11 rejects.
+      npm_config_allow_scripts: undefined,
+      npm_config_globalconfig: undefined,
+    },
   })
 
   const resolvedPackageVersion = await installedPackageVersion(

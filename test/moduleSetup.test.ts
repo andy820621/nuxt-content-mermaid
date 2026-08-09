@@ -79,6 +79,19 @@ describe('module setup', () => {
     expect(moduleDef.meta?.compatibility?.nuxt).toBe('^4.1.0')
   })
 
+  it('declares Nuxt Content as a required module dependency within the peer range', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as {
+      moduleDependencies?: Record<string, { version?: string, optional?: boolean }>
+    }
+
+    expect(moduleDef.moduleDependencies).toEqual({
+      '@nuxt/content': {
+        version: '>=3.5.0 <4.0.0',
+      },
+    })
+  })
+
   it('skips registration when disabled', async () => {
     const mod = await import('../src/module')
     const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }

@@ -7,9 +7,10 @@ describe('disabled module configuration fixture', async () => {
     rootDir: fileURLToPath(new URL('./fixtures/module-configuration-disabled', import.meta.url)),
   })
 
-  it('does not publish runtime transport when activation is disabled', async () => {
+  it('keeps Nuxt Content active without publishing Mermaid runtime transport', async () => {
     const html = await $fetch('/')
     expect(html).toContain('data-content-mermaid-present="false"')
+    expect(html).toContain('data-content-loaded="true"')
   })
 })
 

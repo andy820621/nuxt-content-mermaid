@@ -101,11 +101,11 @@ resolution, a scheduled canary, or drift automation.
 
 ## Release Baseline Freeze
 
-The maintainer starts Release Baseline Freeze through the single
-`pnpm release <version>` entrypoint. Release preparation builds the prepared
-source commit and packs exactly one retained Publishable Package Artifact. Only
-after that pack completes, and before either Compatibility Profile verifier
-starts, the release journal records:
+The maintainer starts Release Baseline Freeze through
+`pnpm release:prepare <version>`. Release preparation builds the prepared source
+commit and packs exactly one retained Publishable Package Artifact. Only after
+that pack completes, and before either Compatibility Profile verifier starts,
+the release journal records:
 
 - the prepared source commit and retained artifact identity;
 - the complete frozen Minimum Compatibility Profile;
@@ -115,10 +115,10 @@ starts, the release journal records:
   ranges.
 
 An existing `.release-evidence/<version>/` directory blocks a new release
-attempt. The release command never resumes, retries one profile, or overwrites
-partial evidence. After inspection, the maintainer moves or removes the entire
-directory and reruns the single release command, which prepares a new source
-commit, packs again, and verifies both profiles again.
+attempt. The preparation command never resumes, retries one profile, or
+overwrites partial evidence. After inspection, the maintainer moves or removes
+the entire directory and reruns preparation, which prepares a new source commit,
+packs again, and verifies both profiles again.
 
 The outer release orchestration invokes Volta once per frozen profile in fixed
 order. It supplies that profile's exact Node runtime to a child verifier without
@@ -132,15 +132,20 @@ files are removed after each child completes.
 
 Both child verifiers install the same retained artifact and run public exports,
 public types, production build, and basic browser SVG rendering. A failure in
-either profile blocks every publish-side mutation and requires the complete
-release command to be rerun. The generic multi-profile runner aggregates
-profile evidence and failures only; runtime dispatch remains the release
-orchestrator's responsibility.
+either profile blocks the manual Git handoff and npm publication and requires
+the complete preparation command to be rerun. The generic multi-profile runner
+aggregates profile evidence and failures only; runtime dispatch remains the
+release orchestrator's responsibility.
 
 Manual Interaction Verification uses the frozen Known-Latest Compatibility
 Profile. After publication, the Registry Smoke Test consumes that same frozen
 profile and artifact identity from release evidence without resolving registry
 latest versions.
+
+After preparation records `verified` evidence, the maintainer performs the
+documented ordinary-Git handoff and verifies the remote branch and peeled tag.
+`pnpm release:publish <version>` independently revalidates those refs and the
+retained artifact before exact-version registry reconciliation and publication.
 
 Ordinary upstream releases discovered after the freeze wait for a later package
 release. A security update or required compatibility correction may reopen the

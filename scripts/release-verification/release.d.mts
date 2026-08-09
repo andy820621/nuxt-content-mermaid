@@ -11,14 +11,14 @@ import type {
 } from './runner.mjs'
 import type { RegistryHealthEvidence } from './registry-smoke.mjs'
 
-export interface ReleaseRequest {
-  mode: 'release'
+export interface PrepareReleaseRequest {
+  mode: 'prepare'
   targetVersion: string
   skipManualReason: string | null
 }
 
-export interface ReconciliationRequest {
-  mode: 'reconcile'
+export interface PublishReleaseRequest {
+  mode: 'publish'
   targetVersion: string
 }
 
@@ -50,6 +50,11 @@ export interface ReleaseBaseline {
   profiles: VersionProfile[]
 }
 
+export interface RemoteReleaseState {
+  branchCommit: string | null
+  tagCommit: string | null
+}
+
 export type ManualCheckName
   = | 'fullscreen'
     | 'zoomPanDrag'
@@ -58,9 +63,10 @@ export type ManualCheckName
     | 'visualReadability'
 
 export interface LeanReleaseEvidence {
-  schemaVersion: 1
-  status: 'preparing' | 'blocked' | 'verified' | 'pushed' | 'published'
+  schemaVersion: 2
+  status: 'preparing' | 'verified' | 'published'
   changeHeadCommit: string
+  preparationBranch: string | null
   sourceChecks: null | {
     command: 'pnpm verify:source'
     passed: boolean
@@ -83,7 +89,7 @@ export interface LeanReleaseEvidence {
     results: Record<string, boolean> | null
   }
   timestamps: Record<string, string>
-  blocked?: {
+  lastFailure?: {
     stage: string
     message: string
   }
@@ -129,12 +135,18 @@ export interface ReleaseEffects {
     | { state: 'absent' }
     | { state: 'published', integrity: string }
   >
+  readRemoteReleaseState: (input: {
+    branch: 'main'
+    repositoryRoot: string
+    tagName: string
+  }) => Promise<RemoteReleaseState>
   prepareRelease: (input: {
     changeHeadCommit: string
     repositoryRoot: string
     targetVersion: string
   }) => Promise<{
     sourceCommit: string
+    preparationBranch: string
     artifact: PackageArtifact
   }>
   readReleaseManifestSnapshot: (input: {
@@ -153,7 +165,7 @@ export interface ReleaseEffects {
     checks: ManualCheckName[]
   }) => Promise<Record<string, boolean>>
   assertReleaseIdentity: (input: {
-    phase: 'fast-forward' | 'tag' | 'push' | 'publish' | 'reconcile'
+    phase: 'publish' | 'registry-smoke'
     repositoryRoot: string
     changeHeadCommit: string
     identity: ReleaseIdentity
@@ -161,20 +173,6 @@ export interface ReleaseEffects {
     releaseBaseline: ReleaseBaseline
     tagName: string
   }) => Promise<void>
-  fastForward: (input: {
-    repositoryRoot: string
-    sourceCommit: string
-  }) => Promise<void>
-  createTag: (input: {
-    repositoryRoot: string
-    sourceCommit: string
-    tagName: string
-  }) => Promise<CommandResult>
-  push: (input: {
-    branch: string
-    repositoryRoot: string
-    tagName: string
-  }) => Promise<CommandResult>
   publish: (input: {
     archivePath: string
     distTag: string
@@ -222,16 +220,16 @@ export function createReleaseEffects(
 
 export function parseReleaseArguments(
   argv: string[],
-): ReleaseRequest | ReconciliationRequest | RegistrySmokeRetryRequest
+): PrepareReleaseRequest | PublishReleaseRequest | RegistrySmokeRetryRequest
 
-export function runReleaseGate(input: {
-  request: ReleaseRequest
+export function runReleasePreparation(input: {
+  request: PrepareReleaseRequest
   repositoryRoot: string
   effects: ReleaseEffects
 }): Promise<LeanReleaseEvidence>
 
-export function runReleaseReconciliation(input: {
-  request: ReconciliationRequest
+export function runReleasePublication(input: {
+  request: PublishReleaseRequest
   repositoryRoot: string
   effects: ReleaseEffects
 }): Promise<LeanReleaseEvidence>
