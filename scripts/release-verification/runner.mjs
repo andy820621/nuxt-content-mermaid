@@ -68,6 +68,40 @@ function createRuntimeEvidence(profile) {
   }
 }
 
+function createProfileEvidence(profile) {
+  return {
+    id: profile.id,
+    requested: { ...profile.versions },
+    resolved: null,
+    ...(profile.expectedResolutions
+      ? {
+          expectedResolutions: {
+            requested: { ...profile.expectedResolutions },
+            resolved: null,
+          },
+        }
+      : {}),
+  }
+}
+
+function validateExpectedResolutions(profile, installation) {
+  if (!profile.expectedResolutions) return
+  if (!installation.expectedResolutions) {
+    throw new Error(
+      `Version Profile ${profile.id} installation did not report expected resolutions`,
+    )
+  }
+  for (const key of ['nuxtKit', 'nuxtSchema']) {
+    const requested = profile.expectedResolutions[key]
+    const resolved = installation.expectedResolutions[key]
+    if (resolved !== requested) {
+      throw new Error(
+        `Version Profile ${profile.id} resolution mismatch for ${key}: requested ${requested}, resolved ${resolved}`,
+      )
+    }
+  }
+}
+
 function createEvidence(request) {
   return {
     schemaVersion: 1,
@@ -75,11 +109,7 @@ function createEvidence(request) {
     mode: 'package-artifact',
     package: null,
     artifact: null,
-    profile: {
-      id: request.profile.id,
-      requested: { ...request.profile.versions },
-      resolved: null,
-    },
+    profile: createProfileEvidence(request.profile),
     runtime: createRuntimeEvidence(request.profile),
     stages: [],
   }
@@ -108,11 +138,7 @@ function createRegistrySmokeEvidence(request) {
       requestedVersion: request.packageVersion,
       resolvedVersion: null,
     },
-    profile: {
-      id: request.profile.id,
-      requested: { ...request.profile.versions },
-      resolved: null,
-    },
+    profile: createProfileEvidence(request.profile),
     runtime: createRuntimeEvidence(request.profile),
     stages: [],
   }
@@ -184,10 +210,8 @@ function createMatrixEvidence() {
 
 function createMatrixProfileEvidence(profile) {
   return {
-    id: profile.id,
+    ...createProfileEvidence(profile),
     success: false,
-    requested: { ...profile.versions },
-    resolved: null,
     runtime: createRuntimeEvidence(profile),
     stages: [],
   }
@@ -237,13 +261,18 @@ async function runConsumerVerificationPlan({
     }
     const installation = await runStage(evidence, 'install', async () => {
       workspace ??= await operations.createWorkspace()
-      return operations.installConsumer({
+      const result = await operations.installConsumer({
         packageSource,
         consumerDirectory: workspace.consumerDirectory,
         profile,
       })
+      validateExpectedResolutions(profile, result)
+      return result
     })
     profileEvidence.resolved = installation.profileVersions
+    if (profileEvidence.expectedResolutions) {
+      profileEvidence.expectedResolutions.resolved = installation.expectedResolutions
+    }
     if (packageEvidence) packageEvidence.resolvedVersion = installation.packageVersion
 
     for (const stage of stageNames.slice(1)) {

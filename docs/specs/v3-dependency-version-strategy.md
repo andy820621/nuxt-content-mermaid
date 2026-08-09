@@ -76,6 +76,28 @@ The Known-Latest Compatibility Profile is one atomic exact tuple of Node, Nuxt, 
 
 Known-Latest Versions are evidence baselines, not peer-range ceilings. Updating only repository pins, the lockfile, or fixed evidence without changing the publishable artifact or runtime code does not require an npm release.
 
+### Initial 3.x Expand Profiles
+
+Before the public 3.x contract replaces the existing matrix, two fixed profiles
+verify the actual package artifact through clean installation, public types,
+production build, and basic browser SVG rendering:
+
+| Profile | Node | Nuxt | Nuxt Content | Mermaid | Kit resolution | Schema resolution |
+| --- | --- | --- | --- | --- | --- | --- |
+| `v3-minimum` | `22.19.0` | `4.1.0` | `3.5.0` | `11.16.1` | `4.5.2` | `4.5.2` |
+| `v3-known-latest` | `24.19.0` | `4.5.2` | `3.15.2` | `11.16.1` | `4.5.2` | `4.5.2` |
+
+Each profile runs under its exact declared Node runtime. Kit and Schema remain
+one shallow pair of expected artifact resolutions rather than additional
+Compatibility Profile dimensions. Verification resolves Mermaid and Kit from
+the installed package artifact's dependency context and Schema from Nuxt's
+dependency context, so a matching top-level consumer package cannot mask a
+different version used by the artifact. The expand step may apply exact Kit and
+Schema overrides to the clean consumer without changing published metadata.
+
+These profiles are fixed release evidence. They do not introduce dynamic latest
+resolution, a scheduled canary, drift automation, or release-freeze state.
+
 ## Release Baseline Freeze
 
 Before building the release candidate, the maintainer freezes:

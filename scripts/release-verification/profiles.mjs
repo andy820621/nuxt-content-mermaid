@@ -15,6 +15,11 @@ const RUNTIME_VERSIONS = Object.freeze({
   vueTsc: '3.2.5',
 })
 const NODE_VERSION = '22.21.1'
+const FINAL_MERMAID_VERSION = '11.16.1'
+const FINAL_TOOLCHAIN_RESOLUTIONS = Object.freeze({
+  nuxtKit: '4.5.2',
+  nuxtSchema: '4.5.2',
+})
 
 export const PINNED_MATRIX_PROFILE_IDS = Object.freeze([
   'nuxt-3-minimum',
@@ -24,6 +29,33 @@ export const PINNED_MATRIX_PROFILE_IDS = Object.freeze([
   'nuxt-3-minimum-content-known-latest',
   'nuxt-4-known-latest-content-minimum',
 ])
+
+function parseExpectedResolutions(input) {
+  if (input === undefined) return undefined
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new TypeError('Invalid Version Profile: expectedResolutions must be an object')
+  }
+
+  const receivedKeys = Object.keys(input).sort()
+  const expectedKeys = ['nuxtKit', 'nuxtSchema']
+  if (receivedKeys.length !== expectedKeys.length
+    || receivedKeys.some((key, index) => key !== expectedKeys[index])) {
+    throw new TypeError('Invalid Version Profile: expected resolution keys nuxtKit, nuxtSchema')
+  }
+
+  for (const key of expectedKeys) {
+    if (!parseExactSemver(input[key])) {
+      throw new TypeError(
+        `Invalid Version Profile: expectedResolutions.${key} must be an exact version`,
+      )
+    }
+  }
+
+  return Object.freeze({
+    nuxtKit: input.nuxtKit,
+    nuxtSchema: input.nuxtSchema,
+  })
+}
 
 export function parseVersionProfile(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -55,10 +87,12 @@ export function parseVersionProfile(input) {
     versions[key] = version
   }
 
+  const expectedResolutions = parseExpectedResolutions(input.expectedResolutions)
   return Object.freeze({
     id: input.id,
     nodeVersion: input.nodeVersion,
     versions: Object.freeze(versions),
+    ...(expectedResolutions ? { expectedResolutions } : {}),
   })
 }
 
@@ -71,6 +105,20 @@ function defineVersionProfile(id, nuxt, nuxtContent) {
       nuxt,
       nuxtContent,
     },
+  })
+}
+
+function defineFinalVersionProfile(id, nodeVersion, nuxt, nuxtContent) {
+  return parseVersionProfile({
+    id,
+    nodeVersion,
+    versions: {
+      ...RUNTIME_VERSIONS,
+      mermaid: FINAL_MERMAID_VERSION,
+      nuxt,
+      nuxtContent,
+    },
+    expectedResolutions: FINAL_TOOLCHAIN_RESOLUTIONS,
   })
 }
 
@@ -88,6 +136,13 @@ export const VERSION_PROFILES = Object.freeze({
     'nuxt-4-known-latest-content-minimum',
     '4.5.2',
     '3.5.0',
+  ),
+  'v3-minimum': defineFinalVersionProfile('v3-minimum', '22.19.0', '4.1.0', '3.5.0'),
+  'v3-known-latest': defineFinalVersionProfile(
+    'v3-known-latest',
+    '24.19.0',
+    '4.5.2',
+    '3.15.2',
   ),
 })
 

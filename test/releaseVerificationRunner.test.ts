@@ -9,6 +9,7 @@ import {
   runRegistrySmokeVerification,
 } from '../scripts/release-verification/runner.mjs'
 import type {
+  ConsumerInstallResult,
   PackageArtifactMatrixVerificationRequest,
   PackageArtifactVerificationRequest,
 } from '../scripts/release-verification/runner.mjs'
@@ -39,6 +40,19 @@ const minimumProfile = {
   },
 }
 
+const finalProfile = {
+  id: 'v3-known-latest',
+  nodeVersion: process.versions.node,
+  versions: {
+    ...knownLatestProfile.versions,
+    mermaid: '11.16.1',
+  },
+  expectedResolutions: {
+    nuxtKit: '4.5.2',
+    nuxtSchema: '4.5.2',
+  },
+}
+
 function createOperations() {
   const workspace = {
     root: '/tmp/package-artifact-verification',
@@ -64,7 +78,7 @@ function createOperations() {
       createWorkspace: vi.fn(async () => workspace),
       createArtifact: vi.fn(async () => artifact),
       inspectArchive: vi.fn(async () => undefined),
-      installConsumer: vi.fn(async () => ({
+      installConsumer: vi.fn(async (): Promise<ConsumerInstallResult> => ({
         packageVersion: artifact.packageVersion,
         profileVersions: {
           betterSqlite3: '12.11.1',
@@ -197,6 +211,7 @@ describe('package artifact verification runner', () => {
         observed: process.versions.node,
       },
     })
+    expect(evidence.profile).not.toHaveProperty('expectedResolutions')
     expect(evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
       ['node-runtime', 'passed'],
       ['artifact', 'passed'],
@@ -208,6 +223,65 @@ describe('package artifact verification runner', () => {
       ['runtime', 'passed'],
       ['cleanup', 'passed'],
     ])
+  })
+
+  it('retains shallow requested and resolved toolchain evidence for a final profile', async () => {
+    const { operations } = createOperations()
+    operations.installConsumer.mockResolvedValueOnce({
+      packageVersion: '2.2.3',
+      profileVersions: finalProfile.versions,
+      expectedResolutions: finalProfile.expectedResolutions,
+    })
+
+    const evidence = await runPackageArtifactVerification({
+      packageSource: {
+        kind: 'pack',
+        repositoryRoot: '/repo',
+      },
+      profile: finalProfile,
+    }, operations)
+
+    expect(evidence.profile).toEqual({
+      id: finalProfile.id,
+      requested: finalProfile.versions,
+      resolved: finalProfile.versions,
+      expectedResolutions: {
+        requested: finalProfile.expectedResolutions,
+        resolved: finalProfile.expectedResolutions,
+      },
+    })
+  })
+
+  it('fails installation when a final profile does not report its expected resolutions', async () => {
+    const { operations } = createOperations()
+    operations.installConsumer.mockResolvedValueOnce({
+      packageVersion: '2.2.3',
+      profileVersions: finalProfile.versions,
+    })
+
+    const failure: ReleaseVerificationFailure
+      = await runPackageArtifactVerification({
+        packageSource: {
+          kind: 'pack',
+          repositoryRoot: '/repo',
+        },
+        profile: finalProfile,
+      }, operations).then(
+        () => { throw new Error('expected verification to fail') },
+        (error: unknown) => error as ReleaseVerificationFailure,
+      )
+
+    expect(failure.stage).toBe('install')
+    expect(failure.evidence.profile).toMatchObject({
+      expectedResolutions: {
+        requested: finalProfile.expectedResolutions,
+        resolved: null,
+      },
+    })
+    expect(failure.evidence.stages).toContainEqual(expect.objectContaining({
+      name: 'install',
+      status: 'failed',
+    }))
   })
 
   it('verifies a retained artifact without packing another archive', async () => {

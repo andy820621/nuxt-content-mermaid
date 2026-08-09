@@ -317,14 +317,18 @@ describe('release repository integration', () => {
     expect(workflow).toContain('run: pnpm verify:source')
 
     const matrixJobStart = workflow.indexOf('  representative-compatibility-matrix:')
-    const nextJobStart = workflow.indexOf('  module-compatibility:')
+    const finalJobStart = workflow.indexOf('  final-compatibility-profiles:')
+    const moduleJobStart = workflow.indexOf('  module-compatibility:')
 
     expect(matrixJobStart).toBeGreaterThan(-1)
-    expect(nextJobStart).toBeGreaterThan(matrixJobStart)
+    expect(finalJobStart).toBeGreaterThan(matrixJobStart)
+    expect(moduleJobStart).toBeGreaterThan(finalJobStart)
 
-    const matrixJob = workflow.slice(matrixJobStart, nextJobStart)
+    const matrixJob = workflow.slice(matrixJobStart, finalJobStart)
+    const finalJob = workflow.slice(finalJobStart, moduleJobStart)
     const parsedWorkflow = parse(workflow)
     const parsedMatrixJob = parsedWorkflow.jobs['representative-compatibility-matrix']
+    const parsedFinalJob = parsedWorkflow.jobs['final-compatibility-profiles']
     const expectedProfiles = PINNED_MATRIX_PROFILE_IDS.map(profileId => ({
       'profile': profileId,
       'node-version': VERSION_PROFILES[profileId]!.nodeVersion,
@@ -349,6 +353,29 @@ describe('release repository integration', () => {
     expect(matrixVerification).toBeGreaterThan(-1)
     expect(matrixPrepare).toBeGreaterThan(matrixInstall)
     expect(matrixVerification).toBeGreaterThan(matrixPrepare)
+
+    expect(parsedFinalJob.strategy).toMatchObject({
+      'fail-fast': false,
+      'matrix': {
+        include: [
+          { 'profile': 'v3-minimum', 'node-version': '22.19.0' },
+          { 'profile': 'v3-known-latest', 'node-version': '24.19.0' },
+        ],
+      },
+    })
+    expect(parsedFinalJob.steps).toContainEqual({
+      uses: 'actions/setup-node@v6',
+      with: { 'node-version': '${{ matrix.node-version }}' },
+    })
+    const finalInstall = finalJob.indexOf('run: npx nypm@latest i')
+    const finalPrepare = finalJob.indexOf('run: npm run dev:prepare')
+    const finalVerification = finalJob.indexOf(
+      'run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}',
+    )
+
+    expect(finalInstall).toBeGreaterThan(-1)
+    expect(finalPrepare).toBeGreaterThan(finalInstall)
+    expect(finalVerification).toBeGreaterThan(finalPrepare)
     expect(gitignore.split(/\r?\n/)).toContain('.release-evidence')
   })
 })

@@ -11,7 +11,7 @@ import {
   classifyInfrastructureCause,
   ReleaseVerificationInfrastructureError,
 } from '../scripts/release-verification/failure-classification.mjs'
-import type { PackageArtifact } from '../scripts/release-verification/runner.mjs'
+import type { PackageArtifact, VersionProfile } from '../scripts/release-verification/runner.mjs'
 
 const temporaryDirectories: string[] = []
 const execFileAsync = promisify(execFile)
@@ -26,6 +26,19 @@ const profile = {
     mermaid: '11.12.3',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
+  },
+}
+
+const finalProfile = {
+  id: 'v3-known-latest',
+  nodeVersion: process.versions.node,
+  versions: {
+    ...profile.versions,
+    mermaid: '11.16.1',
+  },
+  expectedResolutions: {
+    nuxtKit: '4.5.2',
+    nuxtSchema: '4.5.2',
   },
 }
 
@@ -73,14 +86,58 @@ async function createInstalledPackage(consumerDirectory: string, name: string, v
   await writeJson(join(packageDirectory, 'package.json'), { name, version })
 }
 
-async function populateInstalledPackages(consumerDirectory: string, packageVersion = '2.2.3') {
+async function populateInstalledPackages(
+  consumerDirectory: string,
+  packageVersion = '2.2.3',
+  selectedProfile: VersionProfile = profile,
+) {
   await createInstalledPackage(consumerDirectory, '@barzhsieh/nuxt-content-mermaid', packageVersion)
-  await createInstalledPackage(consumerDirectory, 'better-sqlite3', profile.versions.betterSqlite3)
-  await createInstalledPackage(consumerDirectory, 'nuxt', profile.versions.nuxt)
-  await createInstalledPackage(consumerDirectory, '@nuxt/content', profile.versions.nuxtContent)
-  await createInstalledPackage(consumerDirectory, 'mermaid', profile.versions.mermaid)
-  await createInstalledPackage(consumerDirectory, 'typescript', profile.versions.typescript)
-  await createInstalledPackage(consumerDirectory, 'vue-tsc', profile.versions.vueTsc)
+  await createInstalledPackage(
+    consumerDirectory,
+    'better-sqlite3',
+    selectedProfile.versions.betterSqlite3,
+  )
+  await createInstalledPackage(consumerDirectory, 'nuxt', selectedProfile.versions.nuxt)
+  await createInstalledPackage(
+    consumerDirectory,
+    '@nuxt/content',
+    selectedProfile.versions.nuxtContent,
+  )
+  await createInstalledPackage(consumerDirectory, 'mermaid', selectedProfile.versions.mermaid)
+  await createInstalledPackage(consumerDirectory, 'typescript', selectedProfile.versions.typescript)
+  await createInstalledPackage(consumerDirectory, 'vue-tsc', selectedProfile.versions.vueTsc)
+  if (selectedProfile.expectedResolutions) {
+    await createInstalledPackage(
+      consumerDirectory,
+      '@nuxt/kit',
+      selectedProfile.expectedResolutions.nuxtKit,
+    )
+    await createInstalledPackage(
+      consumerDirectory,
+      '@nuxt/schema',
+      selectedProfile.expectedResolutions.nuxtSchema,
+    )
+  }
+}
+
+async function createNestedInstalledPackage(
+  consumerDirectory: string,
+  issuerPackageName: string,
+  dependencyPackageName: string,
+  version: string,
+) {
+  const dependencyDirectory = join(
+    consumerDirectory,
+    'node_modules',
+    ...issuerPackageName.split('/'),
+    'node_modules',
+    ...dependencyPackageName.split('/'),
+  )
+  await mkdir(dependencyDirectory, { recursive: true })
+  await writeJson(join(dependencyDirectory, 'package.json'), {
+    name: dependencyPackageName,
+    version,
+  })
 }
 
 async function createPackageArchive(manifest: Record<string, unknown>, files: string[]) {
@@ -235,6 +292,75 @@ describe('clean consumer installation', () => {
     })
     expect(commandRunner).toHaveBeenCalledOnce()
   })
+
+  it('pins shallow toolchain resolutions and reports dependency-context versions', async () => {
+    const templateDirectory = await createTemplate()
+    const consumerDirectory = await createTemporaryDirectory('final-profile-consumer')
+    const archivePath = join(await createTemporaryDirectory('artifact'), 'package.tgz')
+    await writeFile(archivePath, '')
+    const commandRunner = vi.fn(async () => {
+      await populateInstalledPackages(consumerDirectory, '2.2.3', finalProfile)
+      return {}
+    })
+    const operations = createReleaseVerificationOperations({
+      templateDirectory,
+      commandRunner,
+    })
+
+    const resolved = await operations.installConsumer({
+      packageSource: {
+        kind: 'artifact',
+        artifact: createArtifactFixture({ archivePath }),
+      },
+      consumerDirectory,
+      profile: finalProfile,
+    })
+
+    const packageJson = JSON.parse(await readFile(join(consumerDirectory, 'package.json'), 'utf8'))
+    expect(packageJson.dependencies.mermaid).toBe('11.16.1')
+    expect(packageJson.devDependencies['@nuxt/schema']).toBe('4.5.2')
+    expect(packageJson.overrides).toEqual({
+      '@nuxt/kit': '4.5.2',
+      '@nuxt/schema': '4.5.2',
+    })
+    expect(resolved).toEqual({
+      packageVersion: '2.2.3',
+      profileVersions: finalProfile.versions,
+      expectedResolutions: finalProfile.expectedResolutions,
+    })
+  })
+
+  it.each([
+    ['@barzhsieh/nuxt-content-mermaid', 'mermaid', '11.12.3', 'expected 11.16.1, received 11.12.3'],
+    ['@barzhsieh/nuxt-content-mermaid', '@nuxt/kit', '4.3.1', 'expected 4.5.2, received 4.3.1'],
+    ['nuxt', '@nuxt/schema', '4.3.1', 'expected 4.5.2, received 4.3.1'],
+  ])(
+    'rejects %s dependency-context resolution of %s even when the consumer root matches',
+    async (issuerPackageName, dependencyPackageName, nestedVersion, expectedMessage) => {
+      const templateDirectory = await createTemplate()
+      const consumerDirectory = await createTemporaryDirectory('dependency-context-consumer')
+      const commandRunner = vi.fn(async () => {
+        await populateInstalledPackages(consumerDirectory, '2.2.3', finalProfile)
+        await createNestedInstalledPackage(
+          consumerDirectory,
+          issuerPackageName,
+          dependencyPackageName,
+          nestedVersion,
+        )
+        return {}
+      })
+      const operations = createReleaseVerificationOperations({
+        templateDirectory,
+        commandRunner,
+      })
+
+      await expect(operations.installConsumer({
+        packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
+        consumerDirectory,
+        profile: finalProfile,
+      })).rejects.toThrow(expectedMessage)
+    },
+  )
 
   it('rejects a repository-relative module before installation', async () => {
     const templateDirectory = await createTemplate(`

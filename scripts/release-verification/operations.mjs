@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
 import {
   cp,
   lstat,
@@ -153,6 +154,17 @@ async function assertEmptyConsumerDirectory(consumerDirectory) {
   }
 }
 
+async function expectedPackageVersion(manifestPath, packageName, expectedVersion) {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  if (manifest.name !== packageName) {
+    throw new Error(`Installed package identity mismatch for ${packageName}: received ${manifest.name}`)
+  }
+  if (manifest.version !== expectedVersion) {
+    throw new Error(`Installed package version mismatch for ${packageName}: expected ${expectedVersion}, received ${manifest.version}`)
+  }
+  return manifest.version
+}
+
 async function installedPackageVersion(consumerDirectory, packageName, expectedVersion) {
   const nodeModulesDirectory = resolve(consumerDirectory, 'node_modules')
   const resolvedNodeModulesDirectory = await realpath(nodeModulesDirectory)
@@ -165,14 +177,41 @@ async function installedPackageVersion(consumerDirectory, packageName, expectedV
     throw new Error(`Installed package ${packageName} resolves outside the clean consumer`)
   }
 
-  const manifest = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
-  if (manifest.name !== packageName) {
-    throw new Error(`Installed package identity mismatch for ${packageName}: received ${manifest.name}`)
+  return expectedPackageVersion(
+    join(resolvedPackageDirectory, 'package.json'),
+    packageName,
+    expectedVersion,
+  )
+}
+
+async function installedDependencyVersion({
+  consumerDirectory,
+  issuerPackageName,
+  dependencyPackageName,
+  expectedVersion,
+}) {
+  const nodeModulesDirectory = resolve(consumerDirectory, 'node_modules')
+  const resolvedNodeModulesDirectory = await realpath(nodeModulesDirectory)
+  const issuerManifestPath = join(
+    nodeModulesDirectory,
+    ...issuerPackageName.split('/'),
+    'package.json',
+  )
+  const dependencyManifestPath = createRequire(issuerManifestPath)
+    .resolve(`${dependencyPackageName}/package.json`)
+  const resolvedDependencyManifestPath = await realpath(dependencyManifestPath)
+
+  if (!isWithin(resolvedNodeModulesDirectory, resolvedDependencyManifestPath)) {
+    throw new Error(
+      `Installed dependency ${dependencyPackageName} resolves outside the clean consumer`,
+    )
   }
-  if (manifest.version !== expectedVersion) {
-    throw new Error(`Installed package version mismatch for ${packageName}: expected ${expectedVersion}, received ${manifest.version}`)
-  }
-  return manifest.version
+
+  return expectedPackageVersion(
+    resolvedDependencyManifestPath,
+    dependencyPackageName,
+    expectedVersion,
+  )
 }
 
 function parsePackResult(output) {
@@ -356,6 +395,7 @@ async function installConsumer({
 
   await cp(templateDirectory, consumerDirectory, { recursive: true })
   await rm(join(consumerDirectory, 'package.template.json'))
+  const expectedResolutions = profile.expectedResolutions
   await writeFile(join(consumerDirectory, 'package.json'), `${JSON.stringify({
     ...templateManifest,
     dependencies: {
@@ -366,9 +406,20 @@ async function installConsumer({
       'nuxt': profile.versions.nuxt,
     },
     devDependencies: {
+      ...(expectedResolutions
+        ? { '@nuxt/schema': expectedResolutions.nuxtSchema }
+        : {}),
       'typescript': profile.versions.typescript,
       'vue-tsc': profile.versions.vueTsc,
     },
+    ...(expectedResolutions
+      ? {
+          overrides: {
+            '@nuxt/kit': expectedResolutions.nuxtKit,
+            '@nuxt/schema': expectedResolutions.nuxtSchema,
+          },
+        }
+      : {}),
   }, null, 2)}\n`)
 
   await commandRunner({
@@ -382,6 +433,28 @@ async function installConsumer({
     source.name,
     source.version,
   )
+  const resolvedMermaidVersion = await installedDependencyVersion({
+    consumerDirectory,
+    issuerPackageName: source.name,
+    dependencyPackageName: 'mermaid',
+    expectedVersion: profile.versions.mermaid,
+  })
+  const resolvedExpectedResolutions = expectedResolutions
+    ? {
+        nuxtKit: await installedDependencyVersion({
+          consumerDirectory,
+          issuerPackageName: source.name,
+          dependencyPackageName: '@nuxt/kit',
+          expectedVersion: expectedResolutions.nuxtKit,
+        }),
+        nuxtSchema: await installedDependencyVersion({
+          consumerDirectory,
+          issuerPackageName: 'nuxt',
+          dependencyPackageName: '@nuxt/schema',
+          expectedVersion: expectedResolutions.nuxtSchema,
+        }),
+      }
+    : undefined
 
   return {
     packageVersion: resolvedPackageVersion,
@@ -397,11 +470,7 @@ async function installConsumer({
         '@nuxt/content',
         profile.versions.nuxtContent,
       ),
-      mermaid: await installedPackageVersion(
-        consumerDirectory,
-        'mermaid',
-        profile.versions.mermaid,
-      ),
+      mermaid: resolvedMermaidVersion,
       typescript: await installedPackageVersion(
         consumerDirectory,
         'typescript',
@@ -413,6 +482,9 @@ async function installConsumer({
         profile.versions.vueTsc,
       ),
     },
+    ...(resolvedExpectedResolutions
+      ? { expectedResolutions: resolvedExpectedResolutions }
+      : {}),
   }
 }
 

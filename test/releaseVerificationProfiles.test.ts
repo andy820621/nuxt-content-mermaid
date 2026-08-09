@@ -16,7 +16,7 @@ const runtimeVersions = {
 
 describe('release verification Version Profiles', () => {
   it('declares one exact Node runtime for every profile', () => {
-    expect(Object.values(VERSION_PROFILES).map(profile => profile.nodeVersion))
+    expect(PINNED_MATRIX_PROFILE_IDS.map(profileId => VERSION_PROFILES[profileId]!.nodeVersion))
       .toEqual(Array.from({ length: PINNED_MATRIX_PROFILE_IDS.length }, () => '22.21.1'))
 
     expect(() => parseVersionProfile({
@@ -39,6 +39,39 @@ describe('release verification Version Profiles', () => {
     })).toThrow('nodeVersion must be an exact version')
   })
 
+  it('defines independently selectable final 3.x compatibility profiles', () => {
+    expect(VERSION_PROFILES['v3-minimum']).toEqual({
+      id: 'v3-minimum',
+      nodeVersion: '22.19.0',
+      versions: {
+        ...runtimeVersions,
+        mermaid: '11.16.1',
+        nuxt: '4.1.0',
+        nuxtContent: '3.5.0',
+      },
+      expectedResolutions: {
+        nuxtKit: '4.5.2',
+        nuxtSchema: '4.5.2',
+      },
+    })
+    expect(VERSION_PROFILES['v3-known-latest']).toEqual({
+      id: 'v3-known-latest',
+      nodeVersion: '24.19.0',
+      versions: {
+        ...runtimeVersions,
+        mermaid: '11.16.1',
+        nuxt: '4.5.2',
+        nuxtContent: '3.15.2',
+      },
+      expectedResolutions: {
+        nuxtKit: '4.5.2',
+        nuxtSchema: '4.5.2',
+      },
+    })
+    expect(selectVersionProfile('v3-minimum')).toBe(VERSION_PROFILES['v3-minimum'])
+    expect(selectVersionProfile('v3-known-latest')).toBe(VERSION_PROFILES['v3-known-latest'])
+  })
+
   it('defines the complete pinned Representative Compatibility Matrix', () => {
     expect(PINNED_MATRIX_PROFILE_IDS).toEqual([
       'nuxt-3-minimum',
@@ -48,7 +81,9 @@ describe('release verification Version Profiles', () => {
       'nuxt-3-minimum-content-known-latest',
       'nuxt-4-known-latest-content-minimum',
     ])
-    expect(VERSION_PROFILES).toEqual({
+    expect(Object.fromEntries(
+      PINNED_MATRIX_PROFILE_IDS.map(profileId => [profileId, VERSION_PROFILES[profileId]]),
+    )).toEqual({
       'nuxt-3-minimum': {
         id: 'nuxt-3-minimum',
         nodeVersion: '22.21.1',
@@ -178,6 +213,30 @@ describe('release verification Version Profiles', () => {
     }],
   ])('rejects an invalid profile with a %s', (_label, profile) => {
     expect(() => parseVersionProfile(profile)).toThrow('Invalid Version Profile')
+  })
+
+  it.each([
+    ['missing expected resolution', { nuxtKit: '4.5.2' }],
+    ['extra expected resolution', {
+      nuxtKit: '4.5.2',
+      nuxtSchema: '4.5.2',
+      other: '1.0.0',
+    }],
+    ['ranged expected resolution', {
+      nuxtKit: '^4.5.2',
+      nuxtSchema: '4.5.2',
+    }],
+  ])('rejects a profile with a %s', (_label, expectedResolutions) => {
+    expect(() => parseVersionProfile({
+      id: 'invalid-resolutions',
+      nodeVersion: '22.19.0',
+      versions: {
+        ...runtimeVersions,
+        nuxt: '4.1.0',
+        nuxtContent: '3.5.0',
+      },
+      expectedResolutions,
+    })).toThrow('Invalid Version Profile')
   })
 
   it('accepts exact SemVer build metadata without treating it as a range', () => {

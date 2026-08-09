@@ -1,3 +1,8 @@
+export interface ExpectedResolutions {
+  nuxtKit: string
+  nuxtSchema: string
+}
+
 export interface VersionProfile {
   id: string
   nodeVersion: string
@@ -9,6 +14,7 @@ export interface VersionProfile {
     typescript: string
     vueTsc: string
   }
+  expectedResolutions?: ExpectedResolutions
 }
 
 export interface PackageArtifact {
@@ -32,6 +38,7 @@ export type ConsumerPackageSource
 export interface ConsumerInstallResult {
   packageVersion: string
   profileVersions: VersionProfile['versions']
+  expectedResolutions?: ExpectedResolutions
 }
 
 export interface VerificationWorkspace {
@@ -60,6 +67,11 @@ export interface VerificationStageEvidence {
   reason?: string
 }
 
+export interface ExpectedResolutionEvidence {
+  requested: ExpectedResolutions
+  resolved: ExpectedResolutions | null
+}
+
 export interface PackageArtifactEvidence {
   schemaVersion: 1
   success: boolean
@@ -76,6 +88,7 @@ export interface PackageArtifactEvidence {
     id: string
     requested: VersionProfile['versions']
     resolved: null | VersionProfile['versions']
+    expectedResolutions?: ExpectedResolutionEvidence
   }
   runtime: {
     requested: string | null
@@ -103,6 +116,7 @@ export interface RegistrySmokeVerificationEvidence {
     id: string
     requested: VersionProfile['versions']
     resolved: VersionProfile['versions'] | null
+    expectedResolutions?: ExpectedResolutionEvidence
   }
   runtime: PackageArtifactEvidence['runtime']
   stages: VerificationStageEvidence[]
@@ -132,6 +146,7 @@ export interface CompatibilityMatrixProfileEvidence {
   success: boolean
   requested: VersionProfile['versions']
   resolved: null | VersionProfile['versions']
+  expectedResolutions?: ExpectedResolutionEvidence
   runtime: PackageArtifactEvidence['runtime']
   stages: VerificationStageEvidence[]
 }
