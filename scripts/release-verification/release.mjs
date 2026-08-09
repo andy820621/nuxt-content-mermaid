@@ -117,21 +117,56 @@ function errorMessage(error) {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function recordBlockedEvidence({
+async function recordLastFailure({
   effects,
   evidence,
   error,
   stage,
-  status = 'blocked',
   timestamp = effects.now(),
 }) {
-  evidence.status = status
-  evidence.timestamps.blockedAt = timestamp
-  evidence.blocked = {
+  evidence.timestamps.lastFailureAt = timestamp
+  evidence.lastFailure = {
     stage,
     message: errorMessage(error),
   }
   await effects.writeEvidence(evidence)
+}
+
+function assertCurrentEvidenceSchema(evidence) {
+  if (evidence?.schemaVersion !== 2) {
+    throw new Error(
+      'Release evidence schema is obsolete; release-code changes invalidate prior evidence',
+    )
+  }
+}
+
+function assertMatchingRegistryIntegrity(registryRelease, expectedIntegrity) {
+  if (registryRelease.state !== 'published') return false
+  if (registryRelease.integrity !== expectedIntegrity) {
+    throw new Error('Registry version has a different artifact integrity')
+  }
+  return true
+}
+
+async function readRegistryReleaseOrRecordFailure({
+  effects,
+  evidence,
+  input,
+  stage,
+}) {
+  try {
+    const registryRelease = await effects.readRegistryRelease(input)
+    const isKnown = registryRelease?.state === 'absent'
+      || (registryRelease?.state === 'published'
+        && typeof registryRelease.integrity === 'string'
+        && registryRelease.integrity.length > 0)
+    if (!isKnown) throw new Error('registry query returned an indeterminate result')
+    return registryRelease
+  }
+  catch (error) {
+    await recordLastFailure({ effects, evidence, error, stage })
+    throw new Error(`Registry lookup failed during ${stage}`, { cause: error })
+  }
 }
 
 async function recordRegistryHealth({ effects, evidence }) {
@@ -305,8 +340,6 @@ export function createReleaseEffects({
       temporaryRoot,
     })
   const createArtifact = artifactCreator ?? verificationOperations.createArtifact
-  const preparedBranches = new Map()
-
   function evidencePath(root, version) {
     assertExactSemver(version)
     return join(root, '.release-evidence', version, 'release.json')
@@ -408,7 +441,7 @@ export function createReleaseEffects({
       assertExactSemver(version)
       const temporaryDirectory = await mkdtemp(join(temporaryRoot, 'nuxt-content-mermaid-release-'))
       const worktreeDirectory = join(temporaryDirectory, 'worktree')
-      const branchName = `release-prep/v${version}-${basename(temporaryDirectory)}`
+      const branchName = `release-prep/v${version}`
       const artifactDirectory = join(root, '.release-evidence', version, 'pack')
       const changelogenCommand = join(
         root,
@@ -461,10 +494,10 @@ export function createReleaseEffects({
         const archivePath = join(root, '.release-evidence', version, artifact.filename)
         await rename(artifact.archivePath, archivePath)
         await rm(artifactDirectory, { recursive: true, force: true })
-        preparedBranches.set(sourceCommit, branchName)
         succeeded = true
         return {
           sourceCommit,
+          preparationBranch: branchName,
           artifact: {
             ...artifact,
             archivePath,
@@ -541,13 +574,12 @@ export function createReleaseEffects({
     async assertReleaseIdentity({
       phase,
       repositoryRoot: root,
-      changeHeadCommit,
       identity,
       artifact,
       releaseBaseline,
       tagName,
     }) {
-      if (!['fast-forward', 'tag', 'push', 'publish', 'reconcile'].includes(phase)) {
+      if (!['publish', 'registry-smoke'].includes(phase)) {
         throw new Error(`Unknown release identity phase: ${phase}`)
       }
       assertExactSemver(identity?.targetVersion)
@@ -627,23 +659,6 @@ export function createReleaseEffects({
       }
       const head = String(headResult?.stdout ?? '').trim()
 
-      if (phase === 'fast-forward') {
-        if (head !== changeHeadCommit) {
-          throw new Error('Formal branch changed after source verification')
-        }
-        const preparedManifestResult = await commandRunner({
-          command: 'git',
-          args: ['show', `${identity.sourceCommit}:package.json`],
-          cwd: root,
-        })
-        const preparedManifest = JSON.parse(String(preparedManifestResult?.stdout ?? ''))
-        if (preparedManifest.name !== artifact.packageName
-          || preparedManifest.version !== identity.targetVersion) {
-          throw new Error('Prepared commit manifest does not match release identity')
-        }
-        return
-      }
-
       if (head !== identity.sourceCommit) {
         throw new Error('Formal branch does not resolve to the prepared release commit')
       }
@@ -651,17 +666,6 @@ export function createReleaseEffects({
       if (formalManifest.name !== artifact.packageName
         || formalManifest.version !== identity.targetVersion) {
         throw new Error('Formal package manifest does not match release identity')
-      }
-      if (phase === 'tag') {
-        const existingTagResult = await commandRunner({
-          command: 'git',
-          args: ['tag', '--list', tagName],
-          cwd: root,
-        })
-        if (String(existingTagResult?.stdout ?? '').trim() !== '') {
-          throw new Error(`Release tag already exists: ${tagName}`)
-        }
-        return
       }
       const tagCommitResult = await commandRunner({
         command: 'git',
@@ -754,32 +758,30 @@ export function createReleaseEffects({
       }
       return { state: 'published', integrity }
     },
-    async fastForward({ repositoryRoot: root, sourceCommit }) {
-      await commandRunner({
+    async readRemoteReleaseState({ branch, repositoryRoot: root, tagName }) {
+      const result = await commandRunner({
         command: 'git',
-        args: ['merge', '--ff-only', sourceCommit],
+        args: [
+          'ls-remote',
+          'origin',
+          `refs/heads/${branch}`,
+          `refs/tags/${tagName}`,
+          `refs/tags/${tagName}^{}`,
+        ],
         cwd: root,
       })
-      const branchName = preparedBranches.get(sourceCommit)
-      if (branchName) {
-        await commandRunner({
-          command: 'git',
-          args: ['branch', '-d', branchName],
-          cwd: root,
-        })
-        preparedBranches.delete(sourceCommit)
+      const refs = new Map(String(result?.stdout ?? '')
+        .split('\n')
+        .map(line => line.trim().split(/\s+/, 2))
+        .filter(parts => parts.length === 2)
+        .map(([object, ref]) => [ref, object]))
+      const directTag = refs.get(`refs/tags/${tagName}`) ?? null
+      const peeledTag = refs.get(`refs/tags/${tagName}^{}`) ?? null
+      return {
+        branchCommit: refs.get(`refs/heads/${branch}`) ?? null,
+        tagCommit: peeledTag ?? directTag,
       }
     },
-    createTag: ({ repositoryRoot: cwd, sourceCommit, tagName }) => commandRunner({
-      command: 'git',
-      args: ['tag', '-a', tagName, sourceCommit, '-m', tagName],
-      cwd,
-    }),
-    push: ({ branch, repositoryRoot: cwd, tagName }) => commandRunner({
-      command: 'git',
-      args: ['push', '--atomic', 'origin', branch, tagName],
-      cwd,
-    }),
     publish: ({ archivePath, distTag }) => commandRunner({
       command: 'npm',
       args: ['publish', archivePath, '--tag', distTag, '--ignore-scripts'],
@@ -799,36 +801,40 @@ export function parseReleaseArguments(argv) {
       targetVersion: argv[1],
     }
   }
-  if (argv[0] === 'reconcile') {
+  if (argv[0] === 'publish') {
     assertExactSemver(argv[1])
     if (argv.length !== 2) {
-      throw new Error('Release reconciliation does not accept options')
+      throw new Error('Release publication does not accept options')
     }
     return {
-      mode: 'reconcile',
+      mode: 'publish',
       targetVersion: argv[1],
     }
   }
 
-  assertExactSemver(argv[0])
-  if (argv.length > 1 && argv[1] !== '--skip-manual') {
-    throw new Error(`Unknown release option: ${argv[1]}`)
+  if (argv[0] !== 'prepare') {
+    throw new Error(`Unknown release command: ${argv[0] ?? ''}`)
   }
-  const skipManualReason = argv[1] === '--skip-manual' ? argv[2] : null
-  if (argv[1] === '--skip-manual'
-    && (argv.length !== 3 || !skipManualReason.trim())) {
+
+  assertExactSemver(argv[1])
+  if (argv.length > 2 && argv[2] !== '--skip-manual') {
+    throw new Error(`Unknown release option: ${argv[2]}`)
+  }
+  const skipManualReason = argv[2] === '--skip-manual' ? argv[3] : null
+  if (argv[2] === '--skip-manual'
+    && (argv.length !== 4 || !skipManualReason.trim())) {
     throw new Error('--skip-manual requires a non-empty reason')
   }
   return {
-    mode: 'release',
-    targetVersion: argv[0],
+    mode: 'prepare',
+    targetVersion: argv[1],
     skipManualReason,
   }
 }
 
-export async function runReleaseGate({ request, repositoryRoot, effects }) {
-  if (request.mode !== 'release') {
-    throw new Error('Release gate requires a release request')
+export async function runReleasePreparation({ request, repositoryRoot, effects }) {
+  if (request.mode !== 'prepare') {
+    throw new Error('Release preparation requires a prepare request')
   }
 
   const repository = await effects.readRepositoryState({ repositoryRoot })
@@ -854,9 +860,10 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
 
   const startedAt = effects.now()
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'preparing',
     changeHeadCommit: repository.head,
+    preparationBranch: null,
     sourceChecks: null,
     identity: null,
     releaseBaseline: null,
@@ -891,7 +898,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
       passed: false,
       completedAt,
     }
-    await recordBlockedEvidence({
+    await recordLastFailure({
       effects,
       evidence,
       error,
@@ -912,6 +919,9 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     })
     if (typeof prepared?.sourceCommit !== 'string' || !prepared.sourceCommit) {
       throw new Error('Release preparation did not produce a prepared source commit')
+    }
+    if (prepared.preparationBranch !== `release-prep/v${request.targetVersion}`) {
+      throw new Error('Release preparation did not retain the stable preparation branch')
     }
     if (prepared.artifact?.packageName !== repository.packageName
       || prepared.artifact?.packageVersion !== request.targetVersion) {
@@ -938,7 +948,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     }
   }
   catch (error) {
-    await recordBlockedEvidence({
+    await recordLastFailure({
       effects,
       evidence,
       error,
@@ -972,7 +982,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     await effects.writeEvidence(evidence)
   }
   catch (error) {
-    await recordBlockedEvidence({
+    await recordLastFailure({
       effects,
       evidence,
       error,
@@ -1001,7 +1011,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
         structuredClone(profile)
       ))
     }
-    await recordBlockedEvidence({
+    await recordLastFailure({
       effects,
       evidence,
       error,
@@ -1036,7 +1046,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
         reason: 'required by default',
         results: results && typeof results === 'object' ? { ...results } : null,
       }
-      await recordBlockedEvidence({
+      await recordLastFailure({
         effects,
         evidence,
         error,
@@ -1055,103 +1065,37 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     }
   }
   evidence.status = 'verified'
+  evidence.preparationBranch = prepared.preparationBranch
   evidence.timestamps.verifiedAt = effects.now()
+  delete evidence.lastFailure
   await effects.writeEvidence(evidence)
-
-  const tagName = `v${request.targetVersion}`
-  const identityCheck = phase => effects.assertReleaseIdentity({
-    phase,
-    repositoryRoot,
-    changeHeadCommit: repository.head,
-    identity: evidence.identity,
-    artifact: prepared.artifact,
-    releaseBaseline: evidence.releaseBaseline,
-    tagName,
-  })
-
-  let publicationStage = 'publication-identity'
-  try {
-    await identityCheck('fast-forward')
-    publicationStage = 'fast-forward'
-    await effects.fastForward({
-      repositoryRoot,
-      sourceCommit: prepared.sourceCommit,
-    })
-    publicationStage = 'publication-identity'
-    await identityCheck('tag')
-    publicationStage = 'tag'
-    await effects.createTag({
-      repositoryRoot,
-      sourceCommit: prepared.sourceCommit,
-      tagName,
-    })
-    publicationStage = 'publication-identity'
-    await identityCheck('push')
-    publicationStage = 'push'
-    await effects.push({
-      branch: 'main',
-      repositoryRoot,
-      tagName,
-    })
-    evidence.status = 'pushed'
-    evidence.timestamps.pushedAt = effects.now()
-    await effects.writeEvidence(evidence)
-
-    publicationStage = 'publication-identity'
-    await identityCheck('publish')
-    publicationStage = 'publish'
-    await effects.publish({
-      archivePath: prepared.artifact.archivePath,
-      distTag: 'latest',
-    })
-    evidence.status = 'published'
-    evidence.timestamps.publishedAt = effects.now()
-    await effects.writeEvidence(evidence)
-  }
-  catch (error) {
-    await recordBlockedEvidence({
-      effects,
-      evidence,
-      error,
-      stage: publicationStage,
-      status: publicationStage === 'publish' ? evidence.status : 'blocked',
-    })
-    const context = publicationStage === 'publication-identity'
-      ? 'publication identity validation'
-      : `publication effect ${publicationStage}`
-    throw new Error(`Release blocked during ${context}: ${errorMessage(error)}`, {
-      cause: error,
-    })
-  }
-
-  await recordRegistryHealth({ effects, evidence })
-
   return evidence
 }
 
-export async function runReleaseReconciliation({ request, repositoryRoot, effects }) {
-  if (request.mode !== 'reconcile') {
-    throw new Error('Publication reconciliation requires a reconcile request')
+export async function runReleasePublication({ request, repositoryRoot, effects }) {
+  if (request.mode !== 'publish') {
+    throw new Error('Release publication requires a publish request')
   }
 
   const evidence = await effects.readEvidence({
     repositoryRoot,
     targetVersion: request.targetVersion,
   })
+  assertCurrentEvidenceSchema(evidence)
   if (evidence?.identity?.targetVersion !== request.targetVersion) {
-    throw new Error('Reconciliation evidence does not match the target version')
+    throw new Error('Publication evidence does not match the target version')
   }
-  if (evidence.status !== 'pushed' && !evidence.timestamps?.pushedAt) {
-    throw new Error('Publication reconciliation is only available after push may have succeeded')
+  if (!['verified', 'published'].includes(evidence.status)) {
+    throw new Error('Publication requires verified release evidence')
   }
-  if (evidence.registryHealth !== undefined) return evidence
+  if (evidence.status === 'published' && evidence.registryHealth !== undefined) return evidence
 
   const artifact = {
     ...evidence.artifact,
     integritySha512: evidence.identity.artifactIntegritySha512,
   }
-  const reconciliationIdentity = {
-    phase: 'reconcile',
+  const publicationIdentity = {
+    phase: 'publish',
     repositoryRoot,
     changeHeadCommit: evidence.changeHeadCommit,
     identity: evidence.identity,
@@ -1160,92 +1104,118 @@ export async function runReleaseReconciliation({ request, repositoryRoot, effect
     tagName: `v${request.targetVersion}`,
   }
   try {
-    await effects.assertReleaseIdentity(reconciliationIdentity)
+    await effects.assertReleaseIdentity(publicationIdentity)
   }
   catch (error) {
-    await recordBlockedEvidence({
+    await recordLastFailure({
       effects,
       evidence,
       error,
-      stage: 'reconciliation-identity',
+      stage: 'local-identity',
     })
-    throw new Error(`Publication reconciliation identity validation failed: ${errorMessage(error)}`, {
+    throw new Error(`Publication local identity validation failed: ${errorMessage(error)}`, {
       cause: error,
     })
   }
 
-  let registryRelease
   try {
-    registryRelease = await effects.readRegistryRelease({
-      packageName: artifact.packageName,
-      targetVersion: request.targetVersion,
+    const remote = await effects.readRemoteReleaseState({
+      branch: 'main',
+      repositoryRoot,
+      tagName: `v${request.targetVersion}`,
     })
-    const resultIsKnown = registryRelease?.state === 'absent'
-      || (registryRelease?.state === 'published'
-        && typeof registryRelease.integrity === 'string'
-        && registryRelease.integrity.length > 0)
-    if (!resultIsKnown) {
-      throw new Error('registry query returned an indeterminate result')
+    if (remote.branchCommit !== evidence.identity.sourceCommit) {
+      throw new Error('remote main does not resolve to the verified release commit')
+    }
+    if (remote.tagCommit !== evidence.identity.sourceCommit) {
+      throw new Error('remote tag does not resolve to the verified release commit')
     }
   }
   catch (error) {
-    await recordBlockedEvidence({
+    await recordLastFailure({
       effects,
       evidence,
       error,
-      stage: 'registry-query',
+      stage: 'remote-identity',
     })
-    throw new Error(`Publication reconciliation registry query failed: ${errorMessage(error)}`, {
-      cause: error,
-    })
+    throw error
   }
-  if (registryRelease?.state === 'absent') {
-    let stage = 'reconciliation-identity'
+
+  const registryInput = {
+    packageName: artifact.packageName,
+    targetVersion: request.targetVersion,
+  }
+  const before = await readRegistryReleaseOrRecordFailure({
+    effects,
+    evidence,
+    input: registryInput,
+    stage: 'registry-query',
+  })
+
+  let alreadyPublished
+  try {
+    alreadyPublished = assertMatchingRegistryIntegrity(
+      before,
+      evidence.identity.artifactIntegritySha512,
+    )
+  }
+  catch (error) {
+    await recordLastFailure({
+      effects,
+      evidence,
+      error,
+      stage: 'registry-integrity-conflict',
+    })
+    throw error
+  }
+
+  if (!alreadyPublished) {
+    let publishError = null
     try {
-      await effects.assertReleaseIdentity(reconciliationIdentity)
-      stage = 'reconciliation-publish'
       await effects.publish({
         archivePath: artifact.archivePath,
         distTag: 'latest',
       })
     }
     catch (error) {
-      await recordBlockedEvidence({
+      publishError = error
+    }
+
+    const after = await readRegistryReleaseOrRecordFailure({
+      effects,
+      evidence,
+      input: registryInput,
+      stage: 'post-publish-registry-query',
+    })
+    let publicationVisible
+    try {
+      publicationVisible = assertMatchingRegistryIntegrity(
+        after,
+        evidence.identity.artifactIntegritySha512,
+      )
+    }
+    catch (error) {
+      await recordLastFailure({
         effects,
         evidence,
         error,
-        stage,
-        status: stage === 'reconciliation-publish' ? evidence.status : 'blocked',
+        stage: 'registry-integrity-conflict',
       })
-      throw new Error(`Publication ${stage.replace('-', ' ')} failed: ${errorMessage(error)}`, {
-        cause: error,
-      })
+      throw error
     }
-    evidence.status = 'published'
-    delete evidence.blocked
-    evidence.timestamps.publishedAt = effects.now()
-    await effects.writeEvidence(evidence)
-    await recordRegistryHealth({ effects, evidence })
-    return evidence
+    if (!publicationVisible) {
+      const error = publishError ?? new Error('publication is not visible')
+      await recordLastFailure({ effects, evidence, error, stage: 'publication' })
+      throw new Error('Publication remains indeterminate', { cause: error })
+    }
   }
-  if (registryRelease?.state === 'published'
-    && registryRelease.integrity === evidence.identity.artifactIntegritySha512) {
-    evidence.status = 'published'
-    delete evidence.blocked
-    evidence.timestamps.reconciledAt = effects.now()
-    await effects.writeEvidence(evidence)
-    await recordRegistryHealth({ effects, evidence })
-    return evidence
-  }
-  if (registryRelease?.state === 'published') {
-    await recordBlockedEvidence({
-      effects,
-      evidence,
-      error: new Error('Published registry artifact integrity differs from retained tarball'),
-      stage: 'registry-integrity-conflict',
-    })
-    throw new Error('Fatal publication artifact conflict: registry integrity differs')
-  }
+
+  evidence.status = 'published'
+  evidence.timestamps.publishedAt = effects.now()
+  delete evidence.lastFailure
+  await effects.writeEvidence(evidence)
+  await recordRegistryHealth({ effects, evidence })
+  return evidence
 }
 
 export function runReleaseRegistrySmokeRetry({ request, repositoryRoot, effects }) {
@@ -1255,7 +1225,11 @@ export function runReleaseRegistrySmokeRetry({ request, repositoryRoot, effects 
   return runRegistrySmokeRetry({
     repositoryRoot,
     targetVersion: request.targetVersion,
-    readEvidence: effects.readEvidence,
+    readEvidence: async (input) => {
+      const evidence = await effects.readEvidence(input)
+      assertCurrentEvidenceSchema(evidence)
+      return evidence
+    },
     writeEvidence: effects.writeEvidence,
     verifyRegistryPackage: effects.verifyRegistryPackage,
     now: effects.now,
@@ -1275,10 +1249,10 @@ export async function runReleaseCli({
   if (request.mode === 'registry-smoke-retry') {
     return runReleaseRegistrySmokeRetry({ request, repositoryRoot, effects })
   }
-  if (request.mode === 'reconcile') {
-    return runReleaseReconciliation({ request, repositoryRoot, effects })
+  if (request.mode === 'publish') {
+    return runReleasePublication({ request, repositoryRoot, effects })
   }
-  return runReleaseGate({ request, repositoryRoot, effects })
+  return runReleasePreparation({ request, repositoryRoot, effects })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

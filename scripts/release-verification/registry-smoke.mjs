@@ -168,6 +168,9 @@ function loadRetryRequest(evidence, targetVersion) {
   if (!evidence || typeof evidence !== 'object') {
     invalidRetryEvidence('must be an object')
   }
+  if (evidence.schemaVersion !== 2) {
+    invalidRetryEvidence('uses an obsolete schema; release-code changes invalidate prior evidence')
+  }
   if (evidence.status !== 'published') {
     invalidRetryEvidence('must record a published release')
   }
@@ -359,7 +362,7 @@ export async function runInitialRegistrySmoke({ registryHealth, verifyRegistryPa
       verification: error.evidence,
     }, {
       status: 'investigation',
-      retryCommand: `pnpm release registry-smoke ${registryHealth.package.version}`,
+      retryCommand: `pnpm release:registry-smoke ${registryHealth.package.version}`,
     })
   }
 }

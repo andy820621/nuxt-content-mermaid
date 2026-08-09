@@ -5,7 +5,6 @@ import {
 } from '../scripts/release-verification/failure-classification.mjs'
 import { RegistrySmokeVerificationFailure } from '../scripts/release-verification/runner.mjs'
 import type { RegistrySmokeVerificationEvidence } from '../scripts/release-verification/runner.mjs'
-import type { LeanReleaseEvidence } from '../scripts/release-verification/release.mjs'
 import {
   createPendingRegistryHealth,
   runInitialRegistrySmoke,
@@ -190,7 +189,7 @@ async function createPublishedInvestigationEvidence() {
   })
 
   return {
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     status: 'published' as const,
     identity: { targetVersion: '3.0.0' },
     artifact: { packageVersion: '3.0.0' },
@@ -231,7 +230,7 @@ async function createPublishedInstallInvestigationEvidence() {
   })
 
   return {
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     status: 'published' as const,
     identity: { targetVersion: '3.0.0' },
     artifact: { packageVersion: '3.0.0' },
@@ -395,7 +394,7 @@ describe('initial registry smoke health', () => {
         classification,
         verification,
       }],
-      retryCommand: 'pnpm release registry-smoke 3.0.0',
+      retryCommand: 'pnpm release:registry-smoke 3.0.0',
     })
   })
 })
@@ -660,7 +659,7 @@ describe('registry smoke retry', () => {
   })
 
   it('accepts a persisted reader type while rejecting legacy evidence before side effects', async () => {
-    const legacyEvidence: LeanReleaseEvidence = {
+    const legacyEvidence = {
       schemaVersion: 1,
       status: 'published',
       changeHeadCommit: 'change-head-commit',
@@ -683,7 +682,7 @@ describe('registry smoke retry', () => {
       manualCheck: null,
       timestamps: {},
     }
-    const readEvidence = vi.fn(async (): Promise<LeanReleaseEvidence> => legacyEvidence)
+    const readEvidence = vi.fn(async () => legacyEvidence)
     const writeEvidence = vi.fn(async () => undefined)
     const verifyRegistryPackage = vi.fn(async () => createVerificationEvidence(true))
 
@@ -694,7 +693,7 @@ describe('registry smoke retry', () => {
       writeEvidence,
       verifyRegistryPackage,
       now: () => '2026-08-09T02:00:00.000Z',
-    })).rejects.toThrow('requires registry health')
+    })).rejects.toThrow('release-code changes invalidate prior evidence')
 
     expect(verifyRegistryPackage).not.toHaveBeenCalled()
     expect(writeEvidence).not.toHaveBeenCalled()
@@ -769,7 +768,7 @@ describe('registry smoke retry', () => {
         { number: 1, cleanConsumer: true },
         { number: 2, success: false },
       ],
-      retryCommand: 'pnpm release registry-smoke 3.0.0',
+      retryCommand: 'pnpm release:registry-smoke 3.0.0',
     })
     expect(writeEvidence).toHaveBeenCalledOnce()
     expect(writeEvidence).toHaveBeenCalledWith(result)
@@ -831,7 +830,7 @@ describe('registry smoke retry', () => {
     expect(result.registryHealth).toMatchObject({
       status: 'investigation',
       attempts: [{ number: 1 }, { number: 2, classification: 'package-defect' }],
-      retryCommand: 'pnpm release registry-smoke 3.0.0',
+      retryCommand: 'pnpm release:registry-smoke 3.0.0',
     })
     expect(writeEvidence).toHaveBeenCalledOnce()
   })
@@ -856,7 +855,7 @@ describe('registry smoke retry', () => {
     expect(result.registryHealth).toMatchObject({
       status: 'investigation',
       attempts: [{ number: 1 }, { number: 2, cleanConsumer: false, success: true }],
-      retryCommand: 'pnpm release registry-smoke 3.0.0',
+      retryCommand: 'pnpm release:registry-smoke 3.0.0',
     })
     expect(writeEvidence).toHaveBeenCalledOnce()
   })
