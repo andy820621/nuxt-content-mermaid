@@ -14,7 +14,7 @@ This project enables [Nuxt Content](https://github.com/nuxt/content) to render `
 - `pnpm dev:build`: Build playground only, suitable for verifying production builds.
 - `pnpm lint`: Run ESLint to ensure code style aligns with Nuxt conventions.
 - `pnpm test` / `pnpm test:watch`: Run Vitest; `pnpm test:types` performs type checking for both root and playground.
-- Before release, use `pnpm release:base` (lint + test + build); for versioning use `pnpm release:patch|minor|major` (invokes changelogen).
+- Before release, use `pnpm verify:source`; publish an exact version through `pnpm release <version>` and follow `docs/en/RELEASING.md` for recovery.
 
 ## Coding Style & Naming Conventions
 - TypeScript + ESM, maintain 2-space indentation, avoid using `any`; place public types in `src/types` and export them, runtime constants are centralized in `src/runtime/constants.ts`.
@@ -38,7 +38,7 @@ This project enables [Nuxt Content](https://github.com/nuxt/content) to render `
 
 ### Issue tracker
 
-Issues and specs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
+Implementation work is tracked in GitHub Issues. See `docs/agents/issue-tracker.md`; accepted long-lived contracts live under `docs/specs/`.
 
 ### Triage labels
 
