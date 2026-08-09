@@ -2,9 +2,7 @@
 
 ## Status
 
-Accepted for the 3.0 implementation tracked by [GitHub Issue #21](https://github.com/andy820621/nuxt-content-mermaid/issues/21) and its sub-issues.
-
-ADRs 0002–0018 remain the source of individual decisions and rationale. This specification defines their integrated seam ownership, public release boundary, and verification scope.
+Accepted for the 3.x release line. This specification is the source of truth for integrated seam ownership, public release boundaries, and verification scope.
 
 ## Release Boundary
 
@@ -60,7 +58,13 @@ The Module Configuration Resolver is the package-owned build seam. It validates 
 2. Nuxt-Resolved Module Options;
 3. `runtimeConfig.public.contentMermaid` build-time overrides.
 
-It returns Module Activation separately from runtime options. `enabled` is resolved exclusively from package defaults and Nuxt-Resolved Module Options; public runtime overrides cannot participate structurally or semantically. The final runtime value is validated before being written to public runtime transport.
+It observes application-owned inputs through property descriptors, so validation never invokes getters, setters, or serialization hooks. Package defaults remain internal and valid strict pure data; callers cannot replace or reorder them.
+
+It returns Module Activation separately from runtime options. `enabled` is resolved exclusively from package defaults and Nuxt-Resolved Module Options; the presence of an own `enabled` property in public runtime overrides is an error regardless of value. The final runtime payload is a wholly package-owned clone, remains mutable for Nuxt's build-time transport, and is validated before being written to public runtime config.
+
+Module setup performs a descriptor-safe preflight for the removed top-level `mermaidContent` key. An own property triggers the migration error even when its value is `undefined` or provided by an accessor, and the accessor is never invoked. The package never reads, mirrors, removes, or falls back to `runtimeConfig.public.mermaidContent`.
+
+All configuration preflight and resolution completes before setup changes Nuxt Content hooks, component registration, runtime config, or runtime files. When Module Activation is false, setup returns without installing the Markdown transform or runtime integration and without writing a runtime payload.
 
 ### 3. Configuration Core
 
@@ -166,7 +170,9 @@ While resolution is pending, the component has no Rendering Owner. Renderer Sele
 
 Successful resolution atomically assigns ownership to the Custom Renderer. It receives only the established `code`, default slot, and `spinner` inputs and completely owns configuration, theme, toolbar, loading, error presentation, and rendering. A later Custom Renderer mount or render failure never transfers ownership to the Built-in Renderer.
 
-`not-found` and `load-failed` resolution failures each produce one Custom Renderer Resolution Diagnostic per failed ownership handoff. Reporting happens before the Built-in Renderer receives ownership. The diagnostic is an internal invariant and test seam, not a public structured-diagnostics interface. Independently of `debug`, Package Users receive a console diagnostic containing the package prefix, candidate, and understandable failure reason; exact wording is not guaranteed. `components.error` remains exclusive to Built-in Mermaid render failures.
+Each pending selection attempt owns a one-shot failure commit. After an asynchronous result settles, orchestration first rejects superseded attempts. A current `not-found` or `load-failed` result synchronously reports one Custom Renderer Resolution Diagnostic and only then commits Built-in ownership. The diagnostic is an internal invariant and test seam, not a public structured-diagnostics interface. Independently of `debug`, Package Users receive a console diagnostic containing the package prefix, candidate, and understandable failure reason; exact wording is not guaranteed. `components.error` remains exclusive to Built-in Mermaid render failures.
+
+`src/runtime/components/Mermaid.vue` remains the public orchestration entry and `.mermaid-outer-wrapper` remains its sole root. The internal Built-in Renderer owns the existing `.mermaid-block` root, Mermaid lifecycle, lazy loading, toolbar, fullscreen, loading and error presentation, and related styles without adding a wrapper. The public entry forwards `loading` and scoped `error` slots unchanged. Existing element hierarchy, class hooks, fallback source markup, and Custom Renderer inputs remain stable; compiler-generated scoped-style attributes are not public CSS contracts.
 
 This preserves the existing availability-oriented fallback. Fail-closed selection is deferred unless a concrete safety or compliance requirement makes a Custom Renderer mandatory. A future need to preserve package UI and lifecycle while replacing only diagram generation must use a separately named low-level render adapter rather than changing `components.renderer`.
 
