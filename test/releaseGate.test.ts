@@ -270,25 +270,6 @@ function createPublishedInvestigationEvidence() {
   }
 }
 
-function observeRegistryHealthLifecycle(effects: ReturnType<typeof createInertEffects>) {
-  const lifecycle: string[] = []
-  effects.writeEvidence.mockImplementation(async (evidence: unknown) => {
-    effects.evidenceSnapshots.push(structuredClone(evidence))
-    const snapshot = evidence as {
-      registryHealth?: { status?: string }
-      status?: string
-    }
-    lifecycle.push(
-      `write:${snapshot.status}:${snapshot.registryHealth?.status ?? 'none'}`,
-    )
-  })
-  effects.verifyRegistryPackage.mockImplementation(async (request) => {
-    lifecycle.push('registry-smoke')
-    return createRegistryVerificationEvidence(true, request.profile)
-  })
-  return lifecycle
-}
-
 const manualResults = {
   fullscreen: true,
   zoomPanDrag: true,
@@ -414,6 +395,7 @@ describe('release repository integration', () => {
     const workflow = await readFile(join(repositoryRoot, '.github/workflows/ci.yml'), 'utf8')
     const gitignore = await readFile(join(repositoryRoot, '.gitignore'), 'utf8')
     const domainContext = await readFile(join(repositoryRoot, 'CONTEXT.md'), 'utf8')
+    const releasing = await readFile(join(repositoryRoot, 'docs/en/RELEASING.md'), 'utf8')
 
     expect(manifest.scripts['verify:source'])
       .toBe('pnpm lint && pnpm test && pnpm test:types')
@@ -424,6 +406,8 @@ describe('release repository integration', () => {
     expect(manifest.scripts['release:registry-smoke'])
       .toBe('node scripts/release-verification/release.mjs registry-smoke')
     expect(manifest.scripts).not.toHaveProperty('release')
+    expect(releasing).toContain('git push --atomic origin main v3.0.0')
+    expect(releasing).toContain('refs/tags/v3.0.0^{}')
     expect(manifest.scripts['test:compatibility-profile'])
       .toBe('node scripts/release-verification/package-artifact.mjs --package-source pack')
     expect(manifest.scripts['test:package-artifact'])
@@ -1107,7 +1091,6 @@ describe('production release effects', () => {
       cwd: '/repo',
     })
   })
-
 
   it('prepares one local release commit and retains the single packed artifact', async () => {
     const commands: string[] = []
