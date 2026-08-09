@@ -302,14 +302,20 @@ describe('release repository integration', () => {
     expect(Object.keys(manifest.scripts).filter(key => key.startsWith('release:'))).toEqual([])
     expect(workflow).toContain('run: pnpm verify:source')
 
-    const matrixJob = workflow.slice(
-      workflow.indexOf('  representative-compatibility-matrix:'),
-      workflow.indexOf('  module-compatibility:'),
-    )
+    const matrixJobStart = workflow.indexOf('  representative-compatibility-matrix:')
+    const nextJobStart = workflow.indexOf('  module-compatibility:')
+
+    expect(matrixJobStart).toBeGreaterThan(-1)
+    expect(nextJobStart).toBeGreaterThan(matrixJobStart)
+
+    const matrixJob = workflow.slice(matrixJobStart, nextJobStart)
     const matrixInstall = matrixJob.indexOf('run: npx nypm@latest i')
     const matrixPrepare = matrixJob.indexOf('run: npm run dev:prepare')
     const matrixVerification = matrixJob.indexOf('run: npm run test:compatibility-matrix')
 
+    expect(matrixInstall).toBeGreaterThan(-1)
+    expect(matrixPrepare).toBeGreaterThan(-1)
+    expect(matrixVerification).toBeGreaterThan(-1)
     expect(matrixPrepare).toBeGreaterThan(matrixInstall)
     expect(matrixVerification).toBeGreaterThan(matrixPrepare)
     expect(gitignore.split(/\r?\n/)).toContain('.release-evidence')
