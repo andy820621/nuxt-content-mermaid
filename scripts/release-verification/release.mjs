@@ -19,6 +19,7 @@ import {
   createReleaseVerificationOperations,
   runCommand,
 } from './operations.mjs'
+import { parseExactSemver } from './exact-semver.mjs'
 import { parseVersionProfile, VERSION_PROFILES } from './profiles.mjs'
 import {
   runPackageArtifactVerification,
@@ -30,7 +31,6 @@ import {
   runRegistrySmokeRetry,
 } from './registry-smoke.mjs'
 
-const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 const MANUAL_CHECKS = Object.freeze([
   'fullscreen',
   'zoomPanDrag',
@@ -42,18 +42,14 @@ const MODULE_DIRECTORY = dirname(fileURLToPath(import.meta.url))
 const RELEASE_REGISTRY_PROFILE_ID = 'nuxt-4-actual-latest-release'
 
 function assertExactSemver(version) {
-  const match = typeof version === 'string'
-    ? EXACT_SEMVER_PATTERN.exec(version)
-    : null
-  const prerelease = match?.[4]?.split('.') ?? []
-  if (!match || prerelease.some(identifier => /^\d+$/.test(identifier) && /^0\d+/.test(identifier))) {
+  if (!parseExactSemver(version)) {
     throw new Error('Release entrypoint requires an exact target SemVer')
   }
 }
 
 function compareSemvers(left, right) {
-  const leftMatch = EXACT_SEMVER_PATTERN.exec(left)
-  const rightMatch = EXACT_SEMVER_PATTERN.exec(right)
+  const leftMatch = parseExactSemver(left)
+  const rightMatch = parseExactSemver(right)
   if (!leftMatch || !rightMatch) throw new Error('Cannot compare invalid SemVer values')
   const leftCore = leftMatch.slice(1, 4).map(Number)
   const rightCore = rightMatch.slice(1, 4).map(Number)

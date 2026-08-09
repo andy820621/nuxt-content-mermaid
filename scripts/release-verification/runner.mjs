@@ -1,3 +1,5 @@
+import { parseExactSemver } from './exact-semver.mjs'
+
 const VERIFICATION_STAGES = [
   'artifact',
   'archive',
@@ -11,8 +13,6 @@ const CONSUMER_VERIFICATION_PLANS = Object.freeze({
   artifact: Object.freeze(['install', 'exports', 'types', 'build', 'runtime']),
   registry: Object.freeze(['install', 'build', 'runtime']),
 })
-const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
-
 class StageExecutionFailure extends Error {
   constructor(stage, cause) {
     super(errorMessage(cause))
@@ -103,11 +103,7 @@ function validateRequest(request, supportedKinds = ['pack']) {
 }
 
 function validateRegistrySmokeRequest(request) {
-  const match = typeof request.packageVersion === 'string'
-    ? EXACT_SEMVER_PATTERN.exec(request.packageVersion)
-    : null
-  const prerelease = match?.[4]?.split('.') ?? []
-  if (!match || prerelease.some(identifier => /^\d+$/.test(identifier) && /^0\d+/.test(identifier))) {
+  if (!parseExactSemver(request.packageVersion)) {
     throw new Error('Registry smoke requires an exact package version')
   }
 }

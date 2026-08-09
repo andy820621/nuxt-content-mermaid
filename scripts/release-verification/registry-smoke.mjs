@@ -1,9 +1,9 @@
+import { parseExactSemver } from './exact-semver.mjs'
 import { classifyRegistrySmokeFailure } from './failure-classification.mjs'
 import { RegistrySmokeVerificationFailure } from './runner.mjs'
 import { parseVersionProfile } from './profiles.mjs'
 import { isDeepStrictEqual } from 'node:util'
 
-const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 const PENDING_REGISTRY_HEALTH = new WeakSet()
 
 function requireNonEmptyString(value, label) {
@@ -14,11 +14,7 @@ function requireNonEmptyString(value, label) {
 }
 
 function parseExactPackageVersion(packageVersion) {
-  const match = typeof packageVersion === 'string'
-    ? EXACT_SEMVER_PATTERN.exec(packageVersion)
-    : null
-  const prerelease = match?.[4]?.split('.') ?? []
-  if (!match || prerelease.some(identifier => /^\d+$/.test(identifier) && /^0\d+/.test(identifier))) {
+  if (!parseExactSemver(packageVersion)) {
     throw new TypeError('Registry smoke requires an exact package version')
   }
   return packageVersion

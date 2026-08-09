@@ -16,13 +16,13 @@ import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
 import { runBrowserSmoke } from './browser-smoke.mjs'
+import { parseExactSemver } from './exact-semver.mjs'
 import {
   createReleaseVerificationFailure,
 } from './failure-classification.mjs'
 
 const PACKAGE_NAME = '@barzhsieh/nuxt-content-mermaid'
 const COMMAND_OUTPUT_LIMIT = 8_000
-const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 const CONSUMER_TEMPLATE_FILES = new Set([
   'app.vue',
   'content.config.ts',
@@ -37,11 +37,7 @@ const CONSUMER_TEMPLATE_FILES = new Set([
 ])
 
 function assertExactRegistryVersion(version) {
-  const match = typeof version === 'string'
-    ? EXACT_SEMVER_PATTERN.exec(version)
-    : null
-  const prerelease = match?.[4]?.split('.') ?? []
-  if (!match || prerelease.some(identifier => /^\d+$/.test(identifier) && /^0\d+/.test(identifier))) {
+  if (!parseExactSemver(version)) {
     throw new Error('Registry smoke requires an exact package version')
   }
 }
