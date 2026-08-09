@@ -46,6 +46,55 @@ retained tarball to `latest` with lifecycle scripts disabled. It revalidates
 Git, the tag, package manifests, and tarball SHA-512 integrity before every
 external effect.
 
+## Registry health after publication
+
+Publication and registry health are separate. `status: published` means npm
+accepted the release; `registryHealth.status` reports whether a clean consumer
+installed and ran that exact version with the recorded Version Profile.
+
+A successful first smoke check records `registryHealth.status: healthy`. A
+first failure records `registryHealth.status: investigation`; it is not yet a
+package defect. Use this one and only retry command:
+
+```bash
+pnpm release registry-smoke 3.0.0
+```
+
+It reads the frozen profile from `.release-evidence/3.0.0/release.json`; do not
+change the package version or profile while investigating.
+
+### Recovery sequence for an unhealthy release
+
+1. Inspect the first attempt in `.release-evidence/3.0.0/release.json`: its
+   stage, classification, requested profile, resolved profile, and diagnostics.
+   Preserve this evidence before retrying.
+2. If the classification is `registry`, `network`, `runner`, or `permission`,
+   fix that infrastructure issue without changing the package version or the
+   frozen profile.
+3. From an independent clean environment, run:
+
+   ```bash
+   pnpm release registry-smoke 3.0.0
+   ```
+
+4. Treat only `registryHealth.status: unhealthy` as a confirmed package
+   defect. A result of `investigation` still needs investigation; it is not a
+   reason to withdraw the release.
+5. For a confirmed defect, manually deprecate only the exact affected version:
+
+   ```bash
+   npm deprecate "@barzhsieh/nuxt-content-mermaid@3.0.0" "Use <known-good-version>; fix tracked in <issue-or-version>"
+   ```
+
+6. Prepare a normal corrective patch, then verify its registry health:
+
+   ```bash
+   pnpm release <patch-version>
+   ```
+
+Never use `npm unpublish`. Never move tags, auto-publish a patch, or perform
+automatic rollback. Deprecation is a manual maintainer action only.
+
 ## Evidence and failures
 
 `.release-evidence/<version>/release.json` is a local journal, not an approval
