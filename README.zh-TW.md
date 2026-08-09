@@ -19,6 +19,7 @@
 
 - [功能特色](#功能特色)
 - [使用前提](#使用前提)
+- [相依與遷移契約](./docs/ch/DEPENDENCY_AND_MIGRATION_CONTRACT.md)
 - [快速開始](#快速開始)
 - [設定](#設定)
 - [遷移至 v3](#遷移至-v3)
@@ -47,12 +48,17 @@
 
 ## 使用前提
 
-- `nuxt@^3.20.1 || ^4.1.0`
-- `@nuxt/content@>=3.5.0`
+- Node.js `>=22.19.0`
+- `nuxt@^4.1.0`
+- `@nuxt/content@>=3.5.0 <4.0.0`
+
+相依擁有權、2.x 遷移方式、渲染保證與視覺快照限制，請參閱[相依與遷移契約](./docs/ch/DEPENDENCY_AND_MIGRATION_CONTRACT.md)。
 
 ## 快速開始
 
 ### 1. 安裝模組
+
+您的應用程式擁有 Nuxt 與 Nuxt Content 這兩個 peer dependencies：請在應用程式內安裝與更新它們。Mermaid 則是本模組綁定的 Module-Owned Dependency，因此不必為了本模組另行安裝。
 
 **自動設定（自動寫入 `modules`）：**
 
