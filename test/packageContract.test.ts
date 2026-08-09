@@ -8,7 +8,9 @@ describe('package root runtime contract', () => {
   it('exposes the Nuxt module without the legacy package-root transform export', async () => {
     const packageModule = await import('@barzhsieh/nuxt-content-mermaid')
 
-    expect(packageModule.default).toBeDefined()
+    expect(
+      'default' in packageModule ? packageModule.default : undefined,
+    ).toBeDefined()
     expect('transformMermaidCodeBlocks' in packageModule).toBe(false)
     expect('ContentMermaidConfigurationError' in packageModule).toBe(false)
     expect('ConfigurationIssue' in packageModule).toBe(false)
