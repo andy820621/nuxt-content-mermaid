@@ -9,15 +9,39 @@ A Nuxt application or developer consuming a released version of nuxt-content-mer
 _Avoid_: Caller, consumer
 
 **Compatibility Contract**:
-The externally observable behavior a Package User can rely on, including documented or typed configuration, rendering behavior, extension points, and styling hooks. Internal implementation, exact performance, and debug log wording are excluded when observable results and ordering remain unchanged.
+The externally observable Package-Owned Integration Behavior a Package User can rely on, including documented or typed configuration, extension points, lifecycle, and styling hooks. Mermaid's exact SVG, layout, undocumented DOM, and exhaustive diagram behavior are excluded, as are internal implementation, exact performance, and debug log wording.
 _Avoid_: Implementation detail
+
+**Package-Owned Integration Behavior**:
+The behavior controlled by nuxt-content-mermaid at its Nuxt, Content, configuration, rendering-lifecycle, theme, toolbar, fallback, and extension seams. It includes producing a usable SVG for representative supported input but excludes Mermaid's exact serialization, geometry, undocumented internals, and exhaustive diagram-feature correctness.
+_Avoid_: Mermaid output, exact SVG contract, every diagram type
+
+**Declared-Compatible Combination**:
+A dependency combination that falls within a released package line's declared ranges and is therefore presumed to satisfy its Compatibility Contract, whether or not that exact combination is part of fixed compatibility evidence.
+_Avoid_: Known-Latest Version, tested combination, best-effort compatibility
+
+**Contract Gap**:
+A confirmed failure of a Declared-Compatible Combination to satisfy the Compatibility Contract. It is a defect in a maintained package line rather than a reason to reinterpret or retroactively narrow the declared range.
+_Avoid_: Unsupported combination, candidate failure, upstream incompatibility
+
+**Active Support Line**:
+The current package major whose host and dependency contract receives dependency updates, ordinary fixes, and new capabilities. Nuxt 4 is the sole active host line for nuxt-content-mermaid 3.x.
+_Avoid_: Latest dependency, Frozen Legacy Release
+
+**Frozen Legacy Release**:
+A published package major that remains installable but receives no ordinary fixes, dependency updates, or compatibility expansion. A critical package-caused security backport may be considered individually without making the line maintained again.
+_Avoid_: Active Support Line, maintained major, deprecated package
+
+**Migration Assistance Window**:
+The three months after the 3.0 release in which maintainers prioritize migration documentation, usage guidance, and 3.x defects that prevent migration from 2.x. It is not a 2.x maintenance promise and may be extended only from demonstrated Nuxt 3 user demand.
+_Avoid_: Support window, backport period
 
 **Nuxt Integration Contract**:
 The subset of the Compatibility Contract observed when a Package User installs and configures nuxt-content-mermaid as a Nuxt module. It covers accepted Markdown diagram input and generated component markup, but not direct imports of package named exports.
 _Avoid_: Package behavior, module API
 
 **Module Activation**:
-The build-time decision, controlled by `contentMermaid.enabled` in Nuxt config, that determines whether nuxt-content-mermaid installs its Markdown transformation and runtime integration. It supports both Nuxt 3 and Nuxt 4 and cannot be overridden through public runtime configuration.
+The build-time decision, controlled by `contentMermaid.enabled` in Nuxt config, that determines whether nuxt-content-mermaid installs its Markdown transformation and runtime integration. It is available within the released package line's Supported Nuxt Range and cannot be overridden through public runtime configuration.
 _Avoid_: Runtime enablement, render switch
 
 **Nuxt-Resolved Module Options**:
@@ -184,6 +208,22 @@ _Avoid_: DOM cleanup, optimistic render
 The smallest repeatable body of evidence required to consider a package version safe to publish and healthy after publication. Required automated verification of the Publishable Package Artifact always blocks release; Manual Interaction Verification blocks only when the Release Impact Declaration identifies a relevant risk.
 _Avoid_: Test suite, release checklist
 
+**Release Baseline Freeze**:
+The release-candidate boundary that fixes published dependency ranges plus the exact Minimum and Known-Latest Compatibility Profiles before artifact verification begins. A later baseline or release-code change invalidates that evidence and requires a rebuilt artifact and fresh verification; unrelated upstream releases wait for a later package release.
+_Avoid_: Dependency freeze, support ceiling, release branch
+
+**Minimum Compatibility Profile**:
+The fixed-version evidence tuple at the public lower boundaries of the active Nuxt and Nuxt Content ranges, paired with the package's minimum maintained Node runtime and pinned Module-Owned Dependencies. It protects the declared floor without claiming exhaustive coverage of intermediate combinations.
+_Avoid_: Oldest lockfile, legacy profile, Known-Latest Compatibility Profile
+
+**Known-Latest Compatibility Profile**:
+The atomic fixed-version evidence tuple for Nuxt, Nuxt Content, Mermaid, and Node. One primary dependency dimension changes per ordinary dependency-update pull request, while every dimension is reverified together before any member is recorded as a Known-Latest Version.
+_Avoid_: Independent dependency result, actual-latest stack, supported-version list
+
+**Nuxt Toolchain Family**:
+The coordinated Nuxt update unit consisting of the public Nuxt host dimension plus the package's `@nuxt/kit` runtime integration dependency and `@nuxt/schema` development baseline. Kit and Schema follow the Known-Latest Nuxt baseline without becoming separate public compatibility dimensions.
+_Avoid_: Nuxt peer range, Compatibility Profile dimension, all Nuxt ecosystem packages
+
 **Publishable Package Artifact**:
 The exact package archive intended for npm publication, including only the files, exports, types, and runtime code a Package User will receive. Verification against repository source, a source-linked playground, or unpublished build output is not evidence about this artifact.
 _Avoid_: Source tree, dist directory, npm release
@@ -204,13 +244,21 @@ _Avoid_: Tested Nuxt version, primary Nuxt version
 A major line of Nuxt or another peer dependency that has passed explicit compatibility verification and is included deliberately in the public peer range. Publication of a new upstream major does not make it supported automatically.
 _Avoid_: Installable dependency, future-compatible dependency
 
+**Module-Owned Dependency**:
+An upstream runtime package, such as Mermaid, that nuxt-content-mermaid installs for Package Users and whose version selection, verification, and upgrade responsibility belongs to this package.
+_Avoid_: Peer dependency, host capability, user-installed dependency
+
+**Minor-Bounded Dependency Range**:
+The Module-Owned Dependency policy that permits unverified same-minor patches to enter fresh installs under an upstream semver presumption while preventing a new minor or major from flowing without an explicit range update and package release. It is a deliberate maintenance-latency trade-off rather than fixed-version evidence.
+_Avoid_: Exact dependency, caret range, Known-Latest Version
+
 **Known-Latest Version**:
 The most recent upstream version deliberately pinned after successful compatibility verification for reproducible pull-request evidence. It is distinct from the latest version currently available from the registry.
 _Avoid_: Current latest, minimum supported version
 
 **Compatibility Drift Check**:
-Scheduled verification that resolves the actual latest upstream versions to detect changes since the Known-Latest Version. A confirmed incompatibility inside the declared peer range creates a blocking issue for ordinary releases; a documented security emergency may proceed, but does not waive required artifact verification.
-_Avoid_: Pull-request matrix, dependency update
+An optional scheduled canary that smoke-tests the highest non-prerelease versions within published dependency ranges when it remains quiet and inexpensive to maintain. Its failure is only a notification for best-effort investigation and creates no automatic issue, release block, or response obligation.
+_Avoid_: Release gate, maintenance commitment, dependency update
 
 **Representative Compatibility Matrix**:
 A deliberately small set of minimum, Known-Latest, and high-risk boundary combinations used as evidence for the broader peer-range Compatibility Contract. It does not redefine support as only the combinations that CI happens to execute.
