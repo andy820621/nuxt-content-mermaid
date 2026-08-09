@@ -60,7 +60,7 @@ export function runRegistrySmokeRetry(input: {
   readEvidence: (input: {
     repositoryRoot: string
     targetVersion: string
-  }) => Promise<RegistrySmokeReleaseEvidence>
+  }) => Promise<unknown>
   writeEvidence: (evidence: RegistrySmokeReleaseEvidence) => Promise<void>
   verifyRegistryPackage: (
     request: RegistrySmokeVerificationRequest,

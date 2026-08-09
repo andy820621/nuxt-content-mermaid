@@ -4,6 +4,7 @@ import {
   classifyRegistrySmokeFailure,
 } from '../scripts/release-verification/failure-classification.mjs'
 import { RegistrySmokeVerificationFailure } from '../scripts/release-verification/runner.mjs'
+import type { LeanReleaseEvidence } from '../scripts/release-verification/release.mjs'
 import {
   createPendingRegistryHealth,
   runInitialRegistrySmoke,
@@ -392,6 +393,9 @@ describe('registry smoke retry', () => {
     ['an empty requested Nuxt range', (evidence: PublishedInvestigationEvidence) => {
       evidence.registryHealth.profile.requested.nuxt = ''
     }],
+    ['an empty requested Nuxt Content range', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.profile.requested.nuxtContent = ''
+    }],
   ])('rejects %s before calling the verifier', async (_, mutateEvidence) => {
     const releaseEvidence = await createPublishedInvestigationEvidence()
     const readEvidence = vi.fn(async () => {
@@ -410,6 +414,45 @@ describe('registry smoke retry', () => {
       verifyRegistryPackage,
       now: () => '2026-08-09T02:00:00.000Z',
     })).rejects.toThrow()
+
+    expect(verifyRegistryPackage).not.toHaveBeenCalled()
+    expect(writeEvidence).not.toHaveBeenCalled()
+  })
+
+  it('accepts a persisted reader type while rejecting legacy evidence before side effects', async () => {
+    const legacyEvidence: LeanReleaseEvidence = {
+      schemaVersion: 1,
+      status: 'published',
+      changeHeadCommit: 'change-head-commit',
+      sourceChecks: null,
+      identity: {
+        sourceCommit: 'prepared-release-commit',
+        targetVersion: '3.0.0',
+        artifactIntegritySha512: 'sha512-release-artifact',
+      },
+      artifact: {
+        archivePath: '/repo/.release-evidence/3.0.0/package.tgz',
+        filename: 'package.tgz',
+        packageName: '@barzhsieh/nuxt-content-mermaid',
+        packageVersion: '3.0.0',
+        packlist: [],
+      },
+      compatibilityProfile: null,
+      manualCheck: null,
+      timestamps: {},
+    }
+    const readEvidence = vi.fn(async (): Promise<LeanReleaseEvidence> => legacyEvidence)
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => createVerificationEvidence(true))
+
+    await expect(runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })).rejects.toThrow('requires registry health')
 
     expect(verifyRegistryPackage).not.toHaveBeenCalled()
     expect(writeEvidence).not.toHaveBeenCalled()
