@@ -5,51 +5,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    # Dependabot currently misidentifies transitive versions when updating this
+    # pnpm catalog, which can downgrade the Nuxt 4 toolchain and corrupt the root
+    # lockfile importer. Zero disables version-update PRs without disabling
+    # GitHub-native security-update PRs.
+    open-pull-requests-limit: 0
     assignees:
       - andy820621
-
-    # Keep public peer ranges unchanged when an in-range baseline advances.
-    # Majors are ignored below and require a maintainer-authored contract decision.
-    versioning-strategy: increase-if-necessary
-
-    # Only prepare the evidence candidates defined by the 3.x strategy. Dependabot
-    # does not edit Node engines because they are not dependencies or allowlisted.
-    allow:
-      - dependency-name: nuxt
-      - dependency-name: '@nuxt/kit'
-      - dependency-name: '@nuxt/schema'
-      - dependency-name: '@nuxt/content'
-      - dependency-name: mermaid
-
-    groups:
-      nuxt-toolchain:
-        patterns:
-          - nuxt
-          - '@nuxt/kit'
-          - '@nuxt/schema'
-      nuxt-content:
-        patterns:
-          - '@nuxt/content'
-      mermaid:
-        patterns:
-          - mermaid
-
-    # Public peer majors and all dependency majors need deliberate package-semver
-    # classification; no Dependabot candidate can redefine those boundaries.
-    ignore:
-      - dependency-name: nuxt
-        update-types:
-          - version-update:semver-major
-      - dependency-name: '@nuxt/content'
-        update-types:
-          - version-update:semver-major
-      - dependency-name: '@nuxt/kit'
-        update-types:
-          - version-update:semver-major
-      - dependency-name: '@nuxt/schema'
-        update-types:
-          - version-update:semver-major
-      - dependency-name: mermaid
-        update-types:
-          - version-update:semver-major
