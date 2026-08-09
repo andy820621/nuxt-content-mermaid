@@ -4,7 +4,7 @@ export interface CommandInvocation {
   command: string
   args: string[]
   cwd: string
-  env?: Record<string, string>
+  env?: Record<string, string | undefined>
 }
 
 export interface CommandResult {
