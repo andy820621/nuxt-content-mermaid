@@ -7,6 +7,7 @@ import { RegistrySmokeVerificationFailure } from '../scripts/release-verificatio
 import {
   createPendingRegistryHealth,
   runInitialRegistrySmoke,
+  runRegistrySmokeRetry,
 } from '../scripts/release-verification/registry-smoke.mjs'
 
 describe('registry smoke failure classification', () => {
@@ -95,15 +96,54 @@ function createVerificationEvidence(success: boolean) {
     package: {
       name: '@barzhsieh/nuxt-content-mermaid',
       requestedVersion: '3.0.0',
-      resolvedVersion: success ? '3.0.0' : null,
+      resolvedVersion: '3.0.0',
     },
     profile: {
       id: actualLatestProfile.id,
       requested: actualLatestProfile.versions,
-      resolved: success ? actualLatestProfile.versions : null,
+      resolved: actualLatestProfile.versions,
     },
     stages: [],
   }
+}
+
+async function createPublishedInvestigationEvidence() {
+  const registryHealth = await runInitialRegistrySmoke({
+    registryHealth: createRegistryHealth(),
+    verifyRegistryPackage: async () => {
+      throw new RegistrySmokeVerificationFailure(
+        'runtime',
+        new ReleaseVerificationPackageUserError('SVG is empty'),
+        createVerificationEvidence(false),
+      )
+    },
+    now: () => '2026-08-09T01:00:00.000Z',
+  })
+
+  return {
+    schemaVersion: 1 as const,
+    status: 'published' as const,
+    identity: { targetVersion: '3.0.0' },
+    artifact: { packageVersion: '3.0.0' },
+    registryHealth,
+  }
+}
+
+type PublishedInvestigationEvidence = Awaited<
+  ReturnType<typeof createPublishedInvestigationEvidence>
+>
+
+function createRetryFailure({
+  stage = 'runtime',
+  cause = new ReleaseVerificationPackageUserError('SVG is empty'),
+  cleanConsumer = true,
+}: {
+  stage?: 'install' | 'build' | 'runtime'
+  cause?: Error
+  cleanConsumer?: boolean
+} = {}) {
+  const verification = Object.assign(structuredClone(createVerificationEvidence(false)), { cleanConsumer })
+  return new RegistrySmokeVerificationFailure(stage, cause, verification)
 }
 
 describe('initial registry smoke health', () => {
@@ -230,5 +270,309 @@ describe('initial registry smoke health', () => {
       }],
       retryCommand: 'pnpm release registry-smoke 3.0.0',
     })
+  })
+})
+
+describe('registry smoke retry', () => {
+  it('loads the frozen profile from the first investigation attempt', async () => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const readEvidence = vi.fn(async () => structuredClone(releaseEvidence))
+    const writeEvidence = vi.fn(async () => undefined)
+    const successfulVerification = createVerificationEvidence(true)
+    const verifyRegistryPackage = vi.fn(async () => successfulVerification)
+
+    await runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })
+
+    expect(readEvidence).toHaveBeenCalledWith({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+    })
+    expect(verifyRegistryPackage).toHaveBeenCalledWith({
+      packageName: '@barzhsieh/nuxt-content-mermaid',
+      packageVersion: '3.0.0',
+      profile: actualLatestProfile,
+    })
+    expect(writeEvidence).toHaveBeenCalledOnce()
+    expect(writeEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      registryHealth: expect.objectContaining({
+        status: 'healthy',
+        attempts: expect.arrayContaining([
+          expect.objectContaining({ number: 1 }),
+          expect.objectContaining({ number: 2, success: true }),
+        ]),
+      }),
+    }))
+  })
+
+  it.each([
+    ['release identity target version', (evidence: PublishedInvestigationEvidence) => {
+      evidence.identity.targetVersion = '3.0.1'
+    }],
+    ['artifact package version', (evidence: PublishedInvestigationEvidence) => {
+      evidence.artifact.packageVersion = '3.0.1'
+    }],
+    ['registry health package version', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.package.version = '3.0.1'
+    }],
+    ['frozen profile', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.profile.resolved.nuxt = '4.5.2'
+    }],
+  ])('rejects an invalid %s before calling the verifier', async (_, mutateEvidence) => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const readEvidence = vi.fn(async () => {
+      const evidence = structuredClone(releaseEvidence)
+      mutateEvidence(evidence)
+      return evidence
+    })
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => createVerificationEvidence(true))
+
+    await expect(runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })).rejects.toThrow()
+
+    expect(verifyRegistryPackage).not.toHaveBeenCalled()
+    expect(writeEvidence).not.toHaveBeenCalled()
+  })
+
+  it('rejects a first attempt without an independent clean consumer', async () => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const readEvidence = vi.fn(async () => {
+      const evidence = structuredClone(releaseEvidence)
+      evidence.registryHealth.attempts[0]!.cleanConsumer = false
+      return evidence
+    })
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => createVerificationEvidence(true))
+
+    await expect(runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })).rejects.toThrow()
+
+    expect(verifyRegistryPackage).not.toHaveBeenCalled()
+    expect(writeEvidence).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a non-published release', (evidence: PublishedInvestigationEvidence) => {
+      ;(evidence as unknown as { status: string }).status = 'pushed'
+    }],
+    ['missing registry health', (evidence: PublishedInvestigationEvidence) => {
+      delete (evidence as unknown as { registryHealth?: unknown }).registryHealth
+    }],
+    ['a non-investigation registry health state', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.status = 'healthy'
+    }],
+    ['no first attempt', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.attempts = []
+    }],
+    ['a first attempt numbered after one', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.attempts[0]!.number = 2
+    }],
+    ['an incomplete frozen profile', (evidence: PublishedInvestigationEvidence) => {
+      delete (evidence.registryHealth.profile.resolved as Partial<typeof actualLatestProfile.versions>).mermaid
+    }],
+    ['an empty requested Nuxt range', (evidence: PublishedInvestigationEvidence) => {
+      evidence.registryHealth.profile.requested.nuxt = ''
+    }],
+  ])('rejects %s before calling the verifier', async (_, mutateEvidence) => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const readEvidence = vi.fn(async () => {
+      const evidence = structuredClone(releaseEvidence)
+      mutateEvidence(evidence)
+      return evidence
+    })
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => createVerificationEvidence(true))
+
+    await expect(runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })).rejects.toThrow()
+
+    expect(verifyRegistryPackage).not.toHaveBeenCalled()
+    expect(writeEvidence).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      'the first classification',
+      (evidence: PublishedInvestigationEvidence) => {
+        evidence.registryHealth.attempts[0]!.classification = 'network'
+      },
+      createRetryFailure(),
+    ],
+    [
+      'a network retry classification',
+      () => {},
+      createRetryFailure({ cause: Object.assign(new Error('network unavailable'), { code: 'ENETUNREACH' }) }),
+    ],
+    [
+      'a registry retry classification',
+      () => {},
+      createRetryFailure({ cause: Object.assign(new Error('registry unavailable'), { code: 'E503' }) }),
+    ],
+    [
+      'a runner retry classification',
+      () => {},
+      createRetryFailure({ cause: Object.assign(new Error('runner unavailable'), { code: 'ENOENT' }) }),
+    ],
+    [
+      'a permission retry classification',
+      () => {},
+      createRetryFailure({ cause: Object.assign(new Error('permission denied'), { code: 'EACCES' }) }),
+    ],
+    [
+      'the package-user stage',
+      () => {},
+      createRetryFailure({ stage: 'build' }),
+    ],
+    [
+      'the retry clean-consumer evidence',
+      () => {},
+      createRetryFailure({ cleanConsumer: false }),
+    ],
+  ])('keeps investigation when %s does not confirm a package defect', async (
+    _,
+    mutateEvidence,
+    retryFailure,
+  ) => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const readEvidence = vi.fn(async () => {
+      const evidence = structuredClone(releaseEvidence)
+      mutateEvidence(evidence)
+      return evidence
+    })
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => {
+      throw retryFailure
+    })
+
+    const result = await runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })
+
+    expect(result.registryHealth).toMatchObject({
+      status: 'investigation',
+      attempts: [
+        { number: 1, cleanConsumer: true },
+        { number: 2, success: false },
+      ],
+      retryCommand: 'pnpm release registry-smoke 3.0.0',
+    })
+    expect(writeEvidence).toHaveBeenCalledOnce()
+    expect(writeEvidence).toHaveBeenCalledWith(result)
+  })
+
+  it('records two matching clean package defects as unhealthy', async () => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const readEvidence = vi.fn(async () => structuredClone(releaseEvidence))
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => {
+      throw createRetryFailure()
+    })
+
+    const result = await runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })
+
+    expect(result.registryHealth).toMatchObject({
+      status: 'unhealthy',
+      attempts: [
+        { number: 1, classification: 'package-defect', stage: 'runtime', cleanConsumer: true },
+        { number: 2, classification: 'package-defect', stage: 'runtime', cleanConsumer: true },
+      ],
+    })
+    expect(writeEvidence).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    ['the retry package version', (failure: RegistrySmokeVerificationFailure) => {
+      failure.evidence.package.resolvedVersion = '3.0.1'
+    }],
+    ['the retry frozen profile', (failure: RegistrySmokeVerificationFailure) => {
+      failure.evidence.profile.resolved!.nuxt = '4.5.2'
+    }],
+  ])('keeps investigation when %s does not match the frozen request', async (_, mutateFailure) => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const retryFailure = createRetryFailure()
+    mutateFailure(retryFailure)
+    const readEvidence = vi.fn(async () => structuredClone(releaseEvidence))
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => {
+      throw retryFailure
+    })
+
+    const result = await runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })
+
+    expect(result.registryHealth).toMatchObject({
+      status: 'investigation',
+      attempts: [{ number: 1 }, { number: 2, classification: 'package-defect' }],
+      retryCommand: 'pnpm release registry-smoke 3.0.0',
+    })
+    expect(writeEvidence).toHaveBeenCalledOnce()
+  })
+
+  it('keeps investigation when a successful retry lacks clean-consumer evidence', async () => {
+    const releaseEvidence = await createPublishedInvestigationEvidence()
+    const readEvidence = vi.fn(async () => structuredClone(releaseEvidence))
+    const writeEvidence = vi.fn(async () => undefined)
+    const verifyRegistryPackage = vi.fn(async () => (
+      Object.assign(createVerificationEvidence(true), { cleanConsumer: false })
+    ))
+
+    const result = await runRegistrySmokeRetry({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+      readEvidence,
+      writeEvidence,
+      verifyRegistryPackage,
+      now: () => '2026-08-09T02:00:00.000Z',
+    })
+
+    expect(result.registryHealth).toMatchObject({
+      status: 'investigation',
+      attempts: [{ number: 1 }, { number: 2, cleanConsumer: false, success: true }],
+      retryCommand: 'pnpm release registry-smoke 3.0.0',
+    })
+    expect(writeEvidence).toHaveBeenCalledOnce()
   })
 })

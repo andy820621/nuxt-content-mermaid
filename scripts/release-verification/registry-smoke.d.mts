@@ -9,7 +9,7 @@ import type {
 export interface RegistrySmokeAttempt {
   number: number
   completedAt: string
-  cleanConsumer: true
+  cleanConsumer: boolean
   success: boolean
   stage: VerificationStageName | null
   classification: RegistrySmokeFailureClassification | null
@@ -42,3 +42,28 @@ export function runInitialRegistrySmoke(input: {
   ) => Promise<RegistrySmokeVerificationEvidence>
   now: () => string
 }): Promise<RegistryHealthEvidence>
+
+export interface RegistrySmokeReleaseEvidence {
+  status: 'published'
+  identity: { targetVersion: string }
+  artifact: { packageVersion: string }
+  registryHealth: RegistryHealthEvidence
+}
+
+export interface RegistrySmokeRetryVerificationEvidence extends RegistrySmokeVerificationEvidence {
+  cleanConsumer?: boolean
+}
+
+export function runRegistrySmokeRetry(input: {
+  repositoryRoot: string
+  targetVersion: string
+  readEvidence: (input: {
+    repositoryRoot: string
+    targetVersion: string
+  }) => Promise<RegistrySmokeReleaseEvidence>
+  writeEvidence: (evidence: RegistrySmokeReleaseEvidence) => Promise<void>
+  verifyRegistryPackage: (
+    request: RegistrySmokeVerificationRequest,
+  ) => Promise<RegistrySmokeRetryVerificationEvidence>
+  now: () => string
+}): Promise<RegistrySmokeReleaseEvidence>

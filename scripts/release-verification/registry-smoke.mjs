@@ -1,6 +1,7 @@
 import { classifyRegistrySmokeFailure } from './failure-classification.mjs'
 import { RegistrySmokeVerificationFailure } from './runner.mjs'
 import { parseVersionProfile } from './profiles.mjs'
+import { isDeepStrictEqual } from 'node:util'
 
 const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 const PENDING_REGISTRY_HEALTH = new WeakSet()
@@ -88,6 +89,120 @@ function hasRegistrySmokeVerificationEvidence(error) {
     && error.evidence.mode === 'registry-smoke'
 }
 
+function invalidRetryEvidence(message) {
+  throw new TypeError(`Registry smoke retry evidence ${message}`)
+}
+
+function assertRetryCallbacks({ readEvidence, writeEvidence, verifyRegistryPackage, now }) {
+  if (typeof readEvidence !== 'function') {
+    throw new TypeError('Registry smoke retry requires a readEvidence callback')
+  }
+  if (typeof writeEvidence !== 'function') {
+    throw new TypeError('Registry smoke retry requires a writeEvidence callback')
+  }
+  if (typeof verifyRegistryPackage !== 'function') {
+    throw new TypeError('Registry smoke retry requires a verifyRegistryPackage callback')
+  }
+  if (typeof now !== 'function') {
+    throw new TypeError('Registry smoke retry requires a now callback')
+  }
+}
+
+function loadRetryRequest(evidence, targetVersion) {
+  if (!evidence || typeof evidence !== 'object') {
+    invalidRetryEvidence('must be an object')
+  }
+  if (evidence.status !== 'published') {
+    invalidRetryEvidence('must record a published release')
+  }
+  if (evidence.identity?.targetVersion !== targetVersion) {
+    invalidRetryEvidence('identity must match the target version')
+  }
+  if (evidence.artifact?.packageVersion !== targetVersion) {
+    invalidRetryEvidence('artifact must match the target version')
+  }
+
+  const registryHealth = evidence.registryHealth
+  if (!registryHealth || typeof registryHealth !== 'object') {
+    invalidRetryEvidence('requires registry health')
+  }
+  if (registryHealth.status !== 'investigation') {
+    invalidRetryEvidence('requires an investigation')
+  }
+  if (registryHealth.package?.version !== targetVersion) {
+    invalidRetryEvidence('package must match the target version')
+  }
+  if (!Array.isArray(registryHealth.attempts) || registryHealth.attempts.length < 1) {
+    invalidRetryEvidence('requires a first attempt')
+  }
+
+  const firstAttempt = registryHealth.attempts[0]
+  if (firstAttempt?.number !== 1) {
+    invalidRetryEvidence('requires first attempt number 1')
+  }
+  if (firstAttempt.cleanConsumer !== true) {
+    invalidRetryEvidence('requires an independent clean first attempt')
+  }
+
+  freezeRequestedProfile(registryHealth.profile?.requested)
+  const resolvedProfile = parseVersionProfile({
+    id: registryHealth.profile?.id,
+    versions: registryHealth.profile?.resolved,
+  })
+  const firstAttemptProfile = parseVersionProfile({
+    id: firstAttempt.verification?.profile?.id,
+    versions: firstAttempt.verification?.profile?.resolved,
+  })
+  if (!isDeepStrictEqual(resolvedProfile, firstAttemptProfile)) {
+    invalidRetryEvidence('frozen profile must match the first attempt')
+  }
+  if (firstAttempt.verification?.mode !== 'registry-smoke'
+    || firstAttempt.verification?.package?.requestedVersion !== targetVersion
+    || firstAttempt.verification?.package?.resolvedVersion !== targetVersion) {
+    invalidRetryEvidence('first attempt must resolve the exact package version')
+  }
+
+  return Object.freeze({
+    packageName: requireNonEmptyString(registryHealth.package.name, 'package name'),
+    packageVersion: parseExactPackageVersion(registryHealth.package.version),
+    profile: firstAttemptProfile,
+    registryHealth,
+  })
+}
+
+function cleanConsumerFromVerification(verification) {
+  return verification?.cleanConsumer !== false
+}
+
+function matchesFrozenRetryRequest(verification, { packageVersion, profile }) {
+  if (verification?.mode !== 'registry-smoke'
+    || verification.package?.requestedVersion !== packageVersion
+    || verification.package?.resolvedVersion !== packageVersion) {
+    return false
+  }
+  try {
+    const reportedProfile = parseVersionProfile({
+      id: verification.profile?.id,
+      versions: verification.profile?.resolved,
+    })
+    return isDeepStrictEqual(profile, reportedProfile)
+  }
+  catch {
+    return false
+  }
+}
+
+function createsConfirmedPackageDefect(firstAttempt, retryAttempt, frozenRequest) {
+  const isPackageUserStage = stage => stage === 'install' || stage === 'build' || stage === 'runtime'
+  return firstAttempt.cleanConsumer === true
+    && retryAttempt.cleanConsumer === true
+    && firstAttempt.classification === 'package-defect'
+    && retryAttempt.classification === 'package-defect'
+    && isPackageUserStage(firstAttempt.stage)
+    && firstAttempt.stage === retryAttempt.stage
+    && matchesFrozenRetryRequest(retryAttempt.verification, frozenRequest)
+}
+
 export function createPendingRegistryHealth(input) {
   return freezeRegistryHealth(input ?? {})
 }
@@ -144,4 +259,71 @@ export async function runInitialRegistrySmoke({ registryHealth, verifyRegistryPa
       retryCommand: `pnpm release registry-smoke ${registryHealth.package.version}`,
     })
   }
+}
+
+export async function runRegistrySmokeRetry({
+  repositoryRoot,
+  targetVersion,
+  readEvidence,
+  writeEvidence,
+  verifyRegistryPackage,
+  now,
+}) {
+  assertRetryCallbacks({ readEvidence, writeEvidence, verifyRegistryPackage, now })
+  const evidence = await readEvidence({ repositoryRoot, targetVersion })
+  const { registryHealth, packageName, packageVersion, profile } = loadRetryRequest(
+    evidence,
+    targetVersion,
+  )
+  const request = Object.freeze({
+    packageName,
+    packageVersion,
+    profile,
+  })
+
+  try {
+    const verification = await verifyRegistryPackage(request)
+    const cleanConsumer = cleanConsumerFromVerification(verification)
+    const attempt = {
+      number: registryHealth.attempts.length + 1,
+      completedAt: now(),
+      cleanConsumer,
+      success: true,
+      stage: null,
+      classification: null,
+      verification,
+    }
+    evidence.registryHealth = {
+      ...registryHealth,
+      status: cleanConsumer ? 'healthy' : 'investigation',
+      attempts: [...registryHealth.attempts, attempt],
+      retryCommand: cleanConsumer ? null : registryHealth.retryCommand,
+    }
+  }
+  catch (error) {
+    if (!(error instanceof RegistrySmokeVerificationFailure)
+      || !hasRegistrySmokeVerificationEvidence(error)) {
+      throw error
+    }
+    const attempt = {
+      number: registryHealth.attempts.length + 1,
+      completedAt: now(),
+      cleanConsumer: cleanConsumerFromVerification(error.evidence),
+      success: false,
+      stage: error.stage,
+      classification: classifyRegistrySmokeFailure(error.cause),
+      verification: error.evidence,
+    }
+    evidence.registryHealth = {
+      ...registryHealth,
+      status: createsConfirmedPackageDefect(registryHealth.attempts[0], attempt, request)
+        ? 'unhealthy'
+        : 'investigation',
+      attempts: [...registryHealth.attempts, attempt],
+      retryCommand: registryHealth.retryCommand,
+    }
+  }
+
+  await writeEvidence(evidence)
+  return evidence
 }
