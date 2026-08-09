@@ -97,18 +97,57 @@ Package Artifact. Verification may apply exact Kit and Schema overrides to the
 clean Package User application without changing published metadata.
 
 These profiles are fixed release evidence. They do not introduce dynamic latest
-resolution, a scheduled canary, drift automation, or release-freeze state.
+resolution, a scheduled canary, or drift automation.
 
 ## Release Baseline Freeze
 
-Before building the release candidate, the maintainer freezes:
+The maintainer starts Release Baseline Freeze through the single
+`pnpm release <version>` entrypoint. Release preparation builds the prepared
+source commit and packs exactly one retained Publishable Package Artifact. Only
+after that pack completes, and before either Compatibility Profile verifier
+starts, the release journal records:
 
-- the dependency and peer ranges intended for the manifest;
-- the exact Minimum Compatibility Profile;
-- the exact Known-Latest Compatibility Profile;
-- the Nuxt Toolchain Family and other resolved versions retained in artifact evidence.
+- the prepared source commit and retained artifact identity;
+- the complete frozen Minimum Compatibility Profile;
+- the complete frozen Known-Latest Compatibility Profile; and
+- the artifact manifest's exact shallow values for `engines.node`, the `nuxt`
+  and `@nuxt/content` peer ranges, and the `@nuxt/kit` and `mermaid` dependency
+  ranges.
 
-Ordinary upstream releases discovered after the freeze wait for a later package release. A security update or required compatibility correction may reopen the baseline, but any baseline or release-code change invalidates the prior artifact evidence. The package artifact must then be rebuilt and both fixed profiles rerun. The freeze is a release-candidate cutoff, not a support ceiling or long-lived dependency freeze.
+An existing `.release-evidence/<version>/` directory blocks a new release
+attempt. The release command never resumes, retries one profile, or overwrites
+partial evidence. After inspection, the maintainer moves or removes the entire
+directory and reruns the single release command, which prepares a new source
+commit, packs again, and verifies both profiles again.
+
+The outer release orchestration invokes Volta once per frozen profile in fixed
+order. It supplies that profile's exact Node runtime to a child verifier without
+downloading or installing Node inside the verifier. Each child request contains
+the complete frozen Version Profile and retained artifact identity. Standard
+output and standard error remain ordinary execution logs; the child atomically
+writes its evidence to a designated temporary result JSON file. The parent
+accepts a result only when its requested coordinates exactly equal the frozen
+profile snapshot, then aggregates the two results. Temporary request and result
+files are removed after each child completes.
+
+Both child verifiers install the same retained artifact and run public exports,
+public types, production build, and basic browser SVG rendering. A failure in
+either profile blocks every publish-side mutation and requires the complete
+release command to be rerun. The generic multi-profile runner aggregates
+profile evidence and failures only; runtime dispatch remains the release
+orchestrator's responsibility.
+
+Manual Interaction Verification uses the frozen Known-Latest Compatibility
+Profile. After publication, the Registry Smoke Test consumes that same frozen
+profile and artifact identity from release evidence without resolving registry
+latest versions.
+
+Ordinary upstream releases discovered after the freeze wait for a later package
+release. A security update or required compatibility correction may reopen the
+baseline, but any release-code, manifest-range, Version Profile, source, or
+artifact change invalidates all prior evidence. The Publishable Package Artifact
+must then be rebuilt and both fixed profiles rerun. The freeze is a
+release-candidate cutoff, not a support ceiling or long-lived dependency freeze.
 
 ## Proportionate Verification
 
@@ -116,9 +155,9 @@ General pull requests run the shared lint, unit, source type, and current fixed 
 
 Before publication, the actual Publishable Package Artifact must pass the Minimum and Known-Latest Compatibility Profiles. Each profile covers clean installation, public package types, production build, and basic browser SVG rendering. Existing release-impact rules may still require focused manual interaction checks, and the post-publication Registry Smoke Test remains separate from pre-publication evidence.
 
-A weekly compatibility workflow is optional. It may remain as a canary only while it is quiet and inexpensive, resolving the highest non-prerelease Nuxt, Nuxt Content, and Mermaid versions within published ranges plus an Active LTS Node version accepted by that Nuxt release. It performs only clean installation, production build, and basic rendering smoke. Failure is a notification for best-effort investigation; it creates no automatic issue, release block, promotion, or response obligation. The workflow may be disabled if it becomes flaky or costly.
-
-New dependency majors and new Mermaid minors are handled by dependency bot or maintainer pull requests, not by the published-range canary.
+New dependency majors and new Mermaid minors are handled by dependency bot or
+maintainer pull requests before a later freeze, never through dynamic latest
+resolution in the release command.
 
 ## Contract Gaps
 

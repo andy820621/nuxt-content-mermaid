@@ -19,6 +19,7 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
 
 - [Features](#features)
 - [Requirements](#requirements)
+- [Dependency and Migration Contract](./docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT.md)
 - [Quick Setup](#quick-setup)
 - [Configuration](#configuration)
 - [Migrating to v3](#migrating-to-v3)
@@ -47,12 +48,21 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
 
 ## Requirements
 
-- `nuxt@^3.20.1 || ^4.1.0`
-- `@nuxt/content@>=3.5.0`
+- Node.js `>=22.19.0`
+- `nuxt@^4.1.0`
+- `@nuxt/content@>=3.5.0 <4.0.0`
+
+For the ownership model, 2.x migration path, rendering guarantees, and visual
+snapshot limits, see the [Dependency and Migration Contract](./docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT.md).
 
 ## Quick Setup
 
 ### 1. Install the module
+
+Your application owns the Nuxt and Nuxt Content peer dependencies: install and
+update them in the application. Mermaid is bundled as this module's
+Module-Owned Dependency, so you do not need to install it separately for this
+module.
 
 **Auto-setup (adds to `modules` automatically):**
 

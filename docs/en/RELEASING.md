@@ -8,9 +8,13 @@ already passed automated and, by default, manual verification.
 - Check out `main` and leave its worktree clean.
 - Install dependencies and ensure npm authentication can publish
   `@barzhsieh/nuxt-content-mermaid`.
+- Ensure [Volta](https://volta.sh/) is available. The gate uses it to run each
+  frozen Compatibility Profile under that profile's exact Node runtime.
 - Choose an exact SemVer greater than the version in `package.json`. The target
   must not already exist in npm.
 - Do not create the release tag or change the package version by hand.
+- Ensure `.release-evidence/<version>/` does not exist. The gate never
+  overwrites release evidence.
 
 ## Run a release
 
@@ -20,11 +24,35 @@ pnpm release 3.0.0
 
 The gate runs `pnpm verify:source`, prepares version and changelog changes in an
 isolated worktree, creates one local release commit, and packs exactly once. It
-retains that tarball under `.release-evidence/3.0.0/`, verifies it through a
-Clean Package User Consumer using actual-latest supported Nuxt 4 and Nuxt
-Content versions, and then starts a second consumer for the manual checks.
+retains that tarball under `.release-evidence/3.0.0/`, freezes the tarball
+identity, shallow package manifest contract, and the exact `v3-minimum` and
+`v3-known-latest` Version Profiles, then verifies both profiles sequentially
+through independent clean Package User applications. Each verifier runs under
+its profile's exact Node runtime. The gate then starts a second Package User
+application with the frozen `v3-known-latest` profile for the manual checks.
 
-Answer every manual prompt after checking the displayed consumer URL:
+If any automated or manual gate fails, inspect the evidence, then move or
+remove the entire `.release-evidence/<version>/` directory and rerun the same
+release command from the beginning. There is no resume or partial-profile
+retry. If the directory already exists, the release command refuses to start
+until the maintainer handles it explicitly.
+
+Inspect `.release-evidence/<version>/release.json` without editing it. The
+`releaseBaseline` records the five shallow manifest values and both complete
+profiles; `identity` and `artifact` identify the prepared source and retained
+tarball; `compatibilityProfiles` records requested and observed coordinates,
+Node runtimes, stages, and failures.
+
+Any release-code, manifest-range, Version Profile, prepared-source, or artifact
+change after the freeze invalidates all prior evidence. Move or remove the
+whole evidence directory, rebuild the artifact, and rerun both profiles. A
+security exception follows the same rule and cannot reuse evidence produced
+before reopening the baseline. Ordinary upstream releases discovered after the
+freeze are deferred to a later package release; they do not silently alter the
+current release candidate.
+
+Answer every manual prompt after checking the displayed Package User
+application URL:
 
 1. enter and exit fullscreen without losing the SVG or page state;
 2. zoom, pan, and drag, then recover the viewport;
@@ -43,14 +71,16 @@ pnpm release 3.0.1 --skip-manual "documentation-only release"
 After all gates pass, the command fast-forwards `main` to the prepared commit,
 creates `v<version>`, atomically pushes `main` and the tag, and publishes the
 retained tarball to `latest` with lifecycle scripts disabled. It revalidates
-Git, the tag, package manifests, and tarball SHA-512 integrity before every
-external effect.
+Git, the tag, frozen manifest and profile values, and tarball SHA-256/SHA-512
+identity before every external effect.
 
 ## Registry health after publication
 
 Publication and registry health are separate. `status: published` means npm
-accepted the release; `registryHealth.status` reports whether a clean consumer
-installed and ran that exact version with the recorded Version Profile.
+accepted the release; before Registry Smoke begins, the gate requires npm's
+published integrity to match the frozen tarball. `registryHealth.status`
+reports whether a clean Package User application installed and ran that exact
+version with the frozen `v3-known-latest` Version Profile.
 
 A successful first smoke check records `registryHealth.status: healthy`. A
 first failure records `registryHealth.status: investigation`; it is not yet a
@@ -117,9 +147,10 @@ rollback. Deprecation is a manual maintainer action only.
 ## Evidence and failures
 
 `.release-evidence/<version>/release.json` is a local journal, not an approval
-token. It records source checks, the prepared commit, the exact resolved
-compatibility profile, manual results or skip reason, status, timestamps, and
-failure details. The retained tarball remains beside it. Both are gitignored.
+token. It records source checks, the prepared commit, both frozen Compatibility
+Profiles and their requested/observed evidence, manual results or skip reason,
+status, timestamps, and failure details. The retained tarball remains beside
+it. Both are gitignored.
 
 If a failure occurs before push, fix the cause and start a fresh release. Never
 reuse an unverified tarball or publish it manually.

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,10 @@ import {
   runReleaseGate,
   runReleaseReconciliation,
 } from '../scripts/release-verification/release.mjs'
-import { RegistrySmokeVerificationFailure } from '../scripts/release-verification/runner.mjs'
+import {
+  CompatibilityMatrixVerificationFailure,
+  RegistrySmokeVerificationFailure,
+} from '../scripts/release-verification/runner.mjs'
 import * as releaseModule from '../scripts/release-verification/release.mjs'
 
 function createInertEffects() {
@@ -28,15 +31,23 @@ function createInertEffects() {
       packageVersion: '2.2.3',
     })),
     readPublishedVersion: vi.fn(async (): Promise<string | null> => null),
-    readRegistryRelease: vi.fn(),
+    readRegistryRelease: vi.fn(async (): Promise<
+      { state: 'absent' } | { state: 'published', integrity: string }
+    > => ({
+      state: 'published' as const,
+      integrity: retainedArtifact.integritySha512,
+    })),
     readEvidence: vi.fn(),
     runCommand: vi.fn(async () => ({ stdout: '', stderr: '' })),
+    initializeEvidence: vi.fn(async (evidence: unknown) => {
+      evidenceSnapshots.push(structuredClone(evidence))
+    }),
     writeEvidence: vi.fn(async (evidence: unknown) => {
       evidenceSnapshots.push(structuredClone(evidence))
     }),
     prepareRelease: vi.fn(),
-    resolveCompatibilityProfile: vi.fn(async () => compatibilityResolution),
-    verifyArtifact: vi.fn(async () => ({ success: true })),
+    readReleaseManifestSnapshot: vi.fn(async () => releaseManifestSnapshot),
+    verifyArtifactProfiles: vi.fn(async () => compatibilityMatrixEvidence),
     runManualCheck: vi.fn(async (): Promise<Partial<Record<string, boolean>>> => manualResults),
     assertReleaseIdentity: vi.fn(async ({ phase }: { phase: string }) => {
       externalCalls.push(`assert:${phase}`)
@@ -46,7 +57,7 @@ function createInertEffects() {
     push: vi.fn(async () => { externalCalls.push('push') }),
     publish: vi.fn(async () => { externalCalls.push('publish') }),
     verifyRegistryPackage: vi.fn(async (request: {
-      profile: typeof actualLatestProfile
+      profile: typeof knownLatestReleaseProfile
     }) => {
       externalCalls.push('registry-smoke')
       return createRegistryVerificationEvidence(true, request.profile)
@@ -68,38 +79,123 @@ const reconciliationRequest = {
 const retainedArtifact = {
   archivePath: '/repo/.release-evidence/3.0.0/package.tgz',
   filename: 'package.tgz',
-  sha256: 'sha256-diagnostic',
+  sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   integritySha512: 'sha512-cmVsZWFzZS1hcnRpZmFjdA==',
   packlist: ['dist/module.mjs', 'dist/types.d.mts', 'package.json'],
   packageName: '@barzhsieh/nuxt-content-mermaid',
   packageVersion: '3.0.0',
 }
 
-const actualLatestProfile = {
-  id: 'nuxt-4-actual-latest-release',
-  nodeVersion: '24.19.0',
+const minimumReleaseProfile = {
+  id: 'v3-minimum',
+  nodeVersion: '22.19.0',
   versions: {
     betterSqlite3: '12.11.1',
-    nuxt: '4.99.0',
-    nuxtContent: '3.99.0',
+    nuxt: '4.1.0',
+    nuxtContent: '3.5.0',
     mermaid: '11.16.1',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
   },
+  expectedResolutions: {
+    nuxtKit: '4.5.2',
+    nuxtSchema: '4.5.2',
+  },
 }
 
-const compatibilityResolution = {
-  requested: {
-    nuxt: '>=4.1.0 <5.0.0',
-    nuxtContent: '>=3.5.0 <4.0.0',
+const knownLatestReleaseProfile = {
+  id: 'v3-known-latest',
+  nodeVersion: '24.19.0',
+  versions: {
+    betterSqlite3: '12.11.1',
+    nuxt: '4.5.2',
+    nuxtContent: '3.15.2',
+    mermaid: '11.16.1',
+    typescript: '5.9.3',
+    vueTsc: '3.2.5',
   },
-  resolved: actualLatestProfile.versions,
-  profile: actualLatestProfile,
+  expectedResolutions: {
+    nuxtKit: '4.5.2',
+    nuxtSchema: '4.5.2',
+  },
+}
+
+const releaseManifestSnapshot = {
+  engines: { node: '>=22.19.0' },
+  peerDependencies: {
+    '@nuxt/content': '>=3.5.0 <4.0.0',
+    'nuxt': '^4.1.0',
+  },
+  dependencies: {
+    '@nuxt/kit': '^4.5.2',
+    'mermaid': '~11.16.1',
+  },
+}
+
+function createCompatibilityProfileEvidence(profile: typeof minimumReleaseProfile) {
+  return {
+    id: profile.id,
+    success: true,
+    requested: profile.versions,
+    resolved: profile.versions,
+    expectedResolutions: {
+      requested: profile.expectedResolutions,
+      resolved: profile.expectedResolutions,
+    },
+    runtime: {
+      requested: profile.nodeVersion,
+      observed: profile.nodeVersion,
+    },
+    stages: [],
+  }
+}
+
+const compatibilityMatrixEvidence = {
+  schemaVersion: 1 as const,
+  success: true,
+  mode: 'package-artifact-matrix' as const,
+  package: {
+    name: retainedArtifact.packageName,
+    version: retainedArtifact.packageVersion,
+  },
+  artifact: {
+    filename: retainedArtifact.filename,
+    sha256: retainedArtifact.sha256,
+  },
+  profiles: [
+    createCompatibilityProfileEvidence(minimumReleaseProfile),
+    createCompatibilityProfileEvidence(knownLatestReleaseProfile),
+  ],
+  stages: [],
+}
+
+function createArtifactProfileEvidence(profile: typeof minimumReleaseProfile) {
+  return {
+    schemaVersion: 1,
+    success: true,
+    mode: 'package-artifact',
+    package: compatibilityMatrixEvidence.package,
+    artifact: compatibilityMatrixEvidence.artifact,
+    profile: {
+      id: profile.id,
+      requested: profile.versions,
+      resolved: profile.versions,
+      expectedResolutions: {
+        requested: profile.expectedResolutions,
+        resolved: profile.expectedResolutions,
+      },
+    },
+    runtime: {
+      requested: profile.nodeVersion,
+      observed: profile.nodeVersion,
+    },
+    stages: [],
+  }
 }
 
 function createRegistryVerificationEvidence(
   success: boolean,
-  profile = actualLatestProfile,
+  profile = knownLatestReleaseProfile,
 ) {
   return {
     schemaVersion: 1 as const,
@@ -114,6 +210,10 @@ function createRegistryVerificationEvidence(
       id: profile.id,
       requested: profile.versions,
       resolved: profile.versions,
+      expectedResolutions: {
+        requested: profile.expectedResolutions,
+        resolved: profile.expectedResolutions,
+      },
     },
     runtime: {
       requested: profile.nodeVersion,
@@ -125,10 +225,10 @@ function createRegistryVerificationEvidence(
 
 function createPublishedInvestigationEvidence() {
   const frozenProfile = {
-    ...actualLatestProfile,
+    ...knownLatestReleaseProfile,
     id: 'frozen-registry-evidence',
     versions: {
-      ...actualLatestProfile.versions,
+      ...knownLatestReleaseProfile.versions,
       nuxt: '4.8.0',
       nuxtContent: '3.8.0',
     },
@@ -146,8 +246,12 @@ function createPublishedInvestigationEvidence() {
       profile: {
         id: frozenProfile.id,
         nodeVersion: frozenProfile.nodeVersion,
-        requested: compatibilityResolution.requested,
+        requested: {
+          nuxt: frozenProfile.versions.nuxt,
+          nuxtContent: frozenProfile.versions.nuxtContent,
+        },
         resolved: frozenProfile.versions,
+        expectedResolutions: frozenProfile.expectedResolutions,
       },
       attempts: [{
         number: 1,
@@ -207,16 +311,16 @@ const pushedEvidence = {
   artifact: {
     archivePath: retainedArtifact.archivePath,
     filename: retainedArtifact.filename,
+    sha256: retainedArtifact.sha256,
     packageName: retainedArtifact.packageName,
     packageVersion: retainedArtifact.packageVersion,
     packlist: retainedArtifact.packlist,
   },
-  compatibilityProfile: {
-    nodeVersion: actualLatestProfile.nodeVersion,
-    requested: compatibilityResolution.requested,
-    resolved: compatibilityResolution.resolved,
-    passed: true,
+  releaseBaseline: {
+    manifest: releaseManifestSnapshot,
+    profiles: [minimumReleaseProfile, knownLatestReleaseProfile],
   },
+  compatibilityProfiles: compatibilityMatrixEvidence.profiles,
   manualCheck: {
     required: false,
     reason: 'documentation-only release',
@@ -486,6 +590,7 @@ describe('release gate preflight', () => {
       artifact: {
         archivePath: retainedArtifact.archivePath,
         filename: retainedArtifact.filename,
+        sha256: retainedArtifact.sha256,
         packageName: retainedArtifact.packageName,
         packageVersion: retainedArtifact.packageVersion,
         packlist: retainedArtifact.packlist,
@@ -504,6 +609,10 @@ describe('release gate preflight', () => {
       sourceCommit: 'prepared-release-commit',
       artifact: { ...retainedArtifact, integritySha512: 'sha256-not-release-identity' },
     }, 'SHA-512 integrity'],
+    [{
+      sourceCommit: 'prepared-release-commit',
+      artifact: { ...retainedArtifact, sha256: 'invalid-sha256' },
+    }, 'SHA-256 digest'],
   ])('blocks an invalid prepared release identity: %s', async (prepared, message) => {
     const effects = createInertEffects()
     effects.prepareRelease.mockResolvedValueOnce(prepared)
@@ -522,14 +631,26 @@ describe('release gate preflight', () => {
     expect(effects.publish).not.toHaveBeenCalled()
   })
 
-  it('verifies the retained artifact with one actual-latest release profile', async () => {
+  it('freezes the retained artifact and both fixed profiles before child verification', async () => {
     const effects = createInertEffects()
-    effects.prepareRelease.mockResolvedValueOnce({
-      sourceCommit: 'prepared-release-commit',
-      artifact: retainedArtifact,
+    const lifecycle: string[] = []
+    effects.prepareRelease.mockImplementationOnce(async () => {
+      lifecycle.push('pack')
+      return {
+        sourceCommit: 'prepared-release-commit',
+        artifact: retainedArtifact,
+      }
     })
-    effects.resolveCompatibilityProfile.mockResolvedValueOnce(compatibilityResolution)
-    effects.verifyArtifact.mockResolvedValueOnce({ success: true })
+    effects.writeEvidence.mockImplementation(async (evidence: unknown) => {
+      effects.evidenceSnapshots.push(structuredClone(evidence))
+      if ((evidence as { releaseBaseline?: unknown }).releaseBaseline) {
+        lifecycle.push('freeze')
+      }
+    })
+    effects.verifyArtifactProfiles.mockImplementationOnce(async () => {
+      lifecycle.push('verify')
+      return compatibilityMatrixEvidence
+    })
 
     const evidence = await runReleaseGate({
       request: releaseRequest,
@@ -537,28 +658,39 @@ describe('release gate preflight', () => {
       effects: effects as never,
     })
 
-    expect(effects.resolveCompatibilityProfile).toHaveBeenCalledOnce()
-    expect(effects.verifyArtifact).toHaveBeenCalledWith({
+    expect(lifecycle.slice(0, 3)).toEqual(['pack', 'freeze', 'verify'])
+    expect(effects.readReleaseManifestSnapshot).toHaveBeenCalledWith({
       artifact: retainedArtifact,
-      profile: actualLatestProfile,
+    })
+    expect(effects.verifyArtifactProfiles).toHaveBeenCalledWith({
+      artifact: retainedArtifact,
+      profiles: [minimumReleaseProfile, knownLatestReleaseProfile],
     })
     expect(evidence).toMatchObject({
-      compatibilityProfile: {
-        id: actualLatestProfile.id,
-        nodeVersion: actualLatestProfile.nodeVersion,
-        requested: compatibilityResolution.requested,
-        resolved: compatibilityResolution.resolved,
-        passed: true,
+      releaseBaseline: {
+        manifest: releaseManifestSnapshot,
+        profiles: [minimumReleaseProfile, knownLatestReleaseProfile],
       },
+      compatibilityProfiles: compatibilityMatrixEvidence.profiles,
       identity: {
+        sourceCommit: 'prepared-release-commit',
         artifactIntegritySha512: retainedArtifact.integritySha512,
       },
     })
-    expect(effects.writeEvidence).toHaveBeenLastCalledWith(evidence)
   })
 
   it.each([
-    ['failed', new Error('basic SVG check failed')],
+    ['failed', new CompatibilityMatrixVerificationFailure(
+      [{ profileId: minimumReleaseProfile.id, stage: 'runtime', cause: new Error('basic SVG check failed') }],
+      {
+        ...compatibilityMatrixEvidence,
+        success: false,
+        profiles: [{
+          ...createCompatibilityProfileEvidence(minimumReleaseProfile),
+          success: false,
+        }],
+      },
+    )],
     ['indeterminate', undefined],
   ])('blocks publication when retained artifact verification is %s', async (_label, result) => {
     const effects = createInertEffects()
@@ -567,10 +699,10 @@ describe('release gate preflight', () => {
       artifact: retainedArtifact,
     })
     if (result instanceof Error) {
-      effects.verifyArtifact.mockRejectedValueOnce(result)
+      effects.verifyArtifactProfiles.mockRejectedValueOnce(result)
     }
     else {
-      effects.verifyArtifact.mockResolvedValueOnce(result as never)
+      effects.verifyArtifactProfiles.mockResolvedValueOnce(result as never)
     }
 
     await expect(runReleaseGate({
@@ -581,13 +713,9 @@ describe('release gate preflight', () => {
 
     expect(effects.writeEvidence).toHaveBeenLastCalledWith(expect.objectContaining({
       status: 'blocked',
-      compatibilityProfile: {
-        id: actualLatestProfile.id,
-        nodeVersion: actualLatestProfile.nodeVersion,
-        requested: compatibilityResolution.requested,
-        resolved: compatibilityResolution.resolved,
-        passed: false,
-      },
+      compatibilityProfiles: result instanceof CompatibilityMatrixVerificationFailure
+        ? result.evidence.profiles
+        : [],
     }))
     expect(effects.createTag).not.toHaveBeenCalled()
     expect(effects.push).not.toHaveBeenCalled()
@@ -609,7 +737,7 @@ describe('release gate preflight', () => {
 
     expect(effects.runManualCheck).toHaveBeenCalledWith({
       artifact: retainedArtifact,
-      profile: actualLatestProfile,
+      profile: knownLatestReleaseProfile,
       checks: [
         'fullscreen',
         'zoomPanDrag',
@@ -734,6 +862,10 @@ describe('release gate preflight', () => {
       changeHeadCommit: 'change-head-commit',
       identity: publicationIdentity,
       artifact: retainedArtifact,
+      releaseBaseline: {
+        manifest: releaseManifestSnapshot,
+        profiles: [minimumReleaseProfile, knownLatestReleaseProfile],
+      },
       tagName: 'v3.0.0',
     })
     expect(effects.fastForward).toHaveBeenCalledWith({
@@ -757,7 +889,11 @@ describe('release gate preflight', () => {
     expect(effects.verifyRegistryPackage).toHaveBeenCalledWith({
       packageName: retainedArtifact.packageName,
       packageVersion: releaseRequest.targetVersion,
-      profile: actualLatestProfile,
+      profile: knownLatestReleaseProfile,
+    })
+    expect(effects.readRegistryRelease).toHaveBeenCalledWith({
+      packageName: retainedArtifact.packageName,
+      targetVersion: releaseRequest.targetVersion,
     })
     expect(evidence).toMatchObject({
       status: 'published',
@@ -811,6 +947,27 @@ describe('release gate preflight', () => {
     expect(effects).not.toHaveProperty('rollback')
   })
 
+  it('refuses registry smoke when npm integrity differs from the frozen artifact', async () => {
+    const effects = createInertEffects()
+    effects.prepareRelease.mockResolvedValueOnce({
+      sourceCommit: 'prepared-release-commit',
+      artifact: retainedArtifact,
+    })
+    effects.readRegistryRelease.mockResolvedValueOnce({
+      state: 'published',
+      integrity: 'sha512-different-registry-artifact',
+    })
+
+    await expect(runReleaseGate({
+      request: releaseRequest,
+      repositoryRoot: '/repo',
+      effects: effects as never,
+    })).rejects.toThrow('frozen artifact identity')
+
+    expect(effects.publish).toHaveBeenCalledOnce()
+    expect(effects.verifyRegistryPackage).not.toHaveBeenCalled()
+  })
+
   it('blocks before mutating the formal branch when publication identity is invalid', async () => {
     const effects = createInertEffects()
     effects.prepareRelease.mockResolvedValueOnce({
@@ -839,7 +996,7 @@ describe('release gate preflight', () => {
 })
 
 describe('release publication reconciliation', () => {
-  it('accepts valid old evidence without registry health', async () => {
+  it('accepts valid frozen evidence without registry health', async () => {
     const effects = createInertEffects()
     effects.readEvidence.mockResolvedValueOnce(structuredClone(pushedEvidence))
     effects.readRegistryRelease.mockResolvedValueOnce({
@@ -855,7 +1012,7 @@ describe('release publication reconciliation', () => {
       status: 'published',
       registryHealth: {
         status: 'healthy',
-        profile: { id: 'nuxt-4-actual-latest-release' },
+        profile: { id: 'v3-known-latest' },
       },
     })
   })
@@ -902,6 +1059,7 @@ describe('release publication reconciliation', () => {
         archivePath: retainedArtifact.archivePath,
         integritySha512: retainedArtifact.integritySha512,
       }),
+      releaseBaseline: pushedEvidence.releaseBaseline,
       tagName: 'v3.0.0',
     })
     expect(effects.assertReleaseIdentity).toHaveBeenCalledTimes(2)
@@ -921,7 +1079,7 @@ describe('release publication reconciliation', () => {
     expect(effects.verifyRegistryPackage).toHaveBeenCalledWith({
       packageName: retainedArtifact.packageName,
       packageVersion: reconciliationRequest.targetVersion,
-      profile: actualLatestProfile,
+      profile: knownLatestReleaseProfile,
     })
     expect(lifecycle).toEqual([
       'write:published:none',
@@ -968,7 +1126,7 @@ describe('release publication reconciliation', () => {
     expect(effects.verifyRegistryPackage).toHaveBeenCalledWith({
       packageName: retainedArtifact.packageName,
       packageVersion: reconciliationRequest.targetVersion,
-      profile: actualLatestProfile,
+      profile: knownLatestReleaseProfile,
     })
     expect(lifecycle).toEqual([
       'write:published:none',
@@ -1109,57 +1267,6 @@ describe('release publication reconciliation', () => {
 })
 
 describe('production release effects', () => {
-  it('resolves a Nuxt 4 actual-latest release profile from the retained v3 baseline', async () => {
-    const commandRunner = vi.fn(async ({ command, args }: {
-      command: string
-      args: string[]
-    }) => {
-      expect(command).toBe('npm')
-      if (args[1] === 'nuxt@>=4.1.0 <5.0.0') {
-        return { stdout: JSON.stringify(['4.9.0', '4.10.0']) }
-      }
-      if (args[1] === '@nuxt/content@>=3.5.0 <4.0.0') {
-        return { stdout: JSON.stringify(['3.15.1', '3.15.2']) }
-      }
-      throw new Error(`Unexpected registry query: ${args[1]}`)
-    })
-    const createReleaseEffects = (releaseModule as unknown as {
-      createReleaseEffects: (options: unknown) => {
-        resolveCompatibilityProfile: (input: unknown) => Promise<unknown>
-      }
-    }).createReleaseEffects
-    const effects = createReleaseEffects({ commandRunner, repositoryRoot: '/repo' })
-
-    await expect(effects.resolveCompatibilityProfile({
-      profileId: 'v3-actual-latest-release',
-    })).resolves.toEqual({
-      requested: {
-        nuxt: '>=4.1.0 <5.0.0',
-        nuxtContent: '>=3.5.0 <4.0.0',
-      },
-      resolved: {
-        betterSqlite3: '12.11.1',
-        mermaid: '11.16.1',
-        nuxt: '4.10.0',
-        nuxtContent: '3.15.2',
-        typescript: '5.9.3',
-        vueTsc: '3.2.5',
-      },
-      profile: {
-        id: 'v3-actual-latest-release',
-        nodeVersion: '24.19.0',
-        versions: {
-          betterSqlite3: '12.11.1',
-          mermaid: '11.16.1',
-          nuxt: '4.10.0',
-          nuxtContent: '3.15.2',
-          typescript: '5.9.3',
-          vueTsc: '3.2.5',
-        },
-      },
-    })
-  })
-
   it('prepares one local release commit and retains the single packed artifact', async () => {
     const commands: string[] = []
     const commandRunner = vi.fn(async ({ command, args, cwd }: {
@@ -1232,6 +1339,7 @@ describe('production release effects', () => {
 
   it('revalidates the formal commit, tag, manifest, and retained archive integrity', async () => {
     const archiveBytes = Buffer.from('retained release artifact')
+    const sha256 = createHash('sha256').update(archiveBytes).digest('hex')
     const integritySha512 = `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`
     const commandRunner = vi.fn(async ({ command, args }: {
       command: string
@@ -1244,6 +1352,7 @@ describe('production release effects', () => {
         'git rev-parse HEAD': 'prepared-release-commit\n',
         'git rev-list -n 1 v3.0.0': 'prepared-release-commit\n',
         'tar -xOf /repo/.release-evidence/3.0.0/package.tgz package/package.json': JSON.stringify({
+          ...releaseManifestSnapshot,
           name: '@barzhsieh/nuxt-content-mermaid',
           version: '3.0.0',
         }),
@@ -1269,7 +1378,7 @@ describe('production release effects', () => {
       }
     }).createReleaseEffects
     const effects = createReleaseEffects({ commandRunner, filesystem, repositoryRoot: '/repo' })
-    const artifact = { ...retainedArtifact, integritySha512 }
+    const artifact = { ...retainedArtifact, integritySha512, sha256 }
 
     await expect(effects.assertReleaseIdentity({
       phase: 'publish',
@@ -1281,8 +1390,52 @@ describe('production release effects', () => {
         artifactIntegritySha512: integritySha512,
       },
       artifact,
+      releaseBaseline: pushedEvidence.releaseBaseline,
       tagName: 'v3.0.0',
     })).resolves.toBeUndefined()
+
+    await expect(effects.assertReleaseIdentity({
+      phase: 'publish',
+      repositoryRoot: '/repo',
+      changeHeadCommit: 'change-head-commit',
+      identity: {
+        sourceCommit: 'prepared-release-commit',
+        targetVersion: '3.0.0',
+        artifactIntegritySha512: integritySha512,
+      },
+      artifact,
+      releaseBaseline: {
+        ...pushedEvidence.releaseBaseline,
+        manifest: {
+          ...releaseManifestSnapshot,
+          dependencies: {
+            ...releaseManifestSnapshot.dependencies,
+            mermaid: '~11.99.0',
+          },
+        },
+      },
+      tagName: 'v3.0.0',
+    })).rejects.toThrow('manifest changed')
+
+    await expect(effects.assertReleaseIdentity({
+      phase: 'publish',
+      repositoryRoot: '/repo',
+      changeHeadCommit: 'change-head-commit',
+      identity: {
+        sourceCommit: 'prepared-release-commit',
+        targetVersion: '3.0.0',
+        artifactIntegritySha512: integritySha512,
+      },
+      artifact,
+      releaseBaseline: {
+        ...pushedEvidence.releaseBaseline,
+        profiles: [{
+          ...minimumReleaseProfile,
+          nodeVersion: '22.20.0',
+        }, knownLatestReleaseProfile],
+      },
+      tagName: 'v3.0.0',
+    })).rejects.toThrow('Compatibility Profiles changed')
 
     await expect(effects.assertReleaseIdentity({
       phase: 'publish',
@@ -1294,6 +1447,7 @@ describe('production release effects', () => {
         artifactIntegritySha512: 'sha512-different',
       },
       artifact,
+      releaseBaseline: pushedEvidence.releaseBaseline,
       tagName: 'v3.0.0',
     })).rejects.toThrow('integrity')
   })
@@ -1433,11 +1587,12 @@ describe('production release effects', () => {
     })).resolves.toEqual({ state: 'absent' })
   })
 
-  it('writes and reads the local evidence journal under the exact target version', async () => {
+  it('initializes one evidence directory and refuses to overwrite it', async () => {
     const repositoryRoot = await mkdtemp(join(tmpdir(), 'release-evidence-test-'))
     try {
       const createReleaseEffects = (releaseModule as unknown as {
         createReleaseEffects: (options: unknown) => {
+          initializeEvidence: (evidence: unknown) => Promise<void>
           writeEvidence: (evidence: unknown) => Promise<void>
           readEvidence: (input: unknown) => Promise<unknown>
         }
@@ -1448,7 +1603,7 @@ describe('production release effects', () => {
       })
       const evidence = structuredClone(pushedEvidence)
 
-      await effects.writeEvidence(evidence)
+      await effects.initializeEvidence(evidence)
 
       const evidencePath = join(
         repositoryRoot,
@@ -1458,79 +1613,132 @@ describe('production release effects', () => {
       )
       await expect(readFile(evidencePath, 'utf8'))
         .resolves.toBe(`${JSON.stringify(evidence, null, 2)}\n`)
+      await expect(effects.initializeEvidence({
+        ...evidence,
+        status: 'blocked',
+      })).rejects.toThrow('already exists')
+      await expect(readFile(evidencePath, 'utf8'))
+        .resolves.toBe(`${JSON.stringify(evidence, null, 2)}\n`)
+
+      const updatedEvidence = { ...evidence, status: 'verified' }
+      await effects.writeEvidence(updatedEvidence)
       await expect(effects.readEvidence({
         repositoryRoot,
         targetVersion: '3.0.0',
-      })).resolves.toEqual(evidence)
+      })).resolves.toEqual(updatedEvidence)
     }
     finally {
       await rm(repositoryRoot, { recursive: true, force: true })
     }
   })
 
-  it('resolves one actual-latest profile and verifies the retained artifact', async () => {
-    const commandRunner = vi.fn(async ({ command, args }: {
-      command: string
-      args: string[]
-    }) => {
-      const invocation = [command, ...args].join(' ')
-      if (invocation === 'npm view nuxt@>=4.1.0 <5.0.0 version --json') {
-        return { stdout: JSON.stringify(['4.9.0', '4.10.0']) }
-      }
-      if (invocation === 'npm view @nuxt/content@>=3.5.0 <4.0.0 version --json') {
-        return { stdout: JSON.stringify(['3.9.0', '3.15.2']) }
-      }
-      throw new Error(`Unexpected command: ${invocation}`)
-    })
-    const artifactVerifier = vi.fn(async () => ({ success: true }))
-    const verificationOperations = { seam: 'clean-package-user-consumer' }
+  it('runs both frozen profiles through Volta and cleans temporary protocol files', async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), 'release-profile-parent-test-'))
+    try {
+      const requests: unknown[] = []
+      const profileProcessRunner = vi.fn(async ({ args }: {
+        args: string[]
+      }) => {
+        const requestPath = args[args.indexOf('--request') + 1]!
+        const resultPath = args[args.indexOf('--result') + 1]!
+        const request = JSON.parse(await readFile(requestPath, 'utf8'))
+        requests.push(request)
+        await writeFile(
+          resultPath,
+          `${JSON.stringify(createArtifactProfileEvidence(request.profile), null, 2)}\n`,
+          'utf8',
+        )
+      })
+      const createReleaseEffects = (releaseModule as unknown as {
+        createReleaseEffects: (options: unknown) => {
+          verifyArtifactProfiles: (input: unknown) => Promise<unknown>
+        }
+      }).createReleaseEffects
+      const effects = createReleaseEffects({
+        profileProcessRunner,
+        repositoryRoot: '/repo',
+        temporaryRoot,
+      })
+
+      await expect(effects.verifyArtifactProfiles({
+        artifact: retainedArtifact,
+        profiles: [minimumReleaseProfile, knownLatestReleaseProfile],
+      })).resolves.toMatchObject({
+        success: true,
+        profiles: [
+          { id: minimumReleaseProfile.id, success: true },
+          { id: knownLatestReleaseProfile.id, success: true },
+        ],
+      })
+
+      expect(profileProcessRunner).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        command: 'volta',
+        args: expect.arrayContaining([
+          'run', '--node', '22.19.0', 'node',
+          '--request', expect.stringMatching(/request\.json$/),
+          '--result', expect.stringMatching(/result\.json$/),
+        ]),
+        cwd: '/repo',
+      }))
+      expect(profileProcessRunner).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        command: 'volta',
+        args: expect.arrayContaining([
+          'run', '--node', '24.19.0', 'node',
+          '--request', expect.stringMatching(/request\.json$/),
+          '--result', expect.stringMatching(/result\.json$/),
+        ]),
+        cwd: '/repo',
+      }))
+      expect(requests).toEqual([
+        {
+          schemaVersion: 1,
+          artifact: retainedArtifact,
+          profile: minimumReleaseProfile,
+        },
+        {
+          schemaVersion: 1,
+          artifact: retainedArtifact,
+          profile: knownLatestReleaseProfile,
+        },
+      ])
+      await expect(readdir(temporaryRoot)).resolves.toEqual([])
+    }
+    finally {
+      await rm(temporaryRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('freezes only the shallow dependency contract from the retained artifact manifest', async () => {
+    const commandRunner = vi.fn(async () => ({
+      stdout: JSON.stringify({
+        engines: { node: '>=22.19.0', pnpm: '>=10' },
+        peerDependencies: {
+          '@nuxt/content': '>=3.5.0 <4.0.0',
+          'nuxt': '^4.1.0',
+          'vue': '^3.5.0',
+        },
+        dependencies: {
+          '@nuxt/kit': '^4.5.2',
+          'defu': '^6.1.4',
+          'mermaid': '~11.16.1',
+        },
+      }),
+    }))
     const createReleaseEffects = (releaseModule as unknown as {
       createReleaseEffects: (options: unknown) => {
-        resolveCompatibilityProfile: () => Promise<unknown>
-        verifyArtifact: (input: unknown) => Promise<unknown>
+        readReleaseManifestSnapshot: (input: unknown) => Promise<unknown>
       }
     }).createReleaseEffects
-    const effects = createReleaseEffects({
-      artifactVerifier,
-      commandRunner,
-      repositoryRoot: '/repo',
-      verificationOperations,
-    })
+    const effects = createReleaseEffects({ commandRunner, repositoryRoot: '/repo' })
 
-    const resolution = await effects.resolveCompatibilityProfile() as {
-      requested: Record<string, string>
-      resolved: typeof actualLatestProfile.versions
-      profile: typeof actualLatestProfile
-    }
-    expect(resolution).toEqual({
-      requested: compatibilityResolution.requested,
-      resolved: {
-        ...actualLatestProfile.versions,
-        nuxt: '4.10.0',
-        nuxtContent: '3.15.2',
-      },
-      profile: {
-        id: 'nuxt-4-actual-latest-release',
-        nodeVersion: actualLatestProfile.nodeVersion,
-        versions: {
-          ...actualLatestProfile.versions,
-          nuxt: '4.10.0',
-          nuxtContent: '3.15.2',
-        },
-      },
-    })
-
-    await expect(effects.verifyArtifact({
+    await expect(effects.readReleaseManifestSnapshot({
       artifact: retainedArtifact,
-      profile: resolution.profile,
-    })).resolves.toEqual({ success: true })
-    expect(artifactVerifier).toHaveBeenCalledWith({
-      packageSource: {
-        kind: 'retained',
-        artifact: retainedArtifact,
-      },
-      profile: resolution.profile,
-    }, verificationOperations)
+    })).resolves.toEqual(releaseManifestSnapshot)
+    expect(commandRunner).toHaveBeenCalledWith({
+      command: 'tar',
+      args: ['-xOf', retainedArtifact.archivePath, 'package/package.json'],
+      cwd: '/repo',
+    })
   })
 
   it('injects registry verification through the shared verification operations', async () => {
@@ -1551,7 +1759,7 @@ describe('production release effects', () => {
     const request = {
       packageName: retainedArtifact.packageName,
       packageVersion: retainedArtifact.packageVersion,
-      profile: actualLatestProfile,
+      profile: knownLatestReleaseProfile,
     }
 
     await expect(effects.verifyRegistryPackage(request)).resolves.toBe(verification)
@@ -1566,7 +1774,7 @@ describe('production release effects', () => {
       })),
       installConsumer: vi.fn(async () => ({
         packageVersion: retainedArtifact.packageVersion,
-        profileVersions: actualLatestProfile.versions,
+        profileVersions: knownLatestReleaseProfile.versions,
       })),
       buildConsumer: vi.fn(async () => undefined),
       cleanupWorkspace: vi.fn(async () => undefined),
@@ -1587,13 +1795,13 @@ describe('production release effects', () => {
 
     await expect(effects.runManualCheck({
       artifact: retainedArtifact,
-      profile: actualLatestProfile,
+      profile: knownLatestReleaseProfile,
       checks,
     })).resolves.toEqual(manualResults)
     expect(verificationOperations.installConsumer).toHaveBeenCalledWith({
       packageSource: { kind: 'artifact', artifact: retainedArtifact },
       consumerDirectory: '/tmp/manual-consumer-root/consumer',
-      profile: actualLatestProfile,
+      profile: knownLatestReleaseProfile,
     })
     expect(verificationOperations.buildConsumer).toHaveBeenCalledWith({
       consumerDirectory: '/tmp/manual-consumer-root/consumer',
@@ -1655,15 +1863,15 @@ describe('production release effects', () => {
       packageVersion: '3.0.0',
       profile: {
         id: 'frozen-registry-evidence',
-        nodeVersion: actualLatestProfile.nodeVersion,
+        nodeVersion: knownLatestReleaseProfile.nodeVersion,
         versions: {
-          ...actualLatestProfile.versions,
+          ...knownLatestReleaseProfile.versions,
           nuxt: '4.8.0',
           nuxtContent: '3.8.0',
         },
+        expectedResolutions: knownLatestReleaseProfile.expectedResolutions,
       },
     })
-    expect(effects.resolveCompatibilityProfile).not.toHaveBeenCalled()
     expect(effects.readPublishedVersion).not.toHaveBeenCalled()
     expect(effects.readRegistryRelease).not.toHaveBeenCalled()
     expect(effects.prepareRelease).not.toHaveBeenCalled()
@@ -1675,13 +1883,14 @@ describe('production release effects', () => {
     try {
       const createReleaseEffects = (releaseModule as unknown as {
         createReleaseEffects: (options: unknown) => {
+          initializeEvidence: (evidence: unknown) => Promise<void>
           writeEvidence: (evidence: unknown) => Promise<void>
         }
       }).createReleaseEffects
       const readEvidenceFile = vi.fn(readFile)
       const commandRunner = vi.fn()
       const registryVerifier = vi.fn(async (request: {
-        profile: typeof actualLatestProfile
+        profile: typeof knownLatestReleaseProfile
       }) => createRegistryVerificationEvidence(true, request.profile))
       const effectOptions = {
         commandRunner,
@@ -1692,6 +1901,7 @@ describe('production release effects', () => {
         verificationOperations: {},
       }
       const initialEffects = createReleaseEffects(effectOptions)
+      await initialEffects.initializeEvidence(createPublishedInvestigationEvidence())
       await initialEffects.writeEvidence(createPublishedInvestigationEvidence())
       const effectFactory = vi.fn(() => createReleaseEffects(effectOptions))
       await expect(runReleaseCli({

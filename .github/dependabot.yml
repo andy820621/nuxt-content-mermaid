@@ -1,0 +1,14 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Dependabot currently misidentifies transitive versions when updating this
+    # pnpm catalog, which can downgrade the Nuxt 4 toolchain and corrupt the root
+    # lockfile importer. Zero disables version-update PRs without disabling
+    # GitHub-native security-update PRs.
+    open-pull-requests-limit: 0
+    assignees:
+      - andy820621

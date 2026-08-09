@@ -47,6 +47,9 @@ function freezeRegistryHealth({ packageName, packageVersion, requestedProfile, p
       nodeVersion: exactProfile.nodeVersion,
       requested: freezeRequestedProfile(requestedProfile),
       resolved: exactProfile.versions,
+      ...(exactProfile.expectedResolutions
+        ? { expectedResolutions: exactProfile.expectedResolutions }
+        : {}),
     }),
     attempts: Object.freeze([]),
     retryCommand: null,
@@ -90,12 +93,13 @@ function invalidSuccessfulVerification(message) {
   throw new TypeError(`Registry smoke verifier returned invalid successful evidence: ${message}`)
 }
 
-function parseReportedProfile(profile, nodeVersion, versions, label) {
+function parseReportedProfile(profile, nodeVersion, versions, expectedResolutions, label) {
   try {
     return parseVersionProfile({
       id: profile?.id,
       nodeVersion,
       versions,
+      ...(expectedResolutions ? { expectedResolutions } : {}),
     })
   }
   catch {
@@ -123,12 +127,14 @@ function validateSuccessfulRegistryVerification(verification, request) {
     verification.profile,
     verification.runtime?.requested,
     verification.profile?.requested,
+    verification.profile?.expectedResolutions?.requested,
     'requested',
   )
   const resolvedProfile = parseReportedProfile(
     verification.profile,
     verification.runtime?.observed,
     verification.profile?.resolved,
+    verification.profile?.expectedResolutions?.resolved,
     'resolved',
   )
   if (!isDeepStrictEqual(request.profile, requestedProfile)
@@ -199,6 +205,9 @@ function loadRetryRequest(evidence, targetVersion) {
     id: registryHealth.profile?.id,
     nodeVersion: registryHealth.profile?.nodeVersion,
     versions: registryHealth.profile?.resolved,
+    ...(registryHealth.profile?.expectedResolutions
+      ? { expectedResolutions: registryHealth.profile.expectedResolutions }
+      : {}),
   })
   const packageName = requireNonEmptyString(registryHealth.package.name, 'package name')
   const packageVersion = parseExactPackageVersion(registryHealth.package.version)
@@ -211,6 +220,11 @@ function loadRetryRequest(evidence, targetVersion) {
     id: firstAttempt.verification.profile?.id,
     nodeVersion: firstAttempt.verification.runtime?.requested,
     versions: firstAttempt.verification.profile?.requested,
+    ...(firstAttempt.verification.profile?.expectedResolutions?.requested
+      ? {
+          expectedResolutions: firstAttempt.verification.profile.expectedResolutions.requested,
+        }
+      : {}),
   })
   if (!isDeepStrictEqual(resolvedProfile, firstAttemptRequestedProfile)) {
     invalidRetryEvidence('frozen profile must match the first attempt request')
@@ -229,6 +243,11 @@ function loadRetryRequest(evidence, targetVersion) {
       id: firstAttempt.verification.profile?.id,
       nodeVersion: firstAttempt.verification.runtime?.observed,
       versions: firstAttempt.verification.profile?.resolved,
+      ...(firstAttempt.verification.profile?.expectedResolutions?.resolved
+        ? {
+            expectedResolutions: firstAttempt.verification.profile.expectedResolutions.resolved,
+          }
+        : {}),
     })
     if (!isDeepStrictEqual(resolvedProfile, firstAttemptProfile)) {
       invalidRetryEvidence('frozen profile must match the first attempt')
@@ -258,6 +277,9 @@ function matchesFrozenRetryRequest(verification, { packageVersion, profile }) {
       id: verification.profile?.id,
       nodeVersion: verification.runtime?.observed,
       versions: verification.profile?.resolved,
+      ...(verification.profile?.expectedResolutions?.resolved
+        ? { expectedResolutions: verification.profile.expectedResolutions.resolved }
+        : {}),
     })
     return isDeepStrictEqual(profile, reportedProfile)
   }
@@ -294,6 +316,9 @@ export async function runInitialRegistrySmoke({ registryHealth, verifyRegistryPa
     id: registryHealth.profile.id,
     nodeVersion: registryHealth.profile.nodeVersion,
     versions: registryHealth.profile.resolved,
+    ...(registryHealth.profile.expectedResolutions
+      ? { expectedResolutions: registryHealth.profile.expectedResolutions }
+      : {}),
   })
   const request = Object.freeze({
     packageName: registryHealth.package.name,
