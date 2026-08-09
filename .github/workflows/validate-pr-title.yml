@@ -1,0 +1,38 @@
+name: Validate PR title
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+jobs:
+  validate-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+          title_pattern='^(feat|fix|refactor|test|docs|chore|build|ci|perf|revert)(\([^():]+\))?: .*[[:graph:]].*$'
+
+          if [[ "$PR_TITLE" =~ $title_pattern ]]; then
+            exit 0
+          fi
+
+          echo "Invalid pull request title: $PR_TITLE"
+          echo "Expected: <type>: <description> or <type>(<scope>): <description>"
+          echo "Types: feat, fix, refactor, test, docs, chore, build, ci, perf, revert"
+          echo "Examples: feat: add toolbar | fix(rendering): preserve last diagram | chore(deps): update mermaid"
+          exit 1
