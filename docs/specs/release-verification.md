@@ -2,15 +2,9 @@
 
 ## Status and Scope
 
-Accepted for the 3.x release line. This specification defines the release gate, the identity of the package being verified and published, durable local evidence, publication reconciliation, and post-publication registry health.
+Accepted for the 3.x release line. This specification defines the release gate, the identity of the package being verified and published, ephemeral local evidence, idempotent publication, and post-publication registry health.
 
-The release workflow has one maintainer entrypoint:
-
-```bash
-pnpm release <exact-version>
-```
-
-It prepares and verifies one exact package artifact. It does not infer a patch, minor, or major version, reuse a previously packed artifact, or trust a stored CI result as release authorization.
+The release workflow has separate preparation and publication entrypoints around an explicit human Git handoff. It prepares and verifies one exact package artifact. It does not infer a patch, minor, or major version, reuse a previously packed artifact, or trust a stored CI result as release authorization.
 
 ## Release Identity and Side-effect Boundary
 
@@ -28,9 +22,12 @@ interface ReleaseIdentity {
 
 The clean formal `main` HEAD used to create the isolated worktree is recorded separately as `changeHeadCommit`. Previous release tags and a calculated release diff are not part of release identity.
 
-Before the gate passes, the workflow may create a disposable worktree and local branch, prepare a local release commit, install dependencies, build, pack, and run verification. It must not create the final Git tag, push a commit or tag, or publish to npm.
+`pnpm release:prepare <exact-version>` performs the complete pre-publication gate and stops after writing `status: verified`. Before that command returns it must not fast-forward the formal branch, create the final tag, contact a Git remote, or publish to npm.
 
-After a push may have succeeded, failures enter publication reconciliation. They are never handled as a new release attempt.
+The maintainer then fast-forwards
+`main`, creates the final tag, pushes both refs atomically, and verifies the remote branch and peeled tag targets. These ordinary Git operations are an explicit human boundary and are not journal states inferred by the release program.
+
+`pnpm release:publish <exact-version>` accepts only frozen verified evidence, revalidates local and remote refs plus the retained artifact, and reconciles the exact registry version by `dist.integrity` before deciding whether npm publication is necessary.
 
 ## Source and Artifact Preparation
 
@@ -40,7 +37,7 @@ CI and the release entrypoint share one source-verification interface:
 pnpm verify:source
 ```
 
-It runs lint, unit and browser-backed tests, and root and playground type checks. A release starts only from a clean formal `main` worktree, records `changeHeadCommit`, and requires a successful, determinate source-verification result. The release does not query GitHub Actions or require local HEAD to equal `origin/main`; a remote divergence is rejected later by the normal fast-forward push.
+It runs lint, unit and browser-backed tests, and root and playground type checks. A release starts only from a clean formal `main` worktree, records `changeHeadCommit`, and requires a successful, determinate source-verification result. The release does not query GitHub Actions or require local HEAD to equal `origin/main`; publication later verifies the remote branch and tag directly.
 
 Source verification excludes build, `prepack`, packing, and package-consumer verification. The only byte-producing lifecycle trusted by the release gate runs in an isolated worktree created from `changeHeadCommit`.
 
@@ -73,35 +70,35 @@ The workflow writes an ordinary JSON maintainer journal under `.release-evidence
 
 Evidence and the retained tarball remain local and gitignored. Generated worktrees and consumer installation state are also never committed.
 
-The workflow never trusts a stored `verified` or `published` value by itself. Before each external side effect it re-reads Git and artifact state, recalculates integrity, and checks the current Release Identity. Evidence writes are atomic so interruption cannot leave a partially trusted journal.
+The workflow never trusts a stored `verified` or `published` value by itself. Before each external side effect it re-reads Git and artifact state, recalculates integrity, and checks the current Release Identity. Evidence writes are atomic so interruption cannot leave a partially trusted journal. A release-code or evidence-schema change invalidates existing evidence; old evidence is not migrated or reused.
 
 An existing evidence directory blocks a new release attempt. After a pre-publication failure, the maintainer inspects and then moves or removes the whole directory before rerunning the full release. Individual phases and profiles are not resumed from stored success.
 
 ## Publication
 
-After all automated and required manual checks pass, the formal branch fast-forwards to `sourceCommit`, adopting the exact release mutations that produced the verified artifact.
+After all automated and required manual checks pass, preparation stops with immutable `verified` evidence and a stable local preparation branch that keeps `sourceCommit` reachable. The maintainer owns the ordinary Git handoff that adopts that commit on formal `main`, creates the final annotated tag, pushes both refs atomically, and checks the remote targets.
 
-Before each tag, push, or publish side effect, the workflow verifies:
+Before npm access, the publication command verifies:
 
 - the formal branch resolves to `sourceCommit`;
 - formal `package.json` equals `targetVersion`;
 - the retained artifact still matches `artifactIntegritySha512`;
 - the artifact manifest name and version are correct; and
-- the final Git tag name and target commit are correct.
+- the final local Git tag name and target commit are correct; and
+- the remote `main` branch and peeled tag both resolve to `sourceCommit`.
 
-Only then may it create the tag, push branch and tag, and publish the retained tarball by explicit path. Publish may not run build, pack, `prepack`, `prepare`, or any other byte-producing lifecycle. Stable releases publish directly to the `latest` dist-tag.
+Remote-ref mismatch or absence stops before npm access. Only then may publication use the retained tarball by explicit path. Publish may not run build, pack, `prepack`, `prepare`, or any other byte-producing lifecycle. Stable releases publish directly to the `latest` dist-tag.
 
-## Publication Reconciliation
+## Idempotent Publication
 
-If push succeeded but publish failed or returned an ambiguous result, the retained artifact and evidence are preserved. The `reconcile` path first revalidates Git, tag, manifest version, artifact path, and SHA-512 integrity, then queries the exact registry version.
+Publication accepts only these outcomes:
 
-Reconciliation accepts only these outcomes:
+1. Exact version absent: publish the retained tarball, then query the exact version again before recording `published`.
+2. Exact version present with matching `dist.integrity`: record `published` without republishing.
+3. Exact version present with different `dist.integrity`: stop with a fatal artifact conflict.
+4. Registry query or publish result indeterminate: retain `verified` evidence and retry the same `release:publish` command later.
 
-1. The version is absent: retry publication with the same retained artifact.
-2. The version exists with matching `dist.integrity`: record publication success without republishing.
-3. The version exists with different `dist.integrity`: stop with a fatal artifact conflict.
-
-A failed or indeterminate registry query remains blocked and is never evidence that the version is absent. Reconciliation cannot accept another tarball or rebuild the package.
+Publication cannot accept a different tarball, rebuild, repack, force-update refs, roll back a remote, or infer success from a command promise. A failed or indeterminate registry query is never evidence that the version is absent.
 
 ## Post-publication Registry Health
 
@@ -113,9 +110,9 @@ Artifact and registry checks share the Clean Package User Consumer core but use 
 2. production build; and
 3. production startup with a visible, non-empty Mermaid SVG assertion.
 
-It uses the actual-latest Nuxt 4 Compatibility Profile. It does not repeat archive, export, public-type, or full-matrix checks.
+It does not repeat archive, export, public-type, or full-matrix checks.
 
-The first smoke resolves the profile once and records both requested ranges and exact resolved versions. A retry loads that frozen profile from evidence and never resolves a new latest set.
+The first Registry Smoke Test and its one permitted retry use the complete frozen `v3-known-latest` Version Profile stored in the release evidence. They do not resolve current registry latest versions and do not mutate the frozen profile.
 
 ## Registry-health Evidence and Recovery
 
@@ -143,10 +140,10 @@ Implementation is complete only when focused tests prove:
 - one-time artifact construction and integrity revalidation;
 - failed or indeterminate source, package, compatibility, or manual gates prevent external side effects;
 - explicit manual-skip reasons;
-- all publication-reconciliation outcomes without real publication;
+- all idempotent-publication outcomes without real publication;
 - registry-only installation and resolved-version matching;
 - fixed registry stages and frozen evidence-derived retry profiles;
-- backward-compatible additive registry-health evidence;
+- fail-closed evidence-schema validation;
 - independence of publication and registry-health states; and
 - first-failure investigation versus independently confirmed package-defect classification.
 
