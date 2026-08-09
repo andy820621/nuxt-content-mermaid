@@ -20,7 +20,15 @@ import {
   runCommand,
 } from './operations.mjs'
 import { parseVersionProfile, VERSION_PROFILES } from './profiles.mjs'
-import { runPackageArtifactVerification } from './runner.mjs'
+import {
+  runPackageArtifactVerification,
+  runRegistrySmokeVerification,
+} from './runner.mjs'
+import {
+  createPendingRegistryHealth,
+  runInitialRegistrySmoke,
+  runRegistrySmokeRetry,
+} from './registry-smoke.mjs'
 
 const EXACT_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9a-z-]+(?:\.[0-9a-z-]+)*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 const MANUAL_CHECKS = Object.freeze([
@@ -31,6 +39,7 @@ const MANUAL_CHECKS = Object.freeze([
   'visualReadability',
 ])
 const MODULE_DIRECTORY = dirname(fileURLToPath(import.meta.url))
+const RELEASE_REGISTRY_PROFILE_ID = 'nuxt-4-actual-latest-release'
 
 function assertExactSemver(version) {
   const match = typeof version === 'string'
@@ -95,6 +104,30 @@ async function recordBlockedEvidence({
     message: errorMessage(error),
   }
   await effects.writeEvidence(evidence)
+}
+
+async function recordRegistryHealth({ effects, evidence }) {
+  if (evidence.registryHealth !== undefined) return evidence
+
+  const compatibilityProfile = evidence.compatibilityProfile
+  const profile = {
+    id: compatibilityProfile?.id ?? RELEASE_REGISTRY_PROFILE_ID,
+    versions: compatibilityProfile?.resolved,
+  }
+  evidence.registryHealth = createPendingRegistryHealth({
+    packageName: evidence.artifact?.packageName,
+    packageVersion: evidence.artifact?.packageVersion,
+    requestedProfile: compatibilityProfile?.requested,
+    profile,
+  })
+  await effects.writeEvidence(evidence)
+  evidence.registryHealth = await runInitialRegistrySmoke({
+    registryHealth: evidence.registryHealth,
+    verifyRegistryPackage: effects.verifyRegistryPackage,
+    now: effects.now,
+  })
+  await effects.writeEvidence(evidence)
+  return evidence
 }
 
 async function availablePort() {
@@ -178,6 +211,7 @@ export function createReleaseEffects({
   commandRunner = runCommand,
   filesystem = {},
   manualInteractionRunner = runManualInteractionChecks,
+  registryVerifier = runRegistrySmokeVerification,
   repositoryRoot = process.cwd(),
   targetVersion,
   temporaryRoot = tmpdir(),
@@ -367,6 +401,7 @@ export function createReleaseEffects({
       },
       profile,
     }, verificationOperations),
+    verifyRegistryPackage: request => registryVerifier(request, verificationOperations),
     async runManualCheck({ artifact, profile, checks }) {
       const workspace = await verificationOperations.createWorkspace()
       let result
@@ -625,6 +660,16 @@ export function createReleaseEffects({
 }
 
 export function parseReleaseArguments(argv) {
+  if (argv[0] === 'registry-smoke') {
+    assertExactSemver(argv[1])
+    if (argv.length !== 2) {
+      throw new Error('Registry smoke retry does not accept options')
+    }
+    return {
+      mode: 'registry-smoke-retry',
+      targetVersion: argv[1],
+    }
+  }
   if (argv[0] === 'reconcile') {
     assertExactSemver(argv[1])
     if (argv.length !== 2) {
@@ -786,6 +831,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
       throw new Error('artifact verification returned an indeterminate result')
     }
     evidence.compatibilityProfile = {
+      id: compatibility.profile.id,
       requested: { ...compatibility.requested },
       resolved: { ...compatibility.resolved },
       passed: true,
@@ -796,6 +842,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
   catch (error) {
     evidence.compatibilityProfile = compatibility
       ? {
+          id: compatibility.profile.id,
           requested: { ...compatibility.requested },
           resolved: { ...compatibility.resolved },
           passed: false,
@@ -923,6 +970,8 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     })
   }
 
+  await recordRegistryHealth({ effects, evidence })
+
   return evidence
 }
 
@@ -1019,6 +1068,7 @@ export async function runReleaseReconciliation({ request, repositoryRoot, effect
     delete evidence.blocked
     evidence.timestamps.publishedAt = effects.now()
     await effects.writeEvidence(evidence)
+    await recordRegistryHealth({ effects, evidence })
     return evidence
   }
   if (registryRelease?.state === 'published'
@@ -1027,6 +1077,7 @@ export async function runReleaseReconciliation({ request, repositoryRoot, effect
     delete evidence.blocked
     evidence.timestamps.reconciledAt = effects.now()
     await effects.writeEvidence(evidence)
+    await recordRegistryHealth({ effects, evidence })
     return evidence
   }
   if (registryRelease?.state === 'published') {
@@ -1040,6 +1091,20 @@ export async function runReleaseReconciliation({ request, repositoryRoot, effect
   }
 }
 
+export function runReleaseRegistrySmokeRetry({ request, repositoryRoot, effects }) {
+  if (request.mode !== 'registry-smoke-retry') {
+    throw new Error('Registry smoke retry requires a registry-smoke-retry request')
+  }
+  return runRegistrySmokeRetry({
+    repositoryRoot,
+    targetVersion: request.targetVersion,
+    readEvidence: effects.readEvidence,
+    writeEvidence: effects.writeEvidence,
+    verifyRegistryPackage: effects.verifyRegistryPackage,
+    now: effects.now,
+  })
+}
+
 export async function runReleaseCli({
   argv = process.argv.slice(2),
   effectFactory = createReleaseEffects,
@@ -1050,6 +1115,9 @@ export async function runReleaseCli({
     repositoryRoot,
     targetVersion: request.targetVersion,
   })
+  if (request.mode === 'registry-smoke-retry') {
+    return runReleaseRegistrySmokeRetry({ request, repositoryRoot, effects })
+  }
   if (request.mode === 'reconcile') {
     return runReleaseReconciliation({ request, repositoryRoot, effects })
   }

@@ -1,9 +1,13 @@
 import type {
   PackageArtifact,
   PackageArtifactEvidence,
+  RegistrySmokeVerificationEvidence,
+  RegistrySmokeVerificationRequest,
   ReleaseVerificationOperations,
   VersionProfile,
+  runRegistrySmokeVerification,
 } from './runner.mjs'
+import type { RegistryHealthEvidence } from './registry-smoke.mjs'
 
 export interface ReleaseRequest {
   mode: 'release'
@@ -13,6 +17,11 @@ export interface ReleaseRequest {
 
 export interface ReconciliationRequest {
   mode: 'reconcile'
+  targetVersion: string
+}
+
+export interface RegistrySmokeRetryRequest {
+  mode: 'registry-smoke-retry'
   targetVersion: string
 }
 
@@ -47,6 +56,7 @@ export interface LeanReleaseEvidence {
     packlist: string[]
   }
   compatibilityProfile: null | {
+    id?: string
     requested: Record<string, string>
     resolved: Record<string, string>
     passed: boolean
@@ -61,6 +71,7 @@ export interface LeanReleaseEvidence {
     stage: string
     message: string
   }
+  registryHealth?: RegistryHealthEvidence
 }
 
 export interface CommandInvocation {
@@ -127,6 +138,9 @@ export interface ReleaseEffects {
     artifact: PackageArtifact
     profile: VersionProfile
   }) => Promise<PackageArtifactEvidence>
+  verifyRegistryPackage: (
+    request: RegistrySmokeVerificationRequest,
+  ) => Promise<RegistrySmokeVerificationEvidence>
   runManualCheck: (input: {
     artifact: PackageArtifact
     profile: VersionProfile
@@ -189,6 +203,7 @@ export interface CreateReleaseEffectsOptions {
     checks: ManualCheckName[]
     consumerDirectory: string
   }) => Promise<Record<string, boolean>>
+  registryVerifier?: typeof runRegistrySmokeVerification
   repositoryRoot?: string
   targetVersion?: string
   temporaryRoot?: string
@@ -201,7 +216,7 @@ export function createReleaseEffects(
 
 export function parseReleaseArguments(
   argv: string[],
-): ReleaseRequest | ReconciliationRequest
+): ReleaseRequest | ReconciliationRequest | RegistrySmokeRetryRequest
 
 export function runReleaseGate(input: {
   request: ReleaseRequest
@@ -211,6 +226,12 @@ export function runReleaseGate(input: {
 
 export function runReleaseReconciliation(input: {
   request: ReconciliationRequest
+  repositoryRoot: string
+  effects: ReleaseEffects
+}): Promise<LeanReleaseEvidence>
+
+export function runReleaseRegistrySmokeRetry(input: {
+  request: RegistrySmokeRetryRequest
   repositoryRoot: string
   effects: ReleaseEffects
 }): Promise<LeanReleaseEvidence>

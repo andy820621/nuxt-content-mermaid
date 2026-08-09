@@ -5,9 +5,11 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   parseReleaseArguments,
+  runReleaseCli,
   runReleaseGate,
   runReleaseReconciliation,
 } from '../scripts/release-verification/release.mjs'
+import { RegistrySmokeVerificationFailure } from '../scripts/release-verification/runner.mjs'
 import * as releaseModule from '../scripts/release-verification/release.mjs'
 
 function createInertEffects() {
@@ -42,6 +44,12 @@ function createInertEffects() {
     createTag: vi.fn(async () => { externalCalls.push('tag') }),
     push: vi.fn(async () => { externalCalls.push('push') }),
     publish: vi.fn(async () => { externalCalls.push('publish') }),
+    verifyRegistryPackage: vi.fn(async (request: {
+      profile: typeof actualLatestProfile
+    }) => {
+      externalCalls.push('registry-smoke')
+      return createRegistryVerificationEvidence(true, request.profile)
+    }),
   }
 }
 
@@ -85,6 +93,67 @@ const compatibilityResolution = {
   },
   resolved: actualLatestProfile.versions,
   profile: actualLatestProfile,
+}
+
+function createRegistryVerificationEvidence(
+  success: boolean,
+  profile = actualLatestProfile,
+) {
+  return {
+    schemaVersion: 1 as const,
+    success,
+    mode: 'registry-smoke' as const,
+    package: {
+      name: retainedArtifact.packageName,
+      requestedVersion: retainedArtifact.packageVersion,
+      resolvedVersion: retainedArtifact.packageVersion,
+    },
+    profile: {
+      id: profile.id,
+      requested: profile.versions,
+      resolved: profile.versions,
+    },
+    stages: [],
+  }
+}
+
+function createPublishedInvestigationEvidence() {
+  const frozenProfile = {
+    ...actualLatestProfile,
+    id: 'frozen-registry-evidence',
+    versions: {
+      ...actualLatestProfile.versions,
+      nuxt: '4.8.0',
+      nuxtContent: '3.8.0',
+    },
+  }
+  const verification = createRegistryVerificationEvidence(false, frozenProfile)
+  return {
+    ...structuredClone(pushedEvidence),
+    status: 'published',
+    registryHealth: {
+      status: 'investigation',
+      package: {
+        name: retainedArtifact.packageName,
+        version: retainedArtifact.packageVersion,
+      },
+      profile: {
+        id: frozenProfile.id,
+        requested: compatibilityResolution.requested,
+        resolved: frozenProfile.versions,
+      },
+      attempts: [{
+        number: 1,
+        completedAt: '2026-08-09T00:00:00.000Z',
+        cleanConsumer: true,
+        success: false,
+        stage: 'runtime',
+        classification: 'package-defect',
+        verification,
+      }],
+      retryCommand: 'pnpm release registry-smoke 3.0.0',
+    },
+  }
 }
 
 const manualResults = {
@@ -159,6 +228,23 @@ describe('release gate CLI', () => {
       mode: 'reconcile',
       targetVersion: '3.0.0',
     })
+  })
+
+  it('parses a registry-smoke retry for one exact version', () => {
+    expect(parseReleaseArguments(['registry-smoke', '3.0.0'])).toEqual({
+      mode: 'registry-smoke-retry',
+      targetVersion: '3.0.0',
+    })
+  })
+
+  it.each([
+    [['registry-smoke']],
+    [['registry-smoke', 'latest']],
+    [['registry-smoke', 'v3.0.0']],
+    [['registry-smoke', '^3.0.0']],
+    [['registry-smoke', '3.0.0', '--clean']],
+  ])('rejects an invalid registry-smoke request: %j', (argv) => {
+    expect(() => parseReleaseArguments(argv)).toThrow()
   })
 
   it.each([
@@ -380,6 +466,7 @@ describe('release gate preflight', () => {
     })
     expect(evidence).toMatchObject({
       compatibilityProfile: {
+        id: actualLatestProfile.id,
         requested: compatibilityResolution.requested,
         resolved: compatibilityResolution.resolved,
         passed: true,
@@ -416,6 +503,7 @@ describe('release gate preflight', () => {
     expect(effects.writeEvidence).toHaveBeenLastCalledWith(expect.objectContaining({
       status: 'blocked',
       compatibilityProfile: {
+        id: actualLatestProfile.id,
         requested: compatibilityResolution.requested,
         resolved: compatibilityResolution.resolved,
         passed: false,
@@ -553,6 +641,7 @@ describe('release gate preflight', () => {
       'push',
       'assert:publish',
       'publish',
+      'registry-smoke',
     ])
     const publicationIdentity = {
       sourceCommit: 'prepared-release-commit',
@@ -585,11 +674,56 @@ describe('release gate preflight', () => {
       archivePath: retainedArtifact.archivePath,
       distTag: 'latest',
     })
-    expect(evidence).toMatchObject({ status: 'published' })
+    expect(evidence).toMatchObject({
+      status: 'published',
+      registryHealth: { status: 'healthy' },
+    })
     expect(effects.evidenceSnapshots).toEqual(expect.arrayContaining([
       expect.objectContaining({ status: 'pushed' }),
       expect.objectContaining({ status: 'published' }),
     ]))
+    const publishedSnapshots = effects.evidenceSnapshots.filter(snapshot => (
+      (snapshot as { status?: string }).status === 'published'
+    )) as Array<{ registryHealth?: { status: string } }>
+    expect(publishedSnapshots).toHaveLength(3)
+    expect(publishedSnapshots[0]).not.toHaveProperty('registryHealth')
+    expect(publishedSnapshots[1]).toMatchObject({ registryHealth: { status: 'pending' } })
+    expect(publishedSnapshots[2]).toMatchObject({ registryHealth: { status: 'healthy' } })
+  })
+
+  it('keeps a published release orthogonal to a first registry-smoke failure', async () => {
+    const effects = createInertEffects()
+    effects.prepareRelease.mockResolvedValueOnce({
+      sourceCommit: 'prepared-release-commit',
+      artifact: retainedArtifact,
+    })
+    effects.verifyRegistryPackage.mockRejectedValueOnce(
+      new RegistrySmokeVerificationFailure(
+        'runtime',
+        Object.assign(new Error('rendered SVG is empty'), { code: 'PACKAGE_DEFECT' }),
+        createRegistryVerificationEvidence(false),
+      ),
+    )
+
+    const evidence = await runReleaseGate({
+      request: releaseRequest,
+      repositoryRoot: '/repo',
+      effects: effects as never,
+    })
+
+    expect(evidence).toMatchObject({
+      status: 'published',
+      registryHealth: {
+        status: 'investigation',
+        retryCommand: 'pnpm release registry-smoke 3.0.0',
+      },
+    })
+    expect(effects.publish).toHaveBeenCalledOnce()
+    expect(effects).not.toHaveProperty('deprecate')
+    expect(effects).not.toHaveProperty('promote')
+    expect(effects).not.toHaveProperty('patch')
+    expect(effects).not.toHaveProperty('unpublish')
+    expect(effects).not.toHaveProperty('rollback')
   })
 
   it('blocks before mutating the formal branch when publication identity is invalid', async () => {
@@ -620,6 +754,27 @@ describe('release gate preflight', () => {
 })
 
 describe('release publication reconciliation', () => {
+  it('accepts valid old evidence without registry health', async () => {
+    const effects = createInertEffects()
+    effects.readEvidence.mockResolvedValueOnce(structuredClone(pushedEvidence))
+    effects.readRegistryRelease.mockResolvedValueOnce({
+      state: 'published',
+      integrity: retainedArtifact.integritySha512,
+    })
+
+    await expect(runReleaseReconciliation({
+      request: reconciliationRequest,
+      repositoryRoot: '/repo',
+      effects: effects as never,
+    })).resolves.toMatchObject({
+      status: 'published',
+      registryHealth: {
+        status: 'healthy',
+        profile: { id: 'nuxt-4-actual-latest-release' },
+      },
+    })
+  })
+
   it('allows reconciliation only after the original push may have succeeded', async () => {
     const effects = createInertEffects()
     effects.readEvidence.mockResolvedValueOnce({
@@ -669,7 +824,14 @@ describe('release publication reconciliation', () => {
       archivePath: retainedArtifact.archivePath,
       distTag: 'latest',
     })
-    expect(evidence).toMatchObject({ status: 'published' })
+    expect(evidence).toMatchObject({
+      status: 'published',
+      registryHealth: {
+        status: 'healthy',
+        attempts: [{ number: 1 }],
+      },
+    })
+    expect(effects.verifyRegistryPackage).toHaveBeenCalledOnce()
   })
 
   it('accepts an already-published version only when registry integrity matches', async () => {
@@ -687,8 +849,35 @@ describe('release publication reconciliation', () => {
     })
 
     expect(effects.publish).not.toHaveBeenCalled()
-    expect(evidence).toMatchObject({ status: 'published' })
+    expect(evidence).toMatchObject({
+      status: 'published',
+      registryHealth: {
+        status: 'healthy',
+        attempts: [{ number: 1 }],
+      },
+    })
+    expect(effects.verifyRegistryPackage).toHaveBeenCalledOnce()
     expect(effects.writeEvidence).toHaveBeenLastCalledWith(evidence)
+  })
+
+  it('does not duplicate the initial registry attempt during reconciliation', async () => {
+    const effects = createInertEffects()
+    const evidenceWithRegistryHealth = createPublishedInvestigationEvidence()
+    effects.readEvidence.mockResolvedValueOnce(structuredClone(evidenceWithRegistryHealth))
+    effects.readRegistryRelease.mockResolvedValueOnce({
+      state: 'published',
+      integrity: retainedArtifact.integritySha512,
+    })
+
+    const evidence = await runReleaseReconciliation({
+      request: reconciliationRequest,
+      repositoryRoot: '/repo',
+      effects: effects as never,
+    })
+
+    expect(evidence.registryHealth).toEqual(evidenceWithRegistryHealth.registryHealth)
+    expect(effects.verifyRegistryPackage).not.toHaveBeenCalled()
+    expect(effects.publish).not.toHaveBeenCalled()
   })
 
   it('keeps pushed evidence when reconciliation publication remains ambiguous', async () => {
@@ -1204,6 +1393,31 @@ describe('production release effects', () => {
     }, verificationOperations)
   })
 
+  it('injects registry verification through the shared verification operations', async () => {
+    const verification = createRegistryVerificationEvidence(true)
+    const registryVerifier = vi.fn(async () => verification)
+    const verificationOperations = { seam: 'registry-package-user-consumer' }
+    const createReleaseEffects = (releaseModule as unknown as {
+      createReleaseEffects: (options: unknown) => {
+        verifyRegistryPackage: (input: unknown) => Promise<unknown>
+      }
+    }).createReleaseEffects
+    const effects = createReleaseEffects({
+      commandRunner: vi.fn(),
+      registryVerifier,
+      repositoryRoot: '/repo',
+      verificationOperations,
+    })
+    const request = {
+      packageName: retainedArtifact.packageName,
+      packageVersion: retainedArtifact.packageVersion,
+      profile: actualLatestProfile,
+    }
+
+    await expect(effects.verifyRegistryPackage(request)).resolves.toBe(verification)
+    expect(registryVerifier).toHaveBeenCalledWith(request, verificationOperations)
+  })
+
   it('runs manual checks in a second clean consumer built from the retained artifact', async () => {
     const verificationOperations = {
       createWorkspace: vi.fn(async () => ({
@@ -1261,13 +1475,9 @@ describe('production release effects', () => {
       integrity: retainedArtifact.integritySha512,
     })
     const effectFactory = vi.fn(() => effects)
-    const runReleaseCli = (releaseModule as unknown as {
-      runReleaseCli: (input: unknown) => Promise<unknown>
-    }).runReleaseCli
-
     await expect(runReleaseCli({
       argv: ['reconcile', '3.0.0'],
-      effectFactory,
+      effectFactory: effectFactory as never,
       repositoryRoot: '/repo',
     })).resolves.toMatchObject({ status: 'published' })
     expect(effectFactory).toHaveBeenCalledWith({
@@ -1275,5 +1485,92 @@ describe('production release effects', () => {
       targetVersion: '3.0.0',
     })
     expect(effects.publish).not.toHaveBeenCalled()
+  })
+
+  it('dispatches registry-smoke retry from frozen evidence without release effects', async () => {
+    const effects = createInertEffects()
+    const evidence = createPublishedInvestigationEvidence()
+    effects.readEvidence.mockResolvedValueOnce(structuredClone(evidence))
+    effects.verifyRegistryPackage.mockImplementationOnce(async request => (
+      createRegistryVerificationEvidence(true, request.profile)
+    ))
+    const effectFactory = vi.fn(() => effects)
+    await expect(runReleaseCli({
+      argv: ['registry-smoke', '3.0.0'],
+      effectFactory: effectFactory as never,
+      repositoryRoot: '/repo',
+    })).resolves.toMatchObject({
+      status: 'published',
+      registryHealth: {
+        status: 'healthy',
+        attempts: [{ number: 1 }, { number: 2 }],
+      },
+    })
+    expect(effects.readEvidence).toHaveBeenCalledWith({
+      repositoryRoot: '/repo',
+      targetVersion: '3.0.0',
+    })
+    expect(effects.verifyRegistryPackage).toHaveBeenCalledWith({
+      packageName: retainedArtifact.packageName,
+      packageVersion: '3.0.0',
+      profile: {
+        id: 'frozen-registry-evidence',
+        versions: {
+          ...actualLatestProfile.versions,
+          nuxt: '4.8.0',
+          nuxtContent: '3.8.0',
+        },
+      },
+    })
+    expect(effects.resolveCompatibilityProfile).not.toHaveBeenCalled()
+    expect(effects.readPublishedVersion).not.toHaveBeenCalled()
+    expect(effects.readRegistryRelease).not.toHaveBeenCalled()
+    expect(effects.prepareRelease).not.toHaveBeenCalled()
+    expect(effects.publish).not.toHaveBeenCalled()
+  })
+
+  it('reads the exact registry-smoke evidence path through production effects', async () => {
+    const repositoryRoot = await mkdtemp(join(tmpdir(), 'registry-smoke-cli-test-'))
+    try {
+      const createReleaseEffects = (releaseModule as unknown as {
+        createReleaseEffects: (options: unknown) => {
+          writeEvidence: (evidence: unknown) => Promise<void>
+        }
+      }).createReleaseEffects
+      const readEvidenceFile = vi.fn(readFile)
+      const commandRunner = vi.fn()
+      const registryVerifier = vi.fn(async (request: {
+        profile: typeof actualLatestProfile
+      }) => createRegistryVerificationEvidence(true, request.profile))
+      const effectOptions = {
+        commandRunner,
+        filesystem: { readFile: readEvidenceFile },
+        registryVerifier,
+        repositoryRoot,
+        targetVersion: '3.0.0',
+        verificationOperations: {},
+      }
+      const initialEffects = createReleaseEffects(effectOptions)
+      await initialEffects.writeEvidence(createPublishedInvestigationEvidence())
+      const effectFactory = vi.fn(() => createReleaseEffects(effectOptions))
+      await expect(runReleaseCli({
+        argv: ['registry-smoke', '3.0.0'],
+        effectFactory: effectFactory as never,
+        repositoryRoot,
+      })).resolves.toMatchObject({
+        status: 'published',
+        registryHealth: { status: 'healthy' },
+      })
+      expect(readEvidenceFile).toHaveBeenCalledWith(join(
+        repositoryRoot,
+        '.release-evidence',
+        '3.0.0',
+        'release.json',
+      ), 'utf8')
+      expect(commandRunner).not.toHaveBeenCalled()
+    }
+    finally {
+      await rm(repositoryRoot, { recursive: true, force: true })
+    }
   })
 })
