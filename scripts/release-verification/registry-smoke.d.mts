@@ -24,6 +24,7 @@ export interface RegistryHealthEvidence {
     nodeVersion: string
     requested: Record<string, string>
     resolved: VersionProfile['versions']
+    expectedResolutions?: VersionProfile['expectedResolutions']
   }
   attempts: RegistrySmokeAttempt[]
   retryCommand: string | null

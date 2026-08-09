@@ -1,4 +1,5 @@
 import { parseExactSemver } from './exact-semver.mjs'
+import { isDeepStrictEqual } from 'node:util'
 
 const VERIFICATION_STAGES = [
   'node-runtime',
@@ -196,24 +197,54 @@ function markRemainingStagesSkipped(
   }
 }
 
-function createMatrixEvidence() {
+function createMatrixEvidence(artifact) {
   return {
     schemaVersion: 1,
     success: false,
     mode: 'package-artifact-matrix',
-    package: null,
-    artifact: null,
+    package: {
+      name: artifact.packageName,
+      version: artifact.packageVersion,
+    },
+    artifact: {
+      filename: artifact.filename,
+      sha256: artifact.sha256,
+    },
     profiles: [],
     stages: [],
   }
 }
 
-function createMatrixProfileEvidence(profile) {
+function matrixProfileEvidence(evidence) {
   return {
-    ...createProfileEvidence(profile),
-    success: false,
-    runtime: createRuntimeEvidence(profile),
-    stages: [],
+    ...evidence.profile,
+    success: evidence.success,
+    runtime: evidence.runtime,
+    stages: evidence.stages,
+  }
+}
+
+function assertAggregatedProfileEvidence(artifact, profile, evidence) {
+  if (evidence?.schemaVersion !== 1 || evidence.mode !== 'package-artifact') {
+    throw new Error(`Version Profile ${profile.id} returned invalid verification evidence`)
+  }
+  if (evidence.package?.name !== artifact.packageName
+    || evidence.package?.version !== artifact.packageVersion
+    || evidence.artifact?.filename !== artifact.filename
+    || evidence.artifact?.sha256 !== artifact.sha256) {
+    throw new Error(`Version Profile ${profile.id} returned mismatched artifact identity`)
+  }
+  if (evidence.profile?.id !== profile.id
+    || !isDeepStrictEqual(evidence.profile.requested, profile.versions)
+    || !isDeepStrictEqual(
+      evidence.profile.expectedResolutions?.requested,
+      profile.expectedResolutions,
+    )) {
+    throw new Error(`Version Profile ${profile.id} returned mismatched requested coordinates`)
+  }
+  if (evidence.runtime?.requested !== profile.nodeVersion
+    || evidence.runtime?.observed !== profile.nodeVersion) {
+    throw new Error(`Version Profile ${profile.id} returned mismatched Node runtime evidence`)
   }
 }
 
@@ -314,41 +345,10 @@ async function runConsumerVerificationPlan({
   return primaryFailure ?? cleanupFailure
 }
 
-async function runMatrixProfile(artifact, profile, operations) {
-  const evidence = createMatrixProfileEvidence(profile)
-  const failure = await runConsumerVerificationPlan({
-    artifact,
-    evidence,
-    operations,
-    packageSource: { kind: 'artifact', artifact },
-    plan: 'artifact',
-    profile,
-    profileEvidence: evidence,
-  })
-
-  evidence.success = !failure
-  return { evidence, failure }
-}
-
-function createSkippedMatrixProfileEvidence(profile, failedStage) {
-  const evidence = createMatrixProfileEvidence(profile)
-  for (const name of CONSUMER_VERIFICATION_PLANS.artifact) {
-    evidence.stages.push({
-      name,
-      status: 'skipped',
-      reason: `required matrix stage ${failedStage} failed`,
-    })
+export async function runPackageArtifactMatrixVerification(request, verifyProfile) {
+  if (!request?.artifact) {
+    throw new Error('Compatibility matrix requires one retained artifact')
   }
-  evidence.stages.push({
-    name: 'cleanup',
-    status: 'skipped',
-    reason: 'temporary workspace was not created',
-  })
-  return evidence
-}
-
-export async function runPackageArtifactMatrixVerification(request, operations) {
-  validateRequest(request)
   if (!Array.isArray(request.profiles) || request.profiles.length === 0) {
     throw new Error('Compatibility matrix requires at least one Version Profile')
   }
@@ -357,74 +357,41 @@ export async function runPackageArtifactMatrixVerification(request, operations) 
     throw new Error('Compatibility matrix contains duplicate Version Profiles')
   }
 
-  const evidence = createMatrixEvidence()
+  if (typeof verifyProfile !== 'function') {
+    throw new TypeError('Compatibility matrix requires an outer profile verifier')
+  }
+
+  const evidence = createMatrixEvidence(request.artifact)
   const failures = []
-  let artifactWorkspace
-  let artifact
-  let matrixFailure
 
-  try {
-    artifact = await runStage(evidence, 'artifact', async () => {
-      artifactWorkspace = await operations.createWorkspace()
-      return operations.createArtifact({
-        repositoryRoot: request.packageSource.repositoryRoot,
-        artifactDirectory: artifactWorkspace.artifactDirectory,
+  for (const profile of request.profiles) {
+    try {
+      const profileEvidence = await verifyProfile({
+        artifact: request.artifact,
+        profile,
       })
-    })
-    evidence.package = {
-      name: artifact.packageName,
-      version: artifact.packageVersion,
-    }
-    evidence.artifact = {
-      filename: artifact.filename,
-      sha256: artifact.sha256,
-    }
-    await runStage(evidence, 'archive', () => operations.inspectArchive({
-      archiveDirectory: artifactWorkspace.archiveDirectory,
-      artifact,
-    }))
-  }
-  catch (error) {
-    matrixFailure = error instanceof StageExecutionFailure
-      ? error
-      : new StageExecutionFailure('artifact', error)
-    failures.push({
-      profileId: null,
-      stage: matrixFailure.stage,
-      cause: matrixFailure.cause,
-    })
-  }
-
-  if (matrixFailure) {
-    evidence.profiles.push(...request.profiles.map(profile => (
-      createSkippedMatrixProfileEvidence(profile, matrixFailure.stage)
-    )))
-  }
-  else {
-    for (const profile of request.profiles) {
-      const result = await runMatrixProfile(artifact, profile, operations)
-      evidence.profiles.push(result.evidence)
-      if (result.failure) {
+      assertAggregatedProfileEvidence(request.artifact, profile, profileEvidence)
+      evidence.profiles.push(matrixProfileEvidence(profileEvidence))
+      if (profileEvidence.success !== true) {
+        const failedStage = profileEvidence.stages.find(stage => stage.status === 'failed')
         failures.push({
           profileId: profile.id,
-          stage: result.failure.stage,
-          cause: result.failure.cause,
+          stage: failedStage?.name ?? 'install',
+          cause: new Error(`Version Profile ${profile.id} verification did not pass`),
         })
       }
     }
-  }
-
-  const cleanupFailure = await cleanupVerificationWorkspace(
-    evidence,
-    artifactWorkspace,
-    operations,
-  )
-  if (cleanupFailure) {
-    failures.push({
-      profileId: null,
-      stage: cleanupFailure.stage,
-      cause: cleanupFailure.cause,
-    })
+    catch (error) {
+      failures.push({
+        profileId: profile.id,
+        stage: error instanceof ReleaseVerificationFailure ? error.stage : 'artifact',
+        cause: error,
+      })
+      if (error instanceof ReleaseVerificationFailure) {
+        assertAggregatedProfileEvidence(request.artifact, profile, error.evidence)
+        evidence.profiles.push(matrixProfileEvidence(error.evidence))
+      }
+    }
   }
 
   if (failures.length > 0) {

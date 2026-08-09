@@ -134,12 +134,14 @@ export interface PackageArtifactVerificationRequest {
 }
 
 export interface PackageArtifactMatrixVerificationRequest {
-  packageSource: Extract<
-    PackageArtifactVerificationRequest['packageSource'],
-    { kind: 'pack' }
-  >
+  artifact: PackageArtifact
   profiles: readonly VersionProfile[]
 }
+
+export type PackageArtifactProfileVerifier = (input: {
+  artifact: PackageArtifact
+  profile: VersionProfile
+}) => Promise<PackageArtifactEvidence>
 
 export interface CompatibilityMatrixProfileEvidence {
   id: string
@@ -230,7 +232,7 @@ export function runPackageArtifactVerification(
 
 export function runPackageArtifactMatrixVerification(
   request: PackageArtifactMatrixVerificationRequest,
-  operations: ReleaseVerificationOperations,
+  verifyProfile: PackageArtifactProfileVerifier,
 ): Promise<PackageArtifactMatrixEvidence>
 
 export function runRegistrySmokeVerification(

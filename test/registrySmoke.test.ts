@@ -95,8 +95,8 @@ describe('registry smoke failure classification', () => {
   })
 })
 
-const actualLatestProfile = {
-  id: 'nuxt-4-actual-latest-release',
+const frozenRegistryProfile = {
+  id: 'v3-known-latest',
   nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
@@ -116,7 +116,7 @@ function createRegistryHealth() {
       nuxt: '>=4.1.0 <5.0.0',
       nuxtContent: '>=3.5.0 <4.0.0',
     },
-    profile: actualLatestProfile,
+    profile: frozenRegistryProfile,
   })
 }
 
@@ -131,12 +131,12 @@ function createVerificationEvidence(success: boolean): RegistrySmokeVerification
       resolvedVersion: '3.0.0',
     },
     profile: {
-      id: actualLatestProfile.id,
-      requested: actualLatestProfile.versions,
-      resolved: actualLatestProfile.versions,
+      id: frozenRegistryProfile.id,
+      requested: frozenRegistryProfile.versions,
+      resolved: frozenRegistryProfile.versions,
     },
     runtime: {
-      requested: actualLatestProfile.nodeVersion,
+      requested: frozenRegistryProfile.nodeVersion,
       observed: process.versions.node,
     },
     stages: [],
@@ -170,7 +170,7 @@ const invalidSuccessfulVerificationCases: Array<[
   }],
   ['the wrong resolved profile', (verification) => {
     verification.profile.resolved = {
-      ...actualLatestProfile.versions,
+      ...frozenRegistryProfile.versions,
       nuxt: '4.5.2',
     }
   }],
@@ -207,8 +207,8 @@ async function createPublishedInstallInvestigationEvidence() {
       resolvedVersion: null,
     },
     profile: {
-      id: actualLatestProfile.id,
-      requested: actualLatestProfile.versions,
+      id: frozenRegistryProfile.id,
+      requested: frozenRegistryProfile.versions,
       resolved: null,
     },
     stages: [
@@ -318,12 +318,12 @@ describe('initial registry smoke health', () => {
         version: '3.0.0',
       },
       profile: {
-        id: 'nuxt-4-actual-latest-release',
+        id: 'v3-known-latest',
         requested: {
           nuxt: '>=4.1.0 <5.0.0',
           nuxtContent: '>=3.5.0 <4.0.0',
         },
-        resolved: actualLatestProfile.versions,
+        resolved: frozenRegistryProfile.versions,
       },
       attempts: [{
         number: 1,
@@ -339,7 +339,7 @@ describe('initial registry smoke health', () => {
     expect(verifyRegistryPackage).toHaveBeenCalledWith({
       packageName: '@barzhsieh/nuxt-content-mermaid',
       packageVersion: '3.0.0',
-      profile: actualLatestProfile,
+      profile: frozenRegistryProfile,
     })
     expect(verifyRegistryPackage).toHaveBeenCalledOnce()
   })
@@ -379,12 +379,12 @@ describe('initial registry smoke health', () => {
         version: '3.0.0',
       },
       profile: {
-        id: 'nuxt-4-actual-latest-release',
+        id: 'v3-known-latest',
         requested: {
           nuxt: '>=4.1.0 <5.0.0',
           nuxtContent: '>=3.5.0 <4.0.0',
         },
-        resolved: actualLatestProfile.versions,
+        resolved: frozenRegistryProfile.versions,
       },
       attempts: [{
         number: 1,
@@ -420,7 +420,7 @@ describe('registry smoke retry', () => {
     expect(verifyRegistryPackage).toHaveBeenCalledWith({
       packageName: '@barzhsieh/nuxt-content-mermaid',
       packageVersion: '3.0.0',
-      profile: actualLatestProfile,
+      profile: frozenRegistryProfile,
     })
     expect(result.registryHealth).toMatchObject({
       status: 'healthy',
@@ -500,7 +500,7 @@ describe('registry smoke retry', () => {
     expect(verifyRegistryPackage).toHaveBeenCalledWith({
       packageName: '@barzhsieh/nuxt-content-mermaid',
       packageVersion: '3.0.0',
-      profile: actualLatestProfile,
+      profile: frozenRegistryProfile,
     })
     expect(writeEvidence).toHaveBeenCalledOnce()
     expect(writeEvidence).toHaveBeenCalledWith(expect.objectContaining({
@@ -628,7 +628,7 @@ describe('registry smoke retry', () => {
       evidence.registryHealth.attempts[0]!.number = 2
     }],
     ['an incomplete frozen profile', (evidence: PublishedInvestigationEvidence) => {
-      delete (evidence.registryHealth.profile.resolved as Partial<typeof actualLatestProfile.versions>).mermaid
+      delete (evidence.registryHealth.profile.resolved as Partial<typeof frozenRegistryProfile.versions>).mermaid
     }],
     ['an empty requested Nuxt range', (evidence: PublishedInvestigationEvidence) => {
       evidence.registryHealth.profile.requested.nuxt = ''
@@ -673,11 +673,13 @@ describe('registry smoke retry', () => {
       artifact: {
         archivePath: '/repo/.release-evidence/3.0.0/package.tgz',
         filename: 'package.tgz',
+        sha256: 'sha256-release-artifact',
         packageName: '@barzhsieh/nuxt-content-mermaid',
         packageVersion: '3.0.0',
         packlist: [],
       },
-      compatibilityProfile: null,
+      releaseBaseline: null,
+      compatibilityProfiles: [],
       manualCheck: null,
       timestamps: {},
     }
