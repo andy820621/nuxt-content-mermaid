@@ -65,9 +65,27 @@ change the package version or profile while investigating.
 
 ### Recovery sequence for an unhealthy release
 
-1. Inspect the first attempt in `.release-evidence/3.0.0/release.json`: its
-   stage, classification, requested profile, resolved profile, and diagnostics.
-   Preserve this evidence before retrying.
+1. Inspect the first attempt with this read-only command. It prints its stage,
+   classification, requested profile, resolved profile, and diagnostics without
+   changing the evidence; preserve the evidence before retrying.
+
+   ```bash
+   node --input-type=module -e '
+   import { readFileSync } from "node:fs"
+   const evidence = JSON.parse(readFileSync(".release-evidence/3.0.0/release.json", "utf8"))
+   const health = evidence.registryHealth
+   const attempt = health.attempts[0]
+   console.log(JSON.stringify({
+     stage: attempt.stage,
+     classification: attempt.classification,
+     requestedProfile: health.profile.requested,
+     resolvedProfile: health.profile.resolved,
+     diagnostics: attempt.verification.stages
+       .filter(stage => stage.error || stage.reason)
+       .map(({ name, status, error, reason }) => ({ name, status, error, reason })),
+   }, null, 2))
+   '
+   ```
 2. If the classification is `registry`, `network`, `runner`, or `permission`,
    fix that infrastructure issue without changing the package version or the
    frozen profile.
@@ -92,8 +110,9 @@ change the package version or profile while investigating.
    pnpm release <patch-version>
    ```
 
-Never use `npm unpublish`. Never move tags, auto-publish a patch, or perform
-automatic rollback. Deprecation is a manual maintainer action only.
+Never use `npm unpublish`. Never create or use candidate dist-tags, move tags,
+auto-promote, auto-deprecate, auto-publish a patch, or perform automatic
+rollback. Deprecation is a manual maintainer action only.
 
 ## Evidence and failures
 
