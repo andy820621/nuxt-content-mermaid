@@ -18,6 +18,7 @@ const execFileAsync = promisify(execFile)
 
 const profile = {
   id: 'nuxt-4-known-latest',
+  nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '4.5.2',

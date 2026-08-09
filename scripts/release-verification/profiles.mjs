@@ -14,6 +14,7 @@ const RUNTIME_VERSIONS = Object.freeze({
   typescript: '5.9.3',
   vueTsc: '3.2.5',
 })
+const NODE_VERSION = '22.21.1'
 
 export const PINNED_MATRIX_PROFILE_IDS = Object.freeze([
   'nuxt-3-minimum',
@@ -30,6 +31,9 @@ export function parseVersionProfile(input) {
   }
   if (typeof input.id !== 'string' || input.id.length === 0) {
     throw new TypeError('Invalid Version Profile: id must be a non-empty string')
+  }
+  if (!parseExactSemver(input.nodeVersion)) {
+    throw new TypeError('Invalid Version Profile: nodeVersion must be an exact version')
   }
   if (!input.versions || typeof input.versions !== 'object' || Array.isArray(input.versions)) {
     throw new TypeError('Invalid Version Profile: versions must be an object')
@@ -53,6 +57,7 @@ export function parseVersionProfile(input) {
 
   return Object.freeze({
     id: input.id,
+    nodeVersion: input.nodeVersion,
     versions: Object.freeze(versions),
   })
 }
@@ -60,6 +65,7 @@ export function parseVersionProfile(input) {
 function defineVersionProfile(id, nuxt, nuxtContent) {
   return parseVersionProfile({
     id,
+    nodeVersion: NODE_VERSION,
     versions: {
       ...RUNTIME_VERSIONS,
       nuxt,

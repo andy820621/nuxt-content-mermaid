@@ -36,12 +36,29 @@ jobs:
   representative-compatibility-matrix:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: nuxt-3-minimum
+            node-version: '22.21.1'
+          - profile: nuxt-4-minimum
+            node-version: '22.21.1'
+          - profile: nuxt-3-known-latest
+            node-version: '22.21.1'
+          - profile: nuxt-4-known-latest
+            node-version: '22.21.1'
+          - profile: nuxt-3-minimum-content-known-latest
+            node-version: '22.21.1'
+          - profile: nuxt-4-known-latest-content-minimum
+            node-version: '22.21.1'
+
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: ${{ matrix.node-version }}
 
       - run: npm i -g --force corepack@latest && corepack enable
 
@@ -54,8 +71,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Verify the pinned Representative Compatibility Matrix
-        run: npm run test:compatibility-matrix
+      - name: Verify Compatibility Profile
+        run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}
 
   module-compatibility:
     runs-on: ubuntu-latest

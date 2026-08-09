@@ -21,6 +21,7 @@ export interface RegistryHealthEvidence {
   package: { name: string, version: string }
   profile: {
     id: string
+    nodeVersion: string
     requested: Record<string, string>
     resolved: VersionProfile['versions']
   }

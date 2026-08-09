@@ -44,6 +44,7 @@ function freezeRegistryHealth({ packageName, packageVersion, requestedProfile, p
     }),
     profile: Object.freeze({
       id: exactProfile.id,
+      nodeVersion: exactProfile.nodeVersion,
       requested: freezeRequestedProfile(requestedProfile),
       resolved: exactProfile.versions,
     }),
@@ -89,10 +90,11 @@ function invalidSuccessfulVerification(message) {
   throw new TypeError(`Registry smoke verifier returned invalid successful evidence: ${message}`)
 }
 
-function parseReportedProfile(profile, versions, label) {
+function parseReportedProfile(profile, nodeVersion, versions, label) {
   try {
     return parseVersionProfile({
       id: profile?.id,
+      nodeVersion,
       versions,
     })
   }
@@ -119,11 +121,13 @@ function validateSuccessfulRegistryVerification(verification, request) {
 
   const requestedProfile = parseReportedProfile(
     verification.profile,
+    verification.runtime?.requested,
     verification.profile?.requested,
     'requested',
   )
   const resolvedProfile = parseReportedProfile(
     verification.profile,
+    verification.runtime?.observed,
     verification.profile?.resolved,
     'resolved',
   )
@@ -193,6 +197,7 @@ function loadRetryRequest(evidence, targetVersion) {
   freezeRequestedProfile(registryHealth.profile?.requested)
   const resolvedProfile = parseVersionProfile({
     id: registryHealth.profile?.id,
+    nodeVersion: registryHealth.profile?.nodeVersion,
     versions: registryHealth.profile?.resolved,
   })
   const packageName = requireNonEmptyString(registryHealth.package.name, 'package name')
@@ -204,6 +209,7 @@ function loadRetryRequest(evidence, targetVersion) {
   }
   const firstAttemptRequestedProfile = parseVersionProfile({
     id: firstAttempt.verification.profile?.id,
+    nodeVersion: firstAttempt.verification.runtime?.requested,
     versions: firstAttempt.verification.profile?.requested,
   })
   if (!isDeepStrictEqual(resolvedProfile, firstAttemptRequestedProfile)) {
@@ -221,6 +227,7 @@ function loadRetryRequest(evidence, targetVersion) {
     }
     const firstAttemptProfile = parseVersionProfile({
       id: firstAttempt.verification.profile?.id,
+      nodeVersion: firstAttempt.verification.runtime?.observed,
       versions: firstAttempt.verification.profile?.resolved,
     })
     if (!isDeepStrictEqual(resolvedProfile, firstAttemptProfile)) {
@@ -249,6 +256,7 @@ function matchesFrozenRetryRequest(verification, { packageVersion, profile }) {
   try {
     const reportedProfile = parseVersionProfile({
       id: verification.profile?.id,
+      nodeVersion: verification.runtime?.observed,
       versions: verification.profile?.resolved,
     })
     return isDeepStrictEqual(profile, reportedProfile)
@@ -284,6 +292,7 @@ export async function runInitialRegistrySmoke({ registryHealth, verifyRegistryPa
 
   const profile = Object.freeze({
     id: registryHealth.profile.id,
+    nodeVersion: registryHealth.profile.nodeVersion,
     versions: registryHealth.profile.resolved,
   })
   const request = Object.freeze({

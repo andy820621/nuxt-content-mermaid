@@ -15,6 +15,30 @@ const runtimeVersions = {
 }
 
 describe('release verification Version Profiles', () => {
+  it('declares one exact Node runtime for every profile', () => {
+    expect(Object.values(VERSION_PROFILES).map(profile => profile.nodeVersion))
+      .toEqual(Array.from({ length: PINNED_MATRIX_PROFILE_IDS.length }, () => '22.21.1'))
+
+    expect(() => parseVersionProfile({
+      id: 'missing-node-runtime',
+      versions: {
+        ...runtimeVersions,
+        nuxt: '4.5.2',
+        nuxtContent: '3.15.2',
+      },
+    })).toThrow('nodeVersion must be an exact version')
+
+    expect(() => parseVersionProfile({
+      id: 'floating-node-runtime',
+      nodeVersion: '22.x',
+      versions: {
+        ...runtimeVersions,
+        nuxt: '4.5.2',
+        nuxtContent: '3.15.2',
+      },
+    })).toThrow('nodeVersion must be an exact version')
+  })
+
   it('defines the complete pinned Representative Compatibility Matrix', () => {
     expect(PINNED_MATRIX_PROFILE_IDS).toEqual([
       'nuxt-3-minimum',
@@ -27,6 +51,7 @@ describe('release verification Version Profiles', () => {
     expect(VERSION_PROFILES).toEqual({
       'nuxt-3-minimum': {
         id: 'nuxt-3-minimum',
+        nodeVersion: '22.21.1',
         versions: {
           ...runtimeVersions,
           nuxt: '3.20.1',
@@ -35,6 +60,7 @@ describe('release verification Version Profiles', () => {
       },
       'nuxt-4-minimum': {
         id: 'nuxt-4-minimum',
+        nodeVersion: '22.21.1',
         versions: {
           ...runtimeVersions,
           nuxt: '4.1.0',
@@ -43,6 +69,7 @@ describe('release verification Version Profiles', () => {
       },
       'nuxt-3-known-latest': {
         id: 'nuxt-3-known-latest',
+        nodeVersion: '22.21.1',
         versions: {
           ...runtimeVersions,
           nuxt: '3.21.11',
@@ -51,6 +78,7 @@ describe('release verification Version Profiles', () => {
       },
       'nuxt-4-known-latest': {
         id: 'nuxt-4-known-latest',
+        nodeVersion: '22.21.1',
         versions: {
           ...runtimeVersions,
           nuxt: '4.5.2',
@@ -59,6 +87,7 @@ describe('release verification Version Profiles', () => {
       },
       'nuxt-3-minimum-content-known-latest': {
         id: 'nuxt-3-minimum-content-known-latest',
+        nodeVersion: '22.21.1',
         versions: {
           ...runtimeVersions,
           nuxt: '3.20.1',
@@ -67,6 +96,7 @@ describe('release verification Version Profiles', () => {
       },
       'nuxt-4-known-latest-content-minimum': {
         id: 'nuxt-4-known-latest-content-minimum',
+        nodeVersion: '22.21.1',
         versions: {
           ...runtimeVersions,
           nuxt: '4.5.2',
@@ -95,6 +125,7 @@ describe('release verification Version Profiles', () => {
   it.each([
     ['missing dependency', {
       id: 'invalid',
+      nodeVersion: '22.21.1',
       versions: {
         ...runtimeVersions,
         nuxt: '4.5.2',
@@ -102,6 +133,7 @@ describe('release verification Version Profiles', () => {
     }],
     ['floating dependency', {
       id: 'invalid',
+      nodeVersion: '22.21.1',
       versions: {
         ...runtimeVersions,
         nuxt: 'latest',
@@ -110,6 +142,7 @@ describe('release verification Version Profiles', () => {
     }],
     ['dependency range', {
       id: 'invalid',
+      nodeVersion: '22.21.1',
       versions: {
         ...runtimeVersions,
         nuxt: '^4.5.2',
@@ -118,6 +151,7 @@ describe('release verification Version Profiles', () => {
     }],
     ['trailing prerelease separator', {
       id: 'invalid',
+      nodeVersion: '22.21.1',
       versions: {
         ...runtimeVersions,
         nuxt: '4.5.2-preview.',
@@ -126,6 +160,7 @@ describe('release verification Version Profiles', () => {
     }],
     ['empty prerelease identifier', {
       id: 'invalid',
+      nodeVersion: '22.21.1',
       versions: {
         ...runtimeVersions,
         nuxt: '4.5.2-preview..1',
@@ -134,6 +169,7 @@ describe('release verification Version Profiles', () => {
     }],
     ['leading zero', {
       id: 'invalid',
+      nodeVersion: '22.21.1',
       versions: {
         ...runtimeVersions,
         nuxt: '04.5.2',
@@ -147,6 +183,7 @@ describe('release verification Version Profiles', () => {
   it('accepts exact SemVer build metadata without treating it as a range', () => {
     expect(parseVersionProfile({
       id: 'build-metadata',
+      nodeVersion: '22.21.1+verified.1',
       versions: {
         ...runtimeVersions,
         nuxt: '4.5.2+verified.1',

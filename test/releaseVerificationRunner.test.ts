@@ -15,6 +15,7 @@ import type {
 
 const knownLatestProfile = {
   id: 'nuxt-4-known-latest',
+  nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '4.5.2',
@@ -27,6 +28,7 @@ const knownLatestProfile = {
 
 const minimumProfile = {
   id: 'nuxt-3-minimum',
+  nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '3.20.1',
@@ -190,8 +192,13 @@ describe('package artifact verification runner', () => {
         requested: knownLatestProfile.versions,
         resolved: knownLatestProfile.versions,
       },
+      runtime: {
+        requested: knownLatestProfile.nodeVersion,
+        observed: process.versions.node,
+      },
     })
     expect(evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'passed'],
       ['artifact', 'passed'],
       ['archive', 'passed'],
       ['install', 'passed'],
@@ -250,6 +257,50 @@ describe('package artifact verification runner', () => {
     expect(operations.createWorkspace).not.toHaveBeenCalled()
   })
 
+  it('rejects a mismatched Node runtime before creating temporary state', async () => {
+    const { operations } = createOperations()
+    const requestedNodeVersion = '0.0.1'
+
+    const failure: ReleaseVerificationFailure
+      = await runPackageArtifactVerification({
+        ...createRequest(),
+        profile: {
+          ...knownLatestProfile,
+          nodeVersion: requestedNodeVersion,
+        },
+      }, operations).then(
+        () => { throw new Error('expected verification to fail') },
+        (error: unknown) => error as ReleaseVerificationFailure,
+      )
+
+    expect(failure).toBeInstanceOf(ReleaseVerificationFailure)
+    expect(failure).toMatchObject({
+      stage: 'node-runtime',
+      evidence: {
+        success: false,
+        runtime: {
+          requested: requestedNodeVersion,
+          observed: process.versions.node,
+        },
+      },
+    })
+    expect(failure.message).toContain(
+      `requested ${requestedNodeVersion}, observed ${process.versions.node}`,
+    )
+    expect(operations.createWorkspace).not.toHaveBeenCalled()
+    expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'failed'],
+      ['artifact', 'skipped'],
+      ['archive', 'skipped'],
+      ['install', 'skipped'],
+      ['exports', 'skipped'],
+      ['types', 'skipped'],
+      ['build', 'skipped'],
+      ['runtime', 'skipped'],
+      ['cleanup', 'skipped'],
+    ])
+  })
+
   it('stops after a required stage fails, reports the stage, and still cleans up', async () => {
     const { operations, workspace } = createOperations()
     operations.verifyTypes.mockRejectedValueOnce(new Error('type contract failed'))
@@ -269,6 +320,7 @@ describe('package artifact verification runner', () => {
       },
     })
     expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'passed'],
       ['artifact', 'passed'],
       ['archive', 'passed'],
       ['install', 'passed'],
@@ -353,10 +405,15 @@ describe('registry smoke verification runner', () => {
         id: 'nuxt-4-known-latest',
         requested: knownLatestProfile.versions,
       },
+      runtime: {
+        requested: knownLatestProfile.nodeVersion,
+        observed: process.versions.node,
+      },
     })
     expect(evidence.package.resolvedVersion).toBe(installResult.packageVersion)
     expect(evidence.profile.resolved).toBe(installResult.profileVersions)
     expect(evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'passed'],
       ['install', 'passed'],
       ['build', 'passed'],
       ['runtime', 'passed'],
@@ -400,6 +457,7 @@ describe('registry smoke verification runner', () => {
 
     expect(failure).toBeInstanceOf(RegistrySmokeVerificationFailure)
     expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'passed'],
       ['install', 'failed'],
       ['build', 'skipped'],
       ['runtime', 'skipped'],
@@ -423,6 +481,7 @@ describe('registry smoke verification runner', () => {
 
     expect(failure).toMatchObject({ stage: 'build' })
     expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'passed'],
       ['install', 'passed'],
       ['build', 'failed'],
       ['runtime', 'skipped'],
@@ -446,6 +505,7 @@ describe('registry smoke verification runner', () => {
 
     expect(failure).toMatchObject({ stage: 'runtime' })
     expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'passed'],
       ['install', 'passed'],
       ['build', 'passed'],
       ['runtime', 'failed'],
@@ -469,6 +529,7 @@ describe('registry smoke verification runner', () => {
 
     expect(failure).toMatchObject({ stage: 'cleanup' })
     expect(failure.evidence.stages.map(stage => [stage.name, stage.status])).toEqual([
+      ['node-runtime', 'passed'],
       ['install', 'passed'],
       ['build', 'passed'],
       ['runtime', 'passed'],
@@ -558,6 +619,7 @@ describe('Representative Compatibility Matrix runner', () => {
         id: minimumProfile.id,
         success: false,
         stages: [
+          ['node-runtime', 'passed'],
           ['install', 'passed'],
           ['exports', 'passed'],
           ['types', 'failed'],
@@ -570,6 +632,7 @@ describe('Representative Compatibility Matrix runner', () => {
         id: knownLatestProfile.id,
         success: true,
         stages: [
+          ['node-runtime', 'passed'],
           ['install', 'passed'],
           ['exports', 'passed'],
           ['types', 'passed'],
@@ -579,6 +642,44 @@ describe('Representative Compatibility Matrix runner', () => {
         ],
       },
     ])
+  })
+
+  it('rejects a profile whose declared Node runtime does not match the matrix process', async () => {
+    const { operations } = createMatrixOperations()
+    const mismatchedProfile = {
+      ...knownLatestProfile,
+      nodeVersion: '0.0.1',
+    }
+
+    const failure: CompatibilityMatrixVerificationFailure
+      = await runPackageArtifactMatrixVerification({
+        ...createMatrixRequest(),
+        profiles: [minimumProfile, mismatchedProfile],
+      }, operations).then(
+        () => { throw new Error('expected matrix verification to fail') },
+        (error: unknown) => error as CompatibilityMatrixVerificationFailure,
+      )
+
+    expect(failure.failures).toMatchObject([{
+      profileId: mismatchedProfile.id,
+      stage: 'node-runtime',
+    }])
+    expect(operations.installConsumer).toHaveBeenCalledTimes(1)
+    expect(failure.evidence.profiles[1]).toMatchObject({
+      runtime: {
+        requested: mismatchedProfile.nodeVersion,
+        observed: process.versions.node,
+      },
+      stages: [
+        { name: 'node-runtime', status: 'failed' },
+        { name: 'install', status: 'skipped' },
+        { name: 'exports', status: 'skipped' },
+        { name: 'types', status: 'skipped' },
+        { name: 'build', status: 'skipped' },
+        { name: 'runtime', status: 'skipped' },
+        { name: 'cleanup', status: 'skipped' },
+      ],
+    })
   })
 
   it('rejects an empty matrix before creating temporary state', async () => {

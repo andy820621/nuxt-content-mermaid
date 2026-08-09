@@ -108,6 +108,7 @@ async function recordRegistryHealth({ effects, evidence }) {
   const compatibilityProfile = evidence.compatibilityProfile
   const profile = {
     id: compatibilityProfile?.id ?? RELEASE_REGISTRY_PROFILE_ID,
+    nodeVersion: compatibilityProfile?.nodeVersion,
     versions: compatibilityProfile?.resolved,
   }
   evidence.registryHealth = createPendingRegistryHealth({
@@ -378,6 +379,7 @@ export function createReleaseEffects({
       ])
       const profile = parseVersionProfile({
         id: profileId,
+        nodeVersion: baseProfile.nodeVersion,
         versions: {
           ...baseProfile.versions,
           nuxt,
@@ -828,6 +830,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     }
     evidence.compatibilityProfile = {
       id: compatibility.profile.id,
+      nodeVersion: compatibility.profile.nodeVersion,
       requested: { ...compatibility.requested },
       resolved: { ...compatibility.resolved },
       passed: true,
@@ -839,6 +842,7 @@ export async function runReleaseGate({ request, repositoryRoot, effects }) {
     evidence.compatibilityProfile = compatibility
       ? {
           id: compatibility.profile.id,
+          nodeVersion: compatibility.profile.nodeVersion,
           requested: { ...compatibility.requested },
           resolved: { ...compatibility.resolved },
           passed: false,

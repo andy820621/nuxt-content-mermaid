@@ -57,6 +57,7 @@ export interface LeanReleaseEvidence {
   }
   compatibilityProfile: null | {
     id?: string
+    nodeVersion: string
     requested: Record<string, string>
     resolved: Record<string, string>
     passed: boolean

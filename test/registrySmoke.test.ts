@@ -97,6 +97,7 @@ describe('registry smoke failure classification', () => {
 
 const actualLatestProfile = {
   id: 'nuxt-4-actual-latest-release',
+  nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '4.5.3',
@@ -133,6 +134,10 @@ function createVerificationEvidence(success: boolean): RegistrySmokeVerification
       id: actualLatestProfile.id,
       requested: actualLatestProfile.versions,
       resolved: actualLatestProfile.versions,
+    },
+    runtime: {
+      requested: actualLatestProfile.nodeVersion,
+      observed: process.versions.node,
     },
     stages: [],
   }

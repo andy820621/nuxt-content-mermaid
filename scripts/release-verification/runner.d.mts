@@ -1,5 +1,6 @@
 export interface VersionProfile {
   id: string
+  nodeVersion: string
   versions: {
     betterSqlite3: string
     nuxt: string
@@ -41,7 +42,8 @@ export interface VerificationWorkspace {
 }
 
 export type VerificationStageName
-  = | 'artifact'
+  = | 'node-runtime'
+    | 'artifact'
     | 'archive'
     | 'install'
     | 'exports'
@@ -75,6 +77,10 @@ export interface PackageArtifactEvidence {
     requested: VersionProfile['versions']
     resolved: null | VersionProfile['versions']
   }
+  runtime: {
+    requested: string | null
+    observed: string
+  }
   stages: VerificationStageEvidence[]
 }
 
@@ -98,6 +104,7 @@ export interface RegistrySmokeVerificationEvidence {
     requested: VersionProfile['versions']
     resolved: VersionProfile['versions'] | null
   }
+  runtime: PackageArtifactEvidence['runtime']
   stages: VerificationStageEvidence[]
 }
 
@@ -125,6 +132,7 @@ export interface CompatibilityMatrixProfileEvidence {
   success: boolean
   requested: VersionProfile['versions']
   resolved: null | VersionProfile['versions']
+  runtime: PackageArtifactEvidence['runtime']
   stages: VerificationStageEvidence[]
 }
 

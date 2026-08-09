@@ -1,6 +1,7 @@
 import { parseExactSemver } from './exact-semver.mjs'
 
 const VERIFICATION_STAGES = [
+  'node-runtime',
   'artifact',
   'archive',
   'install',
@@ -58,6 +59,15 @@ function errorMessage(error) {
   return error instanceof Error ? error.message : String(error)
 }
 
+function createRuntimeEvidence(profile) {
+  return {
+    requested: typeof profile.nodeVersion === 'string'
+      ? profile.nodeVersion
+      : null,
+    observed: process.versions.node,
+  }
+}
+
 function createEvidence(request) {
   return {
     schemaVersion: 1,
@@ -70,7 +80,21 @@ function createEvidence(request) {
       requested: { ...request.profile.versions },
       resolved: null,
     },
+    runtime: createRuntimeEvidence(request.profile),
     stages: [],
+  }
+}
+
+function validateNodeRuntime(profile) {
+  if (!parseExactSemver(profile?.nodeVersion)) {
+    throw new Error(
+      `Version Profile ${profile?.id ?? '<unknown>'} must declare one exact Node runtime`,
+    )
+  }
+  if (profile.nodeVersion !== process.versions.node) {
+    throw new Error(
+      `Node runtime mismatch for Version Profile ${profile.id}: requested ${profile.nodeVersion}, observed ${process.versions.node}`,
+    )
   }
 }
 
@@ -89,6 +113,7 @@ function createRegistrySmokeEvidence(request) {
       requested: { ...request.profile.versions },
       resolved: null,
     },
+    runtime: createRuntimeEvidence(request.profile),
     stages: [],
   }
 }
@@ -163,6 +188,7 @@ function createMatrixProfileEvidence(profile) {
     success: false,
     requested: { ...profile.versions },
     resolved: null,
+    runtime: createRuntimeEvidence(profile),
     stages: [],
   }
 }
@@ -195,13 +221,20 @@ async function runConsumerVerificationPlan({
   plan,
   profile,
   profileEvidence,
+  validateRuntime = true,
   workspace: initialWorkspace,
 }) {
   let workspace = initialWorkspace
   let primaryFailure
   const stageNames = CONSUMER_VERIFICATION_PLANS[plan]
+  const activeStageNames = validateRuntime
+    ? ['node-runtime', ...stageNames]
+    : stageNames
 
   try {
+    if (validateRuntime) {
+      await runStage(evidence, 'node-runtime', () => validateNodeRuntime(profile))
+    }
     const installation = await runStage(evidence, 'install', async () => {
       workspace ??= await operations.createWorkspace()
       return operations.installConsumer({
@@ -244,7 +277,7 @@ async function runConsumerVerificationPlan({
     markRemainingStagesSkipped(
       evidence,
       primaryFailure.stage,
-      stageNames,
+      activeStageNames,
     )
   }
 
@@ -382,6 +415,7 @@ export async function runPackageArtifactVerification(request, operations) {
   let artifact
 
   try {
+    await runStage(evidence, 'node-runtime', () => validateNodeRuntime(request.profile))
     artifact = await runStage(evidence, 'artifact', async () => {
       workspace = await operations.createWorkspace()
       if (request.packageSource.kind === 'retained') {
@@ -424,6 +458,7 @@ export async function runPackageArtifactVerification(request, operations) {
         plan: 'artifact',
         profile: request.profile,
         profileEvidence: evidence.profile,
+        validateRuntime: false,
         workspace,
       })
 

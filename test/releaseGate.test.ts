@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
+import { parse } from 'yaml'
 import {
   parseReleaseArguments,
   runReleaseCli,
@@ -10,6 +11,10 @@ import {
   runReleaseReconciliation,
 } from '../scripts/release-verification/release.mjs'
 import { RegistrySmokeVerificationFailure } from '../scripts/release-verification/runner.mjs'
+import {
+  PINNED_MATRIX_PROFILE_IDS,
+  VERSION_PROFILES,
+} from '../scripts/release-verification/profiles.mjs'
 import * as releaseModule from '../scripts/release-verification/release.mjs'
 
 function createInertEffects() {
@@ -76,6 +81,7 @@ const retainedArtifact = {
 
 const actualLatestProfile = {
   id: 'nuxt-4-actual-latest-release',
+  nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',
     nuxt: '4.99.0',
@@ -113,6 +119,10 @@ function createRegistryVerificationEvidence(
       requested: profile.versions,
       resolved: profile.versions,
     },
+    runtime: {
+      requested: profile.nodeVersion,
+      observed: process.versions.node,
+    },
     stages: [],
   }
 }
@@ -139,6 +149,7 @@ function createPublishedInvestigationEvidence() {
       },
       profile: {
         id: frozenProfile.id,
+        nodeVersion: frozenProfile.nodeVersion,
         requested: compatibilityResolution.requested,
         resolved: frozenProfile.versions,
       },
@@ -205,6 +216,7 @@ const pushedEvidence = {
     packlist: retainedArtifact.packlist,
   },
   compatibilityProfile: {
+    nodeVersion: actualLatestProfile.nodeVersion,
     requested: compatibilityResolution.requested,
     resolved: compatibilityResolution.resolved,
     passed: true,
@@ -299,6 +311,8 @@ describe('release repository integration', () => {
       .toBe('pnpm lint && pnpm test && pnpm test:types')
     expect(manifest.scripts.release)
       .toBe('node scripts/release-verification/release.mjs')
+    expect(manifest.scripts['test:compatibility-profile'])
+      .toBe('node scripts/release-verification/package-artifact.mjs --package-source pack')
     expect(Object.keys(manifest.scripts).filter(key => key.startsWith('release:'))).toEqual([])
     expect(workflow).toContain('run: pnpm verify:source')
 
@@ -309,9 +323,26 @@ describe('release repository integration', () => {
     expect(nextJobStart).toBeGreaterThan(matrixJobStart)
 
     const matrixJob = workflow.slice(matrixJobStart, nextJobStart)
+    const parsedWorkflow = parse(workflow)
+    const parsedMatrixJob = parsedWorkflow.jobs['representative-compatibility-matrix']
+    const expectedProfiles = PINNED_MATRIX_PROFILE_IDS.map(profileId => ({
+      'profile': profileId,
+      'node-version': VERSION_PROFILES[profileId]!.nodeVersion,
+    }))
+
+    expect(parsedMatrixJob.strategy).toMatchObject({
+      'fail-fast': false,
+      'matrix': { include: expectedProfiles },
+    })
+    expect(parsedMatrixJob.steps).toContainEqual({
+      uses: 'actions/setup-node@v6',
+      with: { 'node-version': '${{ matrix.node-version }}' },
+    })
     const matrixInstall = matrixJob.indexOf('run: npx nypm@latest i')
     const matrixPrepare = matrixJob.indexOf('run: npm run dev:prepare')
-    const matrixVerification = matrixJob.indexOf('run: npm run test:compatibility-matrix')
+    const matrixVerification = matrixJob.indexOf(
+      'run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}',
+    )
 
     expect(matrixInstall).toBeGreaterThan(-1)
     expect(matrixPrepare).toBeGreaterThan(-1)
@@ -503,6 +534,7 @@ describe('release gate preflight', () => {
     expect(evidence).toMatchObject({
       compatibilityProfile: {
         id: actualLatestProfile.id,
+        nodeVersion: actualLatestProfile.nodeVersion,
         requested: compatibilityResolution.requested,
         resolved: compatibilityResolution.resolved,
         passed: true,
@@ -540,6 +572,7 @@ describe('release gate preflight', () => {
       status: 'blocked',
       compatibilityProfile: {
         id: actualLatestProfile.id,
+        nodeVersion: actualLatestProfile.nodeVersion,
         requested: compatibilityResolution.requested,
         resolved: compatibilityResolution.resolved,
         passed: false,
@@ -1104,6 +1137,7 @@ describe('production release effects', () => {
       },
       profile: {
         id: 'nuxt-3-actual-latest-drift',
+        nodeVersion: actualLatestProfile.nodeVersion,
         versions: {
           betterSqlite3: '12.11.1',
           mermaid: '11.12.3',
@@ -1467,6 +1501,7 @@ describe('production release effects', () => {
       },
       profile: {
         id: 'nuxt-4-actual-latest-release',
+        nodeVersion: actualLatestProfile.nodeVersion,
         versions: {
           ...actualLatestProfile.versions,
           nuxt: '4.10.0',
@@ -1610,6 +1645,7 @@ describe('production release effects', () => {
       packageVersion: '3.0.0',
       profile: {
         id: 'frozen-registry-evidence',
+        nodeVersion: actualLatestProfile.nodeVersion,
         versions: {
           ...actualLatestProfile.versions,
           nuxt: '4.8.0',

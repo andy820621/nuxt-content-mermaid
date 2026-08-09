@@ -24,6 +24,7 @@ const sourceCommit = 'a'.repeat(40)
 function createResolution(nuxtMajor: 3 | 4) {
   const profile = {
     id: `nuxt-${nuxtMajor}-actual-latest-drift`,
+    nodeVersion: process.versions.node,
     versions: {
       betterSqlite3: '12.11.1',
       mermaid: '11.12.3',
@@ -377,6 +378,10 @@ describe('Scheduled Compatibility Drift Check', () => {
           requested: profile.versions,
           resolved: null,
         },
+        runtime: {
+          requested: profile.nodeVersion,
+          observed: process.versions.node,
+        },
         stages: [],
       },
     )))
@@ -433,6 +438,10 @@ describe('Scheduled Compatibility Drift Check', () => {
           id: resolution.profile.id,
           requested: resolution.profile.versions,
           resolved: null,
+        },
+        runtime: {
+          requested: resolution.profile.nodeVersion,
+          observed: process.versions.node,
         },
         stages: [],
       },
@@ -584,6 +593,10 @@ describe('Scheduled Compatibility Drift Check', () => {
           id: nuxt3.profile.id,
           requested: nuxt3.profile.versions,
           resolved: null,
+        },
+        runtime: {
+          requested: nuxt3.profile.nodeVersion,
+          observed: process.versions.node,
         },
         stages: [],
       },
