@@ -58,11 +58,11 @@ The 3.0 Minimum Compatibility Profile must pass before these floors become final
 
 The Compatibility Contract covers behavior owned by nuxt-content-mermaid at its integration seams:
 
-- supported Mermaid source reaches the Built-in Renderer and produces a usable SVG for the representative Core Runtime Path;
+- when the bundled Mermaid engine successfully renders diagram source, the Built-in Renderer commits the resulting usable SVG according to the transactional rendering contract; when Mermaid fails, package-owned error and fallback semantics apply;
 - Nuxt and Content activation, Markdown transformation, configuration transport, and public types behave as documented;
 - theme, toolbar, lazy rendering, error fallback, transactional rendering, and documented extension or styling hooks preserve their package-owned semantics.
 
-The contract does not cover byte-identical SVG, exact element order, undocumented classes or generated identifiers, node coordinates, dimensions, font measurement, layout, Mermaid internals, or exhaustive correctness of every Mermaid diagram type. Package Users that need a stable visual snapshot must retain their own lockfile rather than treating Mermaid's exact output as this package's public contract.
+The contract does not cover byte-identical SVG, exact element order, undocumented classes or generated identifiers, node coordinates, dimensions, font measurement, layout, Mermaid internals, or exhaustive correctness of every Mermaid diagram type. Package Users that need a stable visual snapshot must retain their own dependency lockfile and control the browser version, fonts, viewport, and relevant execution environment rather than treating Mermaid's exact output as this package's public contract.
 
 ## Compatibility Evidence
 
@@ -148,4 +148,3 @@ A 3.x release is eligible for publication only when:
 - the actual package artifact passes both profiles and any impact-triggered manual checks;
 - known Contract Gaps are fixed or, for a critical security exception, explicitly disclosed with a known-working recommendation;
 - the release bump matches the highest Package User-visible contract change.
-

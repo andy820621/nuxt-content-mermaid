@@ -13,7 +13,7 @@ The externally observable Package-Owned Integration Behavior a Package User can 
 _Avoid_: Implementation detail
 
 **Package-Owned Integration Behavior**:
-The behavior controlled by nuxt-content-mermaid at its Nuxt, Content, configuration, rendering-lifecycle, theme, toolbar, fallback, and extension seams. It includes producing a usable SVG for representative supported input but excludes Mermaid's exact serialization, geometry, undocumented internals, and exhaustive diagram-feature correctness.
+The behavior controlled by nuxt-content-mermaid at its Nuxt, Content, configuration, rendering-lifecycle, theme, toolbar, fallback, and extension seams. It includes committing Mermaid's successful output and handling Mermaid failure, but excludes Mermaid input acceptance, exact serialization, geometry, undocumented internals, and exhaustive diagram-feature correctness.
 _Avoid_: Mermaid output, exact SVG contract, every diagram type
 
 **Declared-Compatible Combination**:
@@ -25,7 +25,7 @@ A confirmed failure of a Declared-Compatible Combination to satisfy the Compatib
 _Avoid_: Unsupported combination, candidate failure, upstream incompatibility
 
 **Active Support Line**:
-The current package major whose host and dependency contract receives dependency updates, ordinary fixes, and new capabilities. Nuxt 4 is the sole active host line for nuxt-content-mermaid 3.x.
+A currently maintained package line whose declared host and dependency contract receives dependency updates, ordinary fixes, and new capabilities.
 _Avoid_: Latest dependency, Frozen Legacy Release
 
 **Frozen Legacy Release**:
@@ -33,7 +33,7 @@ A published package major that remains installable but receives no ordinary fixe
 _Avoid_: Active Support Line, maintained major, deprecated package
 
 **Migration Assistance Window**:
-The three months after the 3.0 release in which maintainers prioritize migration documentation, usage guidance, and 3.x defects that prevent migration from 2.x. It is not a 2.x maintenance promise and may be extended only from demonstrated Nuxt 3 user demand.
+A bounded period after a breaking package release in which maintainers prioritize migration documentation, usage guidance, and defects in the Active Support Line that prevent migration from a Frozen Legacy Release. It is not a maintenance promise for the frozen line.
 _Avoid_: Support window, backport period
 
 **Nuxt Integration Contract**:
@@ -237,7 +237,7 @@ The intentionally small check run after a version is published as the default np
 _Avoid_: Full release suite, local package test
 
 **Supported Nuxt Range**:
-The Nuxt 3 and Nuxt 4 versions publicly accepted by the package's peer dependency contract. The entire declared range is the Compatibility Contract; minimum and latest matrix entries are representative evidence rather than the only supported versions, and a new major enters the range only after explicit compatibility verification.
+The Nuxt versions publicly accepted by one released package line's peer dependency contract. The entire declared range is that line's Compatibility Contract; minimum and latest profile entries are representative evidence rather than the only supported versions, and a new major enters only after explicit compatibility verification.
 _Avoid_: Tested Nuxt version, primary Nuxt version
 
 **Supported Dependency Major**:
