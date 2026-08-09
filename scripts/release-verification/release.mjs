@@ -990,6 +990,8 @@ export async function runReleaseReconciliation({ request, repositoryRoot, effect
   if (evidence.status !== 'pushed' && !evidence.timestamps?.pushedAt) {
     throw new Error('Publication reconciliation is only available after push may have succeeded')
   }
+  if (evidence.registryHealth !== undefined) return evidence
+
   const artifact = {
     ...evidence.artifact,
     integritySha512: evidence.identity.artifactIntegritySha512,

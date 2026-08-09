@@ -156,6 +156,25 @@ function createPublishedInvestigationEvidence() {
   }
 }
 
+function observeRegistryHealthLifecycle(effects: ReturnType<typeof createInertEffects>) {
+  const lifecycle: string[] = []
+  effects.writeEvidence.mockImplementation(async (evidence: unknown) => {
+    effects.evidenceSnapshots.push(structuredClone(evidence))
+    const snapshot = evidence as {
+      registryHealth?: { status?: string }
+      status?: string
+    }
+    lifecycle.push(
+      `write:${snapshot.status}:${snapshot.registryHealth?.status ?? 'none'}`,
+    )
+  })
+  effects.verifyRegistryPackage.mockImplementation(async (request) => {
+    lifecycle.push('registry-smoke')
+    return createRegistryVerificationEvidence(true, request.profile)
+  })
+  return lifecycle
+}
+
 const manualResults = {
   fullscreen: true,
   zoomPanDrag: true,
@@ -674,6 +693,11 @@ describe('release gate preflight', () => {
       archivePath: retainedArtifact.archivePath,
       distTag: 'latest',
     })
+    expect(effects.verifyRegistryPackage).toHaveBeenCalledWith({
+      packageName: retainedArtifact.packageName,
+      packageVersion: releaseRequest.targetVersion,
+      profile: actualLatestProfile,
+    })
     expect(evidence).toMatchObject({
       status: 'published',
       registryHealth: { status: 'healthy' },
@@ -798,6 +822,7 @@ describe('release publication reconciliation', () => {
 
   it('retries publication with the retained tarball when the version is absent', async () => {
     const effects = createInertEffects()
+    const lifecycle = observeRegistryHealthLifecycle(effects)
     effects.readEvidence.mockResolvedValueOnce(structuredClone(pushedEvidence))
     effects.readRegistryRelease.mockResolvedValueOnce({ state: 'absent' })
 
@@ -832,10 +857,32 @@ describe('release publication reconciliation', () => {
       },
     })
     expect(effects.verifyRegistryPackage).toHaveBeenCalledOnce()
+    expect(effects.verifyRegistryPackage).toHaveBeenCalledWith({
+      packageName: retainedArtifact.packageName,
+      packageVersion: reconciliationRequest.targetVersion,
+      profile: actualLatestProfile,
+    })
+    expect(lifecycle).toEqual([
+      'write:published:none',
+      'write:published:pending',
+      'registry-smoke',
+      'write:published:healthy',
+    ])
+    expect(effects.evidenceSnapshots).toHaveLength(3)
+    expect(effects.evidenceSnapshots[0]).not.toHaveProperty('registryHealth')
+    expect(effects.evidenceSnapshots[1]).toMatchObject({
+      status: 'published',
+      registryHealth: { status: 'pending' },
+    })
+    expect(effects.evidenceSnapshots[2]).toMatchObject({
+      status: 'published',
+      registryHealth: { status: 'healthy' },
+    })
   })
 
   it('accepts an already-published version only when registry integrity matches', async () => {
     const effects = createInertEffects()
+    const lifecycle = observeRegistryHealthLifecycle(effects)
     effects.readEvidence.mockResolvedValueOnce(structuredClone(pushedEvidence))
     effects.readRegistryRelease.mockResolvedValueOnce({
       state: 'published',
@@ -857,28 +904,59 @@ describe('release publication reconciliation', () => {
       },
     })
     expect(effects.verifyRegistryPackage).toHaveBeenCalledOnce()
+    expect(effects.verifyRegistryPackage).toHaveBeenCalledWith({
+      packageName: retainedArtifact.packageName,
+      packageVersion: reconciliationRequest.targetVersion,
+      profile: actualLatestProfile,
+    })
+    expect(lifecycle).toEqual([
+      'write:published:none',
+      'write:published:pending',
+      'registry-smoke',
+      'write:published:healthy',
+    ])
+    expect(effects.evidenceSnapshots).toHaveLength(3)
+    expect(effects.evidenceSnapshots[0]).not.toHaveProperty('registryHealth')
+    expect(effects.evidenceSnapshots[1]).toMatchObject({
+      status: 'published',
+      registryHealth: { status: 'pending' },
+    })
+    expect(effects.evidenceSnapshots[2]).toMatchObject({
+      status: 'published',
+      registryHealth: { status: 'healthy' },
+    })
     expect(effects.writeEvidence).toHaveBeenLastCalledWith(evidence)
   })
 
-  it('does not duplicate the initial registry attempt during reconciliation', async () => {
-    const effects = createInertEffects()
-    const evidenceWithRegistryHealth = createPublishedInvestigationEvidence()
-    effects.readEvidence.mockResolvedValueOnce(structuredClone(evidenceWithRegistryHealth))
-    effects.readRegistryRelease.mockResolvedValueOnce({
-      state: 'published',
-      integrity: retainedArtifact.integritySha512,
-    })
+  it.each(['absent', 'throws'])(
+    'treats existing registry health as a true reconciliation no-op when registry query %s',
+    async (registryOutcome) => {
+      const effects = createInertEffects()
+      const evidenceWithRegistryHealth = createPublishedInvestigationEvidence()
+      const originalEvidence = structuredClone(evidenceWithRegistryHealth)
+      effects.readEvidence.mockResolvedValueOnce(evidenceWithRegistryHealth)
+      if (registryOutcome === 'absent') {
+        effects.readRegistryRelease.mockResolvedValueOnce({ state: 'absent' })
+      }
+      else {
+        effects.readRegistryRelease.mockRejectedValueOnce(new Error('registry unavailable'))
+      }
 
-    const evidence = await runReleaseReconciliation({
-      request: reconciliationRequest,
-      repositoryRoot: '/repo',
-      effects: effects as never,
-    })
+      const evidence = await runReleaseReconciliation({
+        request: reconciliationRequest,
+        repositoryRoot: '/repo',
+        effects: effects as never,
+      })
 
-    expect(evidence.registryHealth).toEqual(evidenceWithRegistryHealth.registryHealth)
-    expect(effects.verifyRegistryPackage).not.toHaveBeenCalled()
-    expect(effects.publish).not.toHaveBeenCalled()
-  })
+      expect(evidence).toBe(evidenceWithRegistryHealth)
+      expect(evidence).toEqual(originalEvidence)
+      expect(effects.assertReleaseIdentity).not.toHaveBeenCalled()
+      expect(effects.readRegistryRelease).not.toHaveBeenCalled()
+      expect(effects.verifyRegistryPackage).not.toHaveBeenCalled()
+      expect(effects.publish).not.toHaveBeenCalled()
+      expect(effects.writeEvidence).not.toHaveBeenCalled()
+    },
+  )
 
   it('keeps pushed evidence when reconciliation publication remains ambiguous', async () => {
     const effects = createInertEffects()
