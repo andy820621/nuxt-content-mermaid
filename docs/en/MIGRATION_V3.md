@@ -6,6 +6,8 @@ Version 3 makes the configuration boundary explicit. Update your Nuxt configurat
 
 `contentMermaid` is the only supported Nuxt configuration key. `mermaidContent` does not fall back to the new key: Nuxt setup stops with the public configuration-error fingerprint so an accidental partial migration cannot appear to work.
 
+The rename predates v3: `contentMermaid` was already the canonical key in 2.x, while `mermaidContent` remained as a compatibility alias. Version 3 removes that fallback path, so every remaining legacy key must be migrated explicitly.
+
 ```ts
 // v2 — removed
 export default defineNuxtConfig({
@@ -134,9 +136,14 @@ Configuration failures expose a Minimal Public Diagnostic Fingerprint:
 
 Do not depend on private issue schemas, queue state, staging IDs, or exact debug-log wording. A render is transactional: the latest successfully committed diagram remains visible when a later render fails, becomes stale, or is blocked by a source conflict.
 
+## 8. Remove package-root transform imports
+
+Version 3 removes the undocumented package-root runtime and TypeScript export named `transformMermaidCodeBlocks`. There is no replacement package-root API. Package users should install the Nuxt module through its default export and let the module own Markdown transformation.
+
 ## Migration checklist
 
 - Replace every live `mermaidContent` key with `contentMermaid`.
+- Remove package-root imports of `transformMermaidCodeBlocks`; use the Nuxt module default export.
 - Keep `enabled` only in module configuration.
 - Restrict public runtime transport to pure data and move client-only capabilities to Direct Mermaid Config.
 - Use Page Mermaid Config for Markdown and Direct Mermaid Config for application code, never both on one component.

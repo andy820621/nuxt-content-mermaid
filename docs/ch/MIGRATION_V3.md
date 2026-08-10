@@ -6,6 +6,8 @@ v3 明確劃分設定邊界。請先更新 Nuxt 設定，然後為每張圖選�
 
 `contentMermaid` 是唯一支援的 Nuxt 設定鍵。`mermaidContent` 不會回退到新鍵；Nuxt setup 會以公開的設定錯誤 fingerprint 停止，避免不完整的遷移看似正常運作。
 
+這次重新命名並非始於 v3：`contentMermaid` 在 2.x 已是正式設定鍵，`mermaidContent` 僅保留為相容 alias。v3 移除這條 fallback 路徑，因此所有殘留的舊鍵都必須明確遷移。
+
 ```ts
 // v2 — 已移除
 export default defineNuxtConfig({
@@ -134,9 +136,14 @@ flowchart LR
 
 請勿依賴私有 issue schema、queue 狀態、staging ID 或精確的 debug log 文字。渲染是 transactional：當後續渲染失敗、過時，或被來源衝突阻擋時，最新成功 commit 的圖仍會保持可見。
 
+## 8. 移除 package-root transform import
+
+v3 移除未正式文件化的 package-root runtime 與 TypeScript export：`transformMermaidCodeBlocks`。它沒有替代的 package-root API；套件使用者應透過 default export 安裝 Nuxt module，並由模組負責 Markdown transform。
+
 ## 遷移檢查表
 
 - 將所有 live `mermaidContent` 設定鍵改為 `contentMermaid`。
+- 移除 package-root 的 `transformMermaidCodeBlocks` import，改用 Nuxt module default export。
 - 只在 module configuration 使用 `enabled`。
 - public runtime transport 僅保留純資料；將 client-only capability 移至 Direct Mermaid Config。
 - Markdown 用 Page Mermaid Config，應用程式程式碼用 Direct Mermaid Config；單一元件不可同時使用兩者。
