@@ -21,6 +21,11 @@ export interface ReleaseVerificationOperationOptions {
 
 export function runCommand(invocation: CommandInvocation): Promise<CommandResult>
 
+export function formatArtifactChecksum(artifact: {
+  filename: string
+  integritySha512: string
+}): string
+
 export function createReleaseVerificationOperations(
   options: ReleaseVerificationOperationOptions,
 ): ReleaseVerificationOperations

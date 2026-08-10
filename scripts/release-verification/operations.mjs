@@ -12,12 +12,12 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
-import { basename, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
 import { runBrowserSmoke } from './browser-smoke.mjs'
-import { parseExactSemver } from './exact-semver.mjs'
+import { parseExactSemver, parseStableSemver } from './exact-semver.mjs'
 import {
   createReleaseVerificationFailure,
 } from './failure-classification.mjs'
@@ -281,6 +281,119 @@ async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner
   }
 }
 
+function archiveEntries(output) {
+  const entries = String(output ?? '')
+    .split(/\r?\n/)
+    .filter(Boolean)
+  if (entries.length === 0) {
+    throw new Error('Package archive is empty')
+  }
+  for (const entry of entries) {
+    const normalizedEntry = entry.replace(/\/$/, '')
+    const pathSegments = normalizedEntry.split('/')
+    if (isAbsolute(normalizedEntry)
+      || pathSegments.includes('..')
+      || (!normalizedEntry.startsWith('package/') && normalizedEntry !== 'package')) {
+      throw new Error(`Package archive contains an unsafe entry: ${entry}`)
+    }
+  }
+  if (new Set(entries).size !== entries.length) {
+    throw new Error('Package archive contains duplicate entries')
+  }
+  return entries
+}
+
+function checksumIdentity(contents) {
+  const lines = contents.trimEnd().split(/\r?\n/)
+  if (lines.length !== 1) {
+    throw new Error('Artifact checksum must contain exactly one entry')
+  }
+  const separator = lines[0].indexOf('  ')
+  if (separator < 1) {
+    throw new Error('Artifact checksum must use "sha512-<base64>  <filename>"')
+  }
+  const integritySha512 = lines[0].slice(0, separator)
+  const filename = lines[0].slice(separator + 2)
+  if (!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(integritySha512)
+    || filename.length === 0
+    || basename(filename) !== filename) {
+    throw new Error('Artifact checksum must use "sha512-<base64>  <filename>"')
+  }
+  return { filename, integritySha512 }
+}
+
+export function formatArtifactChecksum(artifact) {
+  if (!artifact
+    || basename(artifact.filename ?? '') !== artifact.filename
+    || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(artifact.integritySha512 ?? '')) {
+    throw new Error('Cannot format checksum for an invalid artifact identity')
+  }
+  return `${artifact.integritySha512}  ${artifact.filename}\n`
+}
+
+async function loadArtifact({ archivePath, checksumPath, commandRunner }) {
+  if (!isAbsolute(archivePath) || !isAbsolute(checksumPath)) {
+    throw new Error('Artifact archive and checksum paths must be absolute')
+  }
+  if (archivePath === checksumPath || !archivePath.endsWith('.tgz')) {
+    throw new Error('Artifact loader requires distinct .tgz and checksum files')
+  }
+  const artifactDirectory = dirname(archivePath)
+  const tarballs = (await readdir(artifactDirectory))
+    .filter(filename => filename.endsWith('.tgz'))
+  if (tarballs.length !== 1) {
+    throw new Error(`Workflow artifact must contain exactly one tarball; found ${tarballs.length}`)
+  }
+  if (tarballs[0] !== basename(archivePath)) {
+    throw new Error('Selected artifact tarball does not match the workflow artifact directory')
+  }
+
+  const archiveBytes = await readFile(archivePath)
+  const expected = checksumIdentity(await readFile(checksumPath, 'utf8'))
+  if (expected.filename !== basename(archivePath)) {
+    throw new Error(`Artifact checksum filename mismatch: expected ${basename(archivePath)}, received ${expected.filename}`)
+  }
+  const integritySha512 = `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`
+  if (integritySha512 !== expected.integritySha512) {
+    throw new Error('Artifact SHA-512 mismatch')
+  }
+
+  const listing = await commandRunner({
+    command: 'tar',
+    args: ['-tzf', archivePath],
+    cwd: artifactDirectory,
+  })
+  const entries = archiveEntries(listing?.stdout)
+  if (entries.filter(entry => entry === 'package/package.json').length !== 1) {
+    throw new Error('Package archive must contain exactly one package/package.json')
+  }
+  const manifestResult = await commandRunner({
+    command: 'tar',
+    args: ['-xOzf', archivePath, 'package/package.json'],
+    cwd: artifactDirectory,
+  })
+  const manifest = JSON.parse(manifestResult?.stdout ?? '')
+  if (manifest.name !== PACKAGE_NAME || !parseStableSemver(manifest.version)) {
+    throw new Error(`Archive package identity mismatch: received ${manifest.name}@${manifest.version}`)
+  }
+  const packageContract = assertArchiveDependencyContract(manifest)
+  const packlist = entries
+    .filter(entry => entry.startsWith('package/') && !entry.endsWith('/'))
+    .map(entry => entry.slice('package/'.length))
+    .toSorted()
+
+  return {
+    archivePath,
+    filename: basename(archivePath),
+    sha256: createHash('sha256').update(archiveBytes).digest('hex'),
+    integritySha512,
+    packlist,
+    packageName: manifest.name,
+    packageVersion: manifest.version,
+    packageContract,
+  }
+}
+
 function collectStringLeaves(value) {
   if (typeof value === 'string') return [value]
   if (Array.isArray(value)) return value.flatMap(collectStringLeaves)
@@ -322,6 +435,13 @@ function assertArchiveDependencyContract(manifest) {
   )
   assertArchiveContractValue('dependencies.@nuxt/kit', manifest.dependencies?.['@nuxt/kit'], '^4.5.2')
   assertArchiveContractValue('dependencies.mermaid', manifest.dependencies?.mermaid, '~11.16.1')
+  return {
+    node: manifest.engines.node,
+    nuxt: manifest.peerDependencies.nuxt,
+    nuxtContent: manifest.peerDependencies['@nuxt/content'],
+    nuxtKit: manifest.dependencies['@nuxt/kit'],
+    mermaid: manifest.dependencies.mermaid,
+  }
 }
 
 async function inspectArchive({ archiveDirectory, artifact, commandRunner }) {
@@ -334,21 +454,7 @@ async function inspectArchive({ archiveDirectory, artifact, commandRunner }) {
     args: ['-tzf', artifact.archivePath],
     cwd: archiveDirectory,
   })
-  const entries = String(listingResult?.stdout ?? '')
-    .split(/\r?\n/)
-    .filter(Boolean)
-  if (entries.length === 0) {
-    throw new Error('Package archive is empty')
-  }
-  for (const entry of entries) {
-    const normalizedEntry = entry.replace(/\/$/, '')
-    const pathSegments = normalizedEntry.split('/')
-    if (isAbsolute(normalizedEntry)
-      || pathSegments.includes('..')
-      || (!normalizedEntry.startsWith('package/') && normalizedEntry !== 'package')) {
-      throw new Error(`Package archive contains an unsafe entry: ${entry}`)
-    }
-  }
+  archiveEntries(listingResult?.stdout)
 
   await commandRunner({
     command: 'tar',
@@ -546,6 +652,10 @@ export function createReleaseVerificationOperations({
       }
     },
     createArtifact: input => createArtifact({
+      ...input,
+      commandRunner,
+    }),
+    loadArtifact: input => loadArtifact({
       ...input,
       commandRunner,
     }),

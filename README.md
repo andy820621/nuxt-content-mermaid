@@ -625,7 +625,7 @@ If this module is useful to you, you can [support my open-source work on Ko-fi](
 
 Contributions are welcome! Feel free to open an [issue](https://github.com/andy820621/nuxt-content-mermaid/issues) or submit a pull request.
 
-Maintainers should follow the [blocking release procedure](./docs/en/RELEASING.md).
+Maintainers should follow the [stable release runbook](./docs/en/RELEASING.md).
 
 - Commit messages should follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat: add spinner option`, `fix: handle dark mode toggle`).
 - PRs should include a summary of changes and test results.

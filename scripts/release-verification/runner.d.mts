@@ -25,6 +25,13 @@ export interface PackageArtifact {
   packlist: string[]
   packageName: string
   packageVersion: string
+  packageContract?: {
+    node: string
+    nuxt: string
+    nuxtContent: string
+    nuxtKit: string
+    mermaid: string
+  }
 }
 
 export type ConsumerPackageSource
@@ -124,10 +131,7 @@ export interface RegistrySmokeVerificationEvidence {
 
 export interface PackageArtifactVerificationRequest {
   packageSource: {
-    kind: 'pack'
-    repositoryRoot: string
-  } | {
-    kind: 'retained'
+    kind: 'artifact'
     artifact: PackageArtifact
   }
   profile: VersionProfile
@@ -174,6 +178,10 @@ export interface ReleaseVerificationOperations {
   createArtifact: (input: {
     repositoryRoot: string
     artifactDirectory: string
+  }) => Promise<PackageArtifact>
+  loadArtifact: (input: {
+    archivePath: string
+    checksumPath: string
   }) => Promise<PackageArtifact>
   inspectArchive: (input: {
     archiveDirectory: string

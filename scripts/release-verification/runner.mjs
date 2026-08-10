@@ -145,12 +145,12 @@ function createRegistrySmokeEvidence(request) {
   }
 }
 
-function validateRequest(request, supportedKinds = ['pack']) {
+function validateRequest(request, supportedKinds = ['artifact']) {
   if (!supportedKinds.includes(request.packageSource.kind)) {
     throw new Error(`Unsupported package source: ${request.packageSource.kind}`)
   }
-  if (request.packageSource.kind === 'retained' && !request.packageSource.artifact) {
-    throw new Error('Retained package source requires an artifact')
+  if (request.packageSource.kind === 'artifact' && !request.packageSource.artifact) {
+    throw new Error('Artifact package source requires an artifact')
   }
 }
 
@@ -403,7 +403,7 @@ export async function runPackageArtifactMatrixVerification(request, verifyProfil
 }
 
 export async function runPackageArtifactVerification(request, operations) {
-  validateRequest(request, ['pack', 'retained'])
+  validateRequest(request)
 
   const evidence = createEvidence(request)
   let workspace
@@ -414,13 +414,7 @@ export async function runPackageArtifactVerification(request, operations) {
     await runStage(evidence, 'node-runtime', () => validateNodeRuntime(request.profile))
     artifact = await runStage(evidence, 'artifact', async () => {
       workspace = await operations.createWorkspace()
-      if (request.packageSource.kind === 'retained') {
-        return request.packageSource.artifact
-      }
-      return operations.createArtifact({
-        repositoryRoot: request.packageSource.repositoryRoot,
-        artifactDirectory: workspace.artifactDirectory,
-      })
+      return request.packageSource.artifact
     })
 
     evidence.package = {
