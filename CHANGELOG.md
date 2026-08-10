@@ -1,15 +1,5 @@
 # Changelog
 
-## v3.0.0 (unreleased)
-
-### 💅 Refactors
-
-- Remove the undocumented package-root `transformMermaidCodeBlocks` runtime and TypeScript exports.
-
-#### ⚠️ Breaking Changes
-
-- 3.0.0 removes the undocumented package-root `transformMermaidCodeBlocks` export. There is no replacement API; Package Users should continue to install the Nuxt module through its default export. This is Candidate 02's only intentionally accepted breaking change.
-
 ## v2.2.3
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.2...v2.2.3)
