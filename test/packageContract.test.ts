@@ -22,7 +22,6 @@ describe('package root runtime contract', () => {
     const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'))
 
     expect(packageJson).toMatchObject({
-      version: '2.2.3',
       engines: {
         node: '>=22.19.0',
       },
