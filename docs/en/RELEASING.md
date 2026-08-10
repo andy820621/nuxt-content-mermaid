@@ -13,6 +13,12 @@ the maintainer owns the ordinary Git handoff.
   Compatibility Profile under its exact Node runtime.
 - Choose an exact SemVer greater than `package.json`. It must not already exist
   in npm.
+- Determine whether the playground production build is required. Run
+  `pnpm dev:build` before every major or minor release, and for any release whose
+  changes affect Nuxt Content integration, runtime registration, build
+  configuration, or relevant dependencies. Record the command and result in the
+  release checklist or the PR's Validation section. This is a risk-based
+  release-readiness check, not part of CI or `verify:source`.
 - Ensure `.release-evidence/<version>/` does not exist. Release evidence is
   ephemeral and is never overwritten or migrated.
 - Do not change the package version, create the final tag, or publish manually.

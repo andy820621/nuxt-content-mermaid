@@ -25,10 +25,11 @@ export default defineNuxtConfig({
 
 ### useMermaidTheme 基本用法
 
+在 Nuxt 註冊本模組後，`useMermaidTheme` 會由 Nuxt 自動匯入；請勿從套件
+root import。
+
 ```vue
 <script setup>
-import { useMermaidTheme } from '@barzhsieh/nuxt-content-mermaid'
-
 const { setMermaidTheme, currentTheme } = useMermaidTheme()
 
 function toggleTheme() {
@@ -89,25 +90,6 @@ setMermaidTheme(null)        // 重置為自動模式（如果有安裝 @nuxtjs/
   - `null`: 自動模式（無手動覆蓋）
 
 #### 方法
-
-##### `setMermaidTheme(mode)`：用於設定 Mermaid 主題。
-
-```typescript
-function setMermaidTheme(mode: MermaidThemeMode): void
-```
-
-**參數**:
-- `mode`: `MermaidThemeMode` - 可以是：
-  - 簡寫模式: `'light'` (使用 `contentMermaid.theme.light` 配置) | `'dark'` (使用 `contentMermaid.theme.dark` 配置)
-  - 官方主題: `'default'` | `'forest'` | `'dark'` | `'neutral'` | `'base'` 等
-  - `null`: 重置為自動模式
-
-**範例**:
-```typescript
-setMermaidTheme('dark')        // 切換到深色主題
-setMermaidTheme('forest')      // 使用 forest 主題
-setMermaidTheme(null)          // 重置為自動模式
-```
 
 ##### `setMermaidTheme(mode)`
 設定 Mermaid 主題。
@@ -176,7 +158,7 @@ function resetMermaidTheme(): void
    - 深色模式 → Strict Semantic Resolution: `darkTheme ?? 'dark'`
    - 淺色模式 → Strict Semantic Resolution: `lightTheme ?? 'default'`
 
-4. **基礎主題** - `nuxt.config.ts` 中的 `loader.init.theme`
+4. **解析後的基礎主題** - `nuxt.config.ts` 中的 `loader.init.theme`
    ```typescript
    contentMermaid: {
      loader: {
@@ -185,15 +167,8 @@ function resetMermaidTheme(): void
    }
    ```
 
-5. **預設主題** - 最後回退到 `theme.light` 或 `'default'`
-   ```typescript
-   contentMermaid: {
-     theme: {
-       light: 'default',
-       // dark: 'dark' // 即使沒設定，fallback 也不會用到 dark
-     }
-   }
-   ```
+   若省略，套件 runtime snapshot 會提供 `'default'`。`theme.light` 只會在
+   light color mode 或手動 `'light'` 策略被選中時使用，不是獨立的基礎主題層。
 
 ## 與 @nuxtjs/color-mode 共存
 

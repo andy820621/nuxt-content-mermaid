@@ -43,7 +43,7 @@ It automatically converts `mermaid` code blocks in Markdown into responsive char
 - **Automatic conversion**: Parses Markdown code blocks and replaces them with a `<Mermaid>` rendering component.
 - **Performance friendly**: Supports lazy loading — Mermaid core and related resources are only loaded when the component mounts.
 - **Theme integration**: Integrates with `@nuxtjs/color-mode` to automatically switch between light and dark Mermaid themes.
-- **Highly customizable**: Allows custom wrapper components, loading spinners, error views, and custom CDN or local import sources.
+- **Highly customizable**: Supports custom renderers, loading spinners, error views, themes, and toolbar controls.
 - **Deployment configuration**: Pure-data settings can be transported through public runtime config and are resolved once for each Nuxt application.
 
 ## Requirements
@@ -79,22 +79,22 @@ Mermaid is bundled as this module's Module-Owned Dependency, so you do not need
 to install it separately for this module.
 
 > [!NOTE]
-> **`better-sqlite3`** — `@nuxt/content` v3+ requires `better-sqlite3` at runtime. If it is not already in your project, Nuxt will prompt you to install it on first launch. You can also install it ahead of time:
+> **Nuxt Content database connector** — On Node.js, Nuxt Content asks the
+> application to choose a database connector. `better-sqlite3`, `sqlite3`, and
+> native SQLite in supported Node.js versions are available choices; this
+> module does not require or own a specific connector. Follow the
+> [Nuxt Content installation guide](https://content.nuxt.com/docs/getting-started/installation)
+> for the options supported by your installed version.
 >
-> ```bash
-> # pnpm
-> pnpm add better-sqlite3
-> # npm
-> npm install better-sqlite3
-> ```
->
-> **pnpm v10+** — pnpm v10 blocks native build scripts by default. After installing, run `pnpm approve-builds` to allow packages like `better-sqlite3`, `esbuild`, and `@parcel/watcher` to compile. Alternatively, add the following to your `package.json`:
+> **pnpm v10+** — If you choose `better-sqlite3` or `sqlite3`, pnpm v10 blocks
+> their native build scripts by default. Run `pnpm approve-builds`, or allow
+> only the connector you selected in `package.json`:
 >
 > ```jsonc
 > // package.json
 > {
 >   "pnpm": {
->     "onlyBuiltDependencies": ["@parcel/watcher", "better-sqlite3", "esbuild"]
+>     "onlyBuiltDependencies": ["better-sqlite3"]
 >   }
 > }
 > ```
@@ -156,11 +156,6 @@ export default defineNuxtConfig({
       light: "default",
       dark: "dark",
     },
-    components: {
-      renderer: undefined,
-      spinner: undefined,
-      error: undefined,
-    },
     toolbar: {
       title: "mermaid",
       fontSize: "14px",
@@ -200,27 +195,42 @@ export default defineNuxtConfig({
 
 **loader**
 
-| Option            | Type                                  | Default                | Description                                                                      |
-| :---------------- | :------------------------------------ | :--------------------- | :------------------------------------------------------------------------------- |
-| `loader.init`     | `RuntimeMermaidConfig` (strict pure data) | `{ startOnLoad: false }` | Pure-data Mermaid options transported to `mermaid.initialize`.                  |
-| `loader.lazy`     | `boolean \| { threshold?: number }` | `true`                 | Lazy load Mermaid when the component enters the viewport; set `false` to preload. |
+| Option            | Type                                  | Default          | Description                                                                      |
+| :---------------- | :------------------------------------ | :--------------- | :------------------------------------------------------------------------------- |
+| `loader.init`     | `RuntimeMermaidConfig` (strict pure data) | package defaults | Pure-data Mermaid options transported to `mermaid.initialize`.                  |
+| `loader.lazy`     | `boolean \| { threshold?: number }` | `true`           | Lazy load Mermaid when the component enters the viewport; set `false` to preload. |
+
+The `loader.init` baseline is:
+
+```ts
+{
+  startOnLoad: false,
+  theme: 'default',
+  fontFamily: 'Arial, sans-serif, 微軟正黑體',
+  securityLevel: 'strict',
+}
+```
+
+When omitted, debug-derived values resolve to `logLevel: 5` and
+`suppressErrorRendering: true` with `debug: false`, or `logLevel: 1` and
+`suppressErrorRendering: false` with `debug: true`. Explicit values always win.
 
 **theme**
 
 Color mode integration is automatic when `@nuxtjs/color-mode` is installed; manual themes set via `useMermaidTheme()` take precedence.
 
-| Option            | Type   | Default     | Description                                                                                 |
-| :---------------- | :----- | :---------- | :------------------------------------------------------------------------------------------ |
-| `theme.light`     | string | `'default'` | Mermaid theme to use when color mode is light (and as fallback when color-mode is missing). |
-| `theme.dark`      | string | `'dark'`    | Mermaid theme to use when color mode is dark (and as fallback when color-mode is missing).  |
+| Option            | Type   | Default     | Description                                                                  |
+| :---------------- | :----- | :---------- | :--------------------------------------------------------------------------- |
+| `theme.light`     | string | `'default'` | Used for light color mode and the manual `setMermaidTheme('light')` strategy. |
+| `theme.dark`      | string | `'dark'`    | Used for dark color mode and the manual `setMermaidTheme('dark')` strategy.   |
 
 **components**
 
-| Option                    | Type     | Default     | Description                                                              |
-| :------------------------ | :------- | :---------- | :----------------------------------------------------------------------- |
-| `components.renderer`     | `string` | `undefined` | Optional: custom Mermaid renderer component name.                        |
-| `components.spinner`      | `string` | `undefined` | Optional: global loading spinner component name.                         |
-| `components.error`        | `string` | `undefined` | Optional: global error component name when Mermaid rendering fails.      |
+| Option                    | Type     | Default | Description                                                              |
+| :------------------------ | :------- | :------ | :----------------------------------------------------------------------- |
+| `components.renderer`     | `string` | omitted | Optional: custom Mermaid renderer component name.                        |
+| `components.spinner`      | `string` | omitted | Optional: global loading spinner component name.                         |
+| `components.error`        | `string` | omitted | Optional: global error component name when Mermaid rendering fails.      |
 
 **toolbar**
 
@@ -335,8 +345,7 @@ The module determines the active Mermaid theme with the following priority:
 3. `@nuxtjs/color-mode` (auto-detected when installed):
   - `dark` → `theme.dark`
   - `light` → `theme.light`
-4. `loader.init.theme` (if provided)
-5. Fallback: `theme.light`, then Mermaid default `'default'`
+4. Resolved `loader.init.theme` (package default: `'default'`)
 
 For advanced manual control (e.g., forcing specific themes, custom toggle logic), please refer to the [Manual Theme Control Guide](./docs/en/MANUAL_THEME_CONTROL.md).
 

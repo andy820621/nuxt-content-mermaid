@@ -43,7 +43,7 @@
 - **自動轉換**：解析 Markdown 代碼區塊並替換為 `<Mermaid>` 渲染元件。
 - **效能優化**：支援 Lazy Loading，僅在元件掛載時載入 Mermaid 核心與資源。
 - **主題整合**：無縫整合 `@nuxtjs/color-mode`，自動切換 Light/Dark 對應主題。
-- **高度客製**：支援自訂渲染元件（Wrapper）、Loading Spinner、錯誤畫面以及 CDN 來源。
+- **高度客製**：支援自訂渲染元件、Loading Spinner、錯誤畫面、主題與工具列控制。
 - **部署期設定**：可透過 public runtime config 傳遞純資料設定，並在每個 Nuxt 應用程式初始化時解析一次。
 
 ## 使用前提
@@ -74,22 +74,21 @@ yarn add @barzhsieh/nuxt-content-mermaid @nuxt/content
 Mermaid 是本模組綁定的 Module-Owned Dependency，因此不必為了本模組另行安裝。
 
 > [!NOTE]
-> **`better-sqlite3`** — `@nuxt/content` v3+ 需要 `better-sqlite3` 才能運作。若你的專案尚未安裝，Nuxt 會在首次啟動時提示安裝。你也可以預先安裝：
+> **Nuxt Content 資料庫 connector** — 在 Node.js 環境中，Nuxt Content 會由
+> 應用程式選擇資料庫 connector；可用選項包含 `better-sqlite3`、`sqlite3`，
+> 以及受支援 Node.js 版本提供的 native SQLite。本模組不要求或擁有特定
+> connector；請依已安裝版本參閱
+> [Nuxt Content 安裝指南](https://content.nuxt.com/docs/getting-started/installation)。
 >
-> ```bash
-> # pnpm
-> pnpm add better-sqlite3
-> # npm
-> npm install better-sqlite3
-> ```
->
-> **pnpm v10+** — pnpm v10 預設會封鎖原生套件的 build scripts。安裝後請執行 `pnpm approve-builds`，允許 `better-sqlite3`、`esbuild`、`@parcel/watcher` 等套件編譯。或者在 `package.json` 中加入以下設定：
+> **pnpm v10+** — 若選擇 `better-sqlite3` 或 `sqlite3`，pnpm v10 預設會
+> 封鎖其原生 build script。請執行 `pnpm approve-builds`，或只在
+> `package.json` 允許你選用的 connector：
 >
 > ```jsonc
 > // package.json
 > {
 >   "pnpm": {
->     "onlyBuiltDependencies": ["@parcel/watcher", "better-sqlite3", "esbuild"]
+>     "onlyBuiltDependencies": ["better-sqlite3"]
 >   }
 > }
 > ```
@@ -145,11 +144,6 @@ export default defineNuxtConfig({
       light: "default",
       dark: "dark",
     },
-    components: {
-      renderer: undefined,
-      spinner: undefined,
-      error: undefined,
-    },
     toolbar: {
       title: "mermaid",
       fontSize: "14px",
@@ -189,27 +183,42 @@ export default defineNuxtConfig({
 
 **loader**
 
-| 參數             | 類型                                   | 預設值                   | 說明                                                                  |
-| :--------------- | :------------------------------------- | :----------------------- | :---------------------------------------------------------------------- |
-| `loader.init`    | `RuntimeMermaidConfig`（嚴格純資料）   | `{ startOnLoad: false }` | 傳遞至 `mermaid.initialize` 的純資料 Mermaid 設定。                     |
-| `loader.lazy`    | `boolean \| { threshold?: number }` | `true`                  | 元件進入 viewport 時才載入 Mermaid；設為 `false` 會在前一刻就載入。 |
+| 參數             | 類型                                   | 預設值     | 說明                                                                  |
+| :--------------- | :------------------------------------- | :--------- | :---------------------------------------------------------------------- |
+| `loader.init`    | `RuntimeMermaidConfig`（嚴格純資料）   | 套件預設值 | 傳遞至 `mermaid.initialize` 的純資料 Mermaid 設定。                     |
+| `loader.lazy`    | `boolean \| { threshold?: number }` | `true`     | 元件進入 viewport 時才載入 Mermaid；設為 `false` 會在前一刻就載入。 |
+
+`loader.init` 的 baseline 為：
+
+```ts
+{
+  startOnLoad: false,
+  theme: 'default',
+  fontFamily: 'Arial, sans-serif, 微軟正黑體',
+  securityLevel: 'strict',
+}
+```
+
+未明確設定時，`debug: false` 會解析成 `logLevel: 5` 與
+`suppressErrorRendering: true`；`debug: true` 則解析成 `logLevel: 1` 與
+`suppressErrorRendering: false`。使用者明確提供的值一律優先。
 
 **theme**
 
 若專案安裝了 `@nuxtjs/color-mode` 會自動偵測並跟隨；透過 `useMermaidTheme()` 設定的手動主題會優先。
 
-| 參數          | 類型   | 預設值      | 說明                                                                              |
-| :------------ | :----- | :---------- | :-------------------------------------------------------------------------------- |
-| `theme.light` | string | `'default'` | 當 color-mode 為 light 時的主題，若 color-mode 不存在也會回退使用。               |
-| `theme.dark`  | string | `'dark'`    | 當 color-mode 為 dark 時的主題，若 color-mode 不存在也會回退使用。                |
+| 參數          | 類型   | 預設值      | 說明                                                          |
+| :------------ | :----- | :---------- | :------------------------------------------------------------ |
+| `theme.light` | string | `'default'` | 用於 light color mode 與手動 `setMermaidTheme('light')` 策略。 |
+| `theme.dark`  | string | `'dark'`    | 用於 dark color mode 與手動 `setMermaidTheme('dark')` 策略。   |
 
 **components**
 
-| 參數                     | 類型     | 預設值     | 說明                                                   |
-| :----------------------- | :------- | :--------- | :----------------------------------------------------- |
-| `components.renderer`    | `string` | `undefined` | 指定自訂的 Mermaid 實作元件名稱（見進階用法）。        |
-| `components.spinner`     | `string` | `undefined` | 指定全域的 Loading 元件名稱。                          |
-| `components.error`       | `string` | `undefined` | 指定全域的錯誤顯示元件名稱，渲染失敗時會使用。         |
+| 參數                     | 類型     | 預設值 | 說明                                                   |
+| :----------------------- | :------- | :----- | :----------------------------------------------------- |
+| `components.renderer`    | `string` | 未設定 | 選填：指定自訂的 Mermaid 實作元件名稱（見進階用法）。  |
+| `components.spinner`     | `string` | 未設定 | 選填：指定全域的 Loading 元件名稱。                    |
+| `components.error`       | `string` | 未設定 | 選填：指定全域的錯誤顯示元件名稱，渲染失敗時會使用。   |
 
 **toolbar**
 
@@ -309,11 +318,11 @@ html[data-theme="dark"],
 ### Debug 模式
 
 **`contentMermaid.debug`**（預設 `false`）：
-  - **自動配置**：若未手動設定 `loader.init.logLevel` 或 `suppressErrorRendering`，開啟 debug 模式會自動將 `logLevel` 設為 `1` (Info)，並將 `suppressErrorRendering` 設為 `false`（允許 Mermaid 在 DOM 中顯示錯誤訊息）。
+  - **自動配置**：若未明確設定 `loader.init.logLevel` 或 `suppressErrorRendering`，`debug: false` 會解析為 `logLevel: 5` 與 `suppressErrorRendering: true`；`debug: true` 會解析為 `logLevel: 1` 與 `suppressErrorRendering: false`（允許 Mermaid 在 DOM 中顯示錯誤訊息）。明確設定的值一律優先。
   - **執行行為**：
     - **Debug 開啟**：`mermaid.run` 使用 `suppressErrors: false`，發生錯誤時會拋出完整堆疊以便除錯。
     - **Debug 關閉**：`mermaid.run` 使用 `suppressErrors: true`，避免單一圖表錯誤中斷其他圖表的渲染。
-  - **主控台輸出**：模組會額外輸出渲染佇列的診斷資訊與執行時間統計。
+  - **主控台輸出**：Debug log 的文字與內部渲染排程不是公開 API。設定失敗時，應辨識文件記載的公開錯誤 fingerprint，不要解析內部訊息細節。
 
 ### 主題與顏色模式 (Theme & Color Mode)
 
@@ -324,8 +333,7 @@ html[data-theme="dark"],
 3. `@nuxtjs/color-mode`（安裝時自動偵測）：
   - `dark` → 使用 `theme.dark`
   - `light` → 使用 `theme.light`
-4. `loader.init.theme`（若有設定）
-5. 回退：`theme.light`，若無則 Mermaid 預設 `'default'`
+4. 解析後的 `loader.init.theme`（套件預設為 `'default'`）
 
 更多進階手動控制（如：強制指定特定主題、自訂切換邏輯），請參閱 [手動主題控制指南](./docs/ch/MANUAL_THEME_CONTROL.md)。
 
@@ -447,13 +455,16 @@ graph TD
 
 若需完全接管 Mermaid 的渲染行為（例如：加入外框、Expand/Collapse 功能），可指定 `components.renderer`。
 
+指定的名稱在元件解析完成前只是候選。解析期間 Built-in Renderer 會保持暫停；若找不到或無法載入該元件，模組才會回退到 Built-in Renderer。一旦解析成功，Custom Renderer 就完全擁有渲染流程，之後的 mount 或 render failure 不會觸發 Built-in fallback。
+
 1. 在 `nuxt.config.ts` 中指定元件名稱：
 
    ```ts
    contentMermaid: {
      components: {
-       renderer: "MyCustomMermaid",
-     }
+       renderer: 'MyCustomMermaid',
+       spinner: 'MySpinner', // 選填：傳入自訂渲染元件
+     },
    }
    ```
 
@@ -461,56 +472,56 @@ graph TD
 
    ```vue
    <script setup lang="ts">
-   // 你可以在此使用 slot 內容或自行呼叫 useMermaid() 等邏輯
+   import { onMounted, ref, shallowRef, useId } from 'vue'
+   import type { Component } from 'vue'
+
+   const props = defineProps<{
+     code?: string
+     spinner: Component | string
+   }>()
+
+   const loading = ref(true)
+   const error = shallowRef<unknown>()
+   const svg = ref('')
+   const renderId = `custom-mermaid-${useId().replaceAll(':', '')}`
+
+   onMounted(async () => {
+     try {
+       const mermaid = await useNuxtApp().$mermaid()
+       svg.value = (await mermaid.render(renderId, props.code ?? '')).svg
+     }
+     catch (cause) {
+       error.value = cause
+     }
+     finally {
+       loading.value = false
+     }
+   })
    </script>
 
    <template>
      <div class="custom-wrapper border rounded p-4">
-       <Mermaid>
-         <slot />
-       </Mermaid>
+       <component
+         :is="props.spinner"
+         v-if="loading"
+       />
+       <p
+         v-else-if="error"
+         role="alert"
+       >
+         圖表渲染失敗：{{ error instanceof Error ? error.message : String(error) }}
+       </p>
+       <div
+         v-else
+         v-html="svg"
+       />
      </div>
    </template>
    ```
 
-#### 載入中指示
+Custom Renderer 會收到既有的 `code`、default slot 與 `spinner` 輸入；不會收到 Built-in 的設定、主題、toolbar、loading 或 error state。`components.error` 只處理 Built-in Mermaid render failure，因此 Custom Renderer 必須自行呈現錯誤狀態，如上例所示。
 
-模組在首次渲染前會使用內建的 spinner，如需替換可在 `components.spinner` 指定元件名稱；該元件也會以 `spinner` prop 傳入你的自訂渲染元件，方便直接渲染。
-
-以下是極簡的設定與元件示例：
-
-```ts
-// nuxt.config.ts
-export default defineNuxtConfig({
-  contentMermaid: {
-    components: {
-      renderer: 'MyCustomMermaid',
-      spinner: 'MySpinner', // 選填：改用自己的全域 Loading 元件
-    }
-  }
-})
-```
-
-```vue
-<!-- components/MyCustomMermaid.vue -->
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import type { Component } from 'vue'
-
-const props = defineProps<{ spinner: Component | string }>()
-const loading = ref(true)
-onMounted(() => { loading.value = false })
-</script>
-
-<template>
-  <div class="my-mermaid">
-    <component v-if="loading" :is="props.spinner" />
-    <Mermaid v-else>
-      <slot />
-    </Mermaid>
-  </div>
-</template>
-```
+目前被設定為 `components.renderer` 的元件不得渲染 `<Mermaid>`：巢狀元件會再次選中同一個 Custom Renderer。請改為直接呼叫 `$mermaid()`、其他 rendering library 或自己的 renderer。
 
 ### 元件使用方式
 
