@@ -16,7 +16,7 @@ Start from a clean branch based on the current `main`, then prepare the version,
 changelog, and lockfile:
 
 ```bash
-pnpm release:prepare-pr -- 3.0.0
+pnpm release:prepare-pr 3.0.0
 ```
 
 The version must be an exact stable `x.y.z`. The helper may change only
