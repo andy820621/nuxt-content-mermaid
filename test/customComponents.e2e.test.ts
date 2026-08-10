@@ -16,11 +16,10 @@ describe('custom renderer/spinner/error components', async () => {
     await page.goto(url('/'))
 
     const spinner = page.locator('#test-spinner')
-    await page.waitForSelector('#test-spinner', { state: 'visible', timeout: 5000 })
-    expect(await spinner.isVisible()).toBe(true)
+    await spinner.waitFor({ state: 'visible', timeout: 5000 })
 
     // Wait for stubbed mermaid to finish
-    await page.waitForSelector('#test-spinner', { state: 'detached', timeout: 5000 })
+    await spinner.waitFor({ state: 'detached', timeout: 5000 })
 
     const svg = page.locator('#diagram-container svg#mock-svg')
     expect(await svg.isVisible()).toBe(true)
@@ -36,10 +35,8 @@ describe('custom renderer/spinner/error components', async () => {
     const runs = await page.evaluate(() => (window as { __mermaidRuns__?: Array<{ source: string, threw: boolean }> }).__mermaidRuns__ || [])
     expect(runs.some(r => r.threw)).toBe(true)
 
-    await page.waitForSelector('#test-error', { state: 'visible', timeout: 5000 })
-
     const errorComponent = page.locator('#test-error')
-    expect(await errorComponent.isVisible()).toBe(true)
+    await errorComponent.waitFor({ state: 'visible', timeout: 5000 })
     expect(await errorComponent.textContent()).toContain('Custom Error Component')
 
     const codeBlock = errorComponent.locator('code')
