@@ -11,7 +11,7 @@ import {
 } from './markdown-diagram-transform/configuration'
 import { isNonEmptyRecord } from './runtime/utils/is'
 
-const MERMAID_COMPONENT_NAME = 'Mermaid'
+const MERMAID_COMPONENT_NAME = 'ContentMermaidTransport'
 const PAGE_MERMAID_CONFIG_EXPRESSION = 'config'
 
 function serializeInlineAttributeRecord(value: Record<string, unknown>) {

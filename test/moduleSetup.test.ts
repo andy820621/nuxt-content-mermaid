@@ -201,7 +201,7 @@ describe('module setup', () => {
     await moduleDef.setup?.({}, nuxt)
 
     expect(addPlugin).toHaveBeenCalled()
-    expect(addPlugin).toHaveBeenCalledTimes(2)
+    expect(addPlugin).toHaveBeenCalledTimes(3)
     const registeredPlugins = addPlugin.mock.calls
       .map(([plugin]) => plugin)
       .reverse()
@@ -210,11 +210,18 @@ describe('module setup', () => {
         src: expect.stringContaining('runtime/plugins/runtime-config'),
       },
       {
+        src: expect.stringContaining('runtime/plugins/content-mermaid-transport'),
+      },
+      {
         src: expect.stringContaining('runtime/plugins/mermaid.client'),
         mode: 'client',
       },
     ])
-    expect(addComponent).toHaveBeenCalled()
+    expect(addComponent).toHaveBeenCalledTimes(1)
+    expect(addComponent).toHaveBeenCalledWith({
+      name: 'Mermaid',
+      filePath: expect.stringContaining('runtime/components/Mermaid.vue'),
+    })
     expect(addTypeTemplate).toHaveBeenCalled()
     expect(addVitePlugin).toHaveBeenCalledTimes(1)
     expect(hooks['content:file:beforeParse']).toHaveLength(1)

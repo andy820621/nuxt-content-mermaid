@@ -145,6 +145,9 @@ export default defineNuxtModule<ModuleOptions>({
       mode: 'client',
     })
     addPlugin({
+      src: resolver.resolve(runtimeDir, 'plugins/content-mermaid-transport'),
+    })
+    addPlugin({
       src: resolver.resolve(runtimeDir, 'plugins/runtime-config'),
     })
 

@@ -9,7 +9,7 @@ async function parseProtocol(markdown: string) {
     highlight: false,
   })
   const component = parsed.body.children.find(
-    (node): node is MDCElement => node.type === 'element' && node.tag.toLowerCase() === 'mermaid',
+    (node): node is MDCElement => node.type === 'element' && node.tag.toLowerCase() === 'content-mermaid-transport',
   )
 
   expect(component).toBeDefined()
@@ -69,8 +69,9 @@ describe('Markdown Diagram Protocol', () => {
     const protocol = await parseProtocol(markdown)
     const diagram = parseDiagramFrontmatter(protocol.source)
 
-    expect(protocol.component?.tag).toBe('mermaid')
+    expect(protocol.component?.tag).toBe('content-mermaid-transport')
     expect(protocol.props[':page-config']).toBe('config')
+    expect(protocol.props).not.toHaveProperty(':markdown-page-config')
     expect(protocol.props).not.toHaveProperty(':config')
     expect(protocol.parsed.data.config).toEqual({
       theme: 'neutral',
@@ -106,6 +107,25 @@ describe('Markdown Diagram Protocol', () => {
       'graph TD',
       'A --> B',
     ])
+  })
+
+  it('preserves dotted Page Mermaid Config syntax through the Markdown transport', async () => {
+    const markdown = [
+      '---',
+      'config.theme: forest',
+      '---',
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    const protocol = await parseProtocol(markdown)
+
+    expect(protocol.parsed.data.config).toEqual({ theme: 'forest' })
+    expect(protocol.props[':page-config']).toBe('config')
+    expect(protocol.props).not.toHaveProperty(':markdown-page-config')
   })
 
   it('preserves invalid Mermaid YAML Frontmatter as original Markdown', async () => {

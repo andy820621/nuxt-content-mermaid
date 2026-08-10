@@ -23,7 +23,7 @@ describe('transformMarkdownDiagrams', () => {
   const extractToolbarProp = async (output: string) => {
     const parsed = await parseMarkdown(output, { highlight: false })
     const component = parsed.body.children.find(
-      (node): node is MDCElement => node.type === 'element' && node.tag.toLowerCase() === 'mermaid',
+      (node): node is MDCElement => node.type === 'element' && node.tag.toLowerCase() === 'content-mermaid-transport',
     )
     const toolbar = component?.props?.[':toolbar']
 
@@ -46,7 +46,7 @@ describe('transformMarkdownDiagrams', () => {
     return (data && typeof data === 'object') ? data as Record<string, unknown> : null
   }
 
-  it('wraps mermaid code blocks with Mermaid component and Page Mermaid Config binding', () => {
+  it('uses the Markdown page-config transport when frontmatter has no config', () => {
     const body = [
       '# Diagram',
       '```mermaid',
@@ -58,15 +58,38 @@ describe('transformMarkdownDiagrams', () => {
 
     const output = transformMarkdownDiagrams(body)
 
-    expect(output).toContain('<Mermaid :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+    expect(output).toContain('<ContentMermaidTransport :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></ContentMermaidTransport>')
+    expect(output).not.toContain('<Mermaid')
     expect(output).not.toContain(':config="config"')
+  })
+
+  it.each([
+    { label: 'a leading blank line', prefix: '' },
+    { label: 'a leading Mermaid comment', prefix: '%% page comment' },
+  ])('keeps page config on the Markdown transport after $label', ({ prefix }) => {
+    const body = [
+      prefix,
+      '---',
+      'config:',
+      '  theme: dark',
+      '---',
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    const output = transformMarkdownDiagrams(body)
+    expect(output).toContain('<ContentMermaidTransport :page-config="config" code="')
+    expect(output).not.toContain('<Mermaid')
   })
 
   it('transforms multiple mermaid blocks in a single document', () => {
     const body = loadFixture('multiple-blocks.md')
     const output = transformMarkdownDiagrams(body)
 
-    const matches = output.match(/<Mermaid :page-config="config" code="/g) || []
+    const matches = output.match(/<ContentMermaidTransport :page-config="config" code="/g) || []
     expect(matches.length).toBe(2)
     expect(output).toContain('graph%20TD%0A%20%20A%5BStart%5D%20--%3E%20B%7BChoice%7D')
     expect(output).toContain('sequenceDiagram%0A%20%20participant%20Alice')
@@ -92,7 +115,8 @@ describe('transformMarkdownDiagrams', () => {
       '',
     ].join('\n')
 
-    expect(transformMarkdownDiagrams(body)).toContain('<Mermaid :page-config="config"')
+    const output = transformMarkdownDiagrams(body)
+    expect(output).toContain('<ContentMermaidTransport :page-config="config" code="')
   })
 
   it('preserves non-target Markdown exactly', () => {
@@ -406,7 +430,7 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(output).toContain('  <Mermaid :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></Mermaid>')
+    expect(output).toContain('  <ContentMermaidTransport :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></ContentMermaidTransport>')
   })
 
   it('does not transform mermaid fences inside other fenced code blocks', () => {
