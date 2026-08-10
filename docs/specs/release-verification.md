@@ -41,6 +41,14 @@ It runs lint, unit and browser-backed tests, and root and playground type checks
 
 Source verification excludes build, `prepack`, packing, and package-consumer verification. The only byte-producing lifecycle trusted by the release gate runs in an isolated worktree created from `changeHeadCommit`.
 
+Playground production build is a risk-based release-readiness check rather than
+a mandatory CI or `verify:source` gate. Run `pnpm dev:build` before major or
+minor releases, and when changes affect Nuxt Content integration, runtime
+registration, build configuration, or relevant dependencies. Record the command
+and result in the release or PR checklist. This source-linked playground check
+does not replace or contribute evidence to the retained-artifact Compatibility
+Profile.
+
 Preparation applies the exact target version and every release mutation that can affect build output or the npm packlist, including changelog and lockfile metadata, then creates one local prepared release commit. From that commit the workflow installs locked build dependencies and invokes pack exactly once. The resulting tarball is retained under `.release-evidence/<target-version>/`; its manifest and packlist are inspected and its npm SHA-512 integrity is recorded. No later phase rebuilds or repacks it.
 
 ## Gate Verification

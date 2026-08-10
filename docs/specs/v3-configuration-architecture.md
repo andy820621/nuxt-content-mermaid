@@ -259,8 +259,6 @@ Implementation is complete only when tests cover:
 - logical invalidation, stale work, staging cleanup, strict and sandbox commit, Committed Diagram preservation, one-error-per-conflict, and latest-only recovery;
 - lint, unit tests, type tests, package build, and relevant Nuxt browser fixtures.
 
-Playground production build is a risk-based release-readiness check rather than
-a mandatory CI or `verify:source` gate. Run `pnpm dev:build` before major or
-minor releases, and when changes affect Nuxt Content integration, runtime
-registration, build configuration, or relevant dependencies. Record the command
-and result in the release or PR checklist.
+Playground production build is outside this architecture's mandatory
+verification boundary. Its risk-based release-readiness policy is owned by
+[`release-verification.md`](./release-verification.md).
