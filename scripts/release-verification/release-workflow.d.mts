@@ -39,41 +39,58 @@ export function extractChangelogSection(
   targetVersion: string,
 ): string
 
-export interface WorkflowReleaseRequest {
+export interface PreflightReleaseRequest {
   targetVersion: string
-  sourceCommit?: string
-  eventName?: string
-  ref?: string
-  archivePath?: string
-  checksumPath?: string
-  integritySha512?: string
-  repositoryRoot?: string
-  artifactDirectory?: string
+  sourceCommit: string
+  eventName: string
+  ref: string
+}
+
+export interface NpmPublishReleaseRequest {
+  targetVersion: string
+  archivePath: string
+  checksumPath: string
+}
+
+export interface RegistrySmokeReleaseRequest {
+  targetVersion: string
+  integritySha512: string
+}
+
+export interface FinalizeReleaseRequest {
+  targetVersion: string
+  sourceCommit: string
+}
+
+export interface PackReleaseRequest {
+  targetVersion: string
+  repositoryRoot: string
+  artifactDirectory: string
 }
 
 export function runPreflight(input: {
-  request: WorkflowReleaseRequest
+  request: PreflightReleaseRequest
   effects: object
 }): Promise<unknown>
 
 export function runNpmPublish(input: {
-  request: WorkflowReleaseRequest
+  request: NpmPublishReleaseRequest
   effects: object
   maxAttempts?: number
 }): Promise<unknown>
 
 export function runRegistrySmoke(input: {
-  request: WorkflowReleaseRequest
+  request: RegistrySmokeReleaseRequest
   effects: object
 }): Promise<unknown>
 
 export function runFinalize(input: {
-  request: WorkflowReleaseRequest
+  request: FinalizeReleaseRequest
   effects: object
 }): Promise<unknown>
 
 export function runPack(input: {
-  request: WorkflowReleaseRequest
+  request: PackReleaseRequest
   effects: object
 }): Promise<unknown>
 
@@ -84,9 +101,15 @@ export function createReleaseWorkflowEffects(options?: {
   environment?: Record<string, string | undefined>
 }): object
 
-export function parseReleaseWorkflowArguments(
-  argv: string[],
-): { command: string } & Record<string, string>
+export type ReleaseWorkflowCliRequest
+  = | { 'command': 'validate-pr', 'event-path': string }
+    | { command: 'preflight', version: string }
+    | { 'command': 'pack', 'artifact-directory': string, 'version': string }
+    | { command: 'publish', archive: string, checksum: string, version: string }
+    | { command: 'registry-smoke', integrity: string, version: string }
+    | { command: 'finalize', sha: string, version: string }
+
+export function parseReleaseWorkflowArguments(argv: string[]): ReleaseWorkflowCliRequest
 
 export function runReleaseWorkflowCli(input: {
   argv: string[]
