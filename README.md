@@ -88,13 +88,13 @@ to install it separately for this module.
 >
 > **pnpm v10+** — If you choose `better-sqlite3` or `sqlite3`, pnpm v10 blocks
 > their native build scripts by default. Run `pnpm approve-builds`, or allow
-> only the connector you selected in `package.json`:
+> only the connector you selected in `package.json`. The example below uses
+> `better-sqlite3`; replace it with `sqlite3` when that is your connector:
 >
-> ```jsonc
-> // package.json
+> ```json
 > {
 >   "pnpm": {
->     "onlyBuiltDependencies": ["better-sqlite3"] // use "sqlite3" if that is your selected connector
+>     "onlyBuiltDependencies": ["better-sqlite3"]
 >   }
 > }
 > ```

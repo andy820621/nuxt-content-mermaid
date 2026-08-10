@@ -82,13 +82,13 @@ Mermaid 是本模組綁定的 Module-Owned Dependency，因此不必為了本模
 >
 > **pnpm v10+** — 若選擇 `better-sqlite3` 或 `sqlite3`，pnpm v10 預設會
 > 封鎖其原生 build script。請執行 `pnpm approve-builds`，或只在
-> `package.json` 允許你選用的 connector：
+> `package.json` 允許你選用的 connector。下例使用 `better-sqlite3`；若
+> 選用 `sqlite3`，請先將套件名稱替換為 `sqlite3`：
 >
-> ```jsonc
-> // package.json
+> ```json
 > {
 >   "pnpm": {
->     "onlyBuiltDependencies": ["better-sqlite3"] // 若選用 sqlite3，請替換成 "sqlite3"
+>     "onlyBuiltDependencies": ["better-sqlite3"]
 >   }
 > }
 > ```
