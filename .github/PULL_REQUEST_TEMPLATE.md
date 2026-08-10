@@ -1,6 +1,6 @@
 ## Summary
 
-<!-- Briefly explain why this change is needed and its outcome. -->
+<!-- Briefly explain why this change is needed and its outcome. Include related Issue/discussion links. -->
 
 ## Changes
 
@@ -8,7 +8,7 @@
 
 ## Validation
 
-<!-- List tests, builds, linting, or manual checks actually performed. -->
+<!-- List each test, build, lint, or manual check actually performed, with its command and outcome. -->
 
 ## Notes (optional)
 

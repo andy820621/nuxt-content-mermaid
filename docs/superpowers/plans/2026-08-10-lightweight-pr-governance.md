@@ -56,7 +56,7 @@ gh issue create \
     '## Acceptance criteria' \
     '' \
     '- Copilot instructions describe the repository Git and PR conventions.' \
-    '- The PR template contains Summary, Changes, Validation, and optional Notes sections.' \
+    '- The PR template contains Summary, Changes, Validation, and optional Notes sections, with related Issue/discussion links and validation commands and outcomes.' \
     '- PR titles accept the approved Conventional Commit types with an optional scope.' \
     '- Dependency updates use chore(deps), not a deps type.' \
     '- Validation installs no package and is not made a required check by this change.')"
@@ -101,7 +101,8 @@ When creating pull requests:
 - Use a Conventional Commit-compatible pull request title.
 - Follow the repository pull request template.
 - Explain the reason for the change and its outcome, not only the implementation.
-- Include only validation that was actually performed.
+- Include related Issue/discussion links.
+- For each validation actually performed, include its command and outcome.
 - Do not claim a test, build, lint, or manual check passed unless it was run.
 ```
 
@@ -112,7 +113,7 @@ Create `.github/PULL_REQUEST_TEMPLATE.md` with exactly this content:
 ```markdown
 ## Summary
 
-<!-- Briefly explain why this change is needed and its outcome. -->
+<!-- Briefly explain why this change is needed and its outcome. Include related Issue/discussion links. -->
 
 ## Changes
 
@@ -120,7 +121,7 @@ Create `.github/PULL_REQUEST_TEMPLATE.md` with exactly this content:
 
 ## Validation
 
-<!-- List tests, builds, linting, or manual checks actually performed. -->
+<!-- List each test, build, lint, or manual check actually performed, with its command and outcome. -->
 
 ## Notes (optional)
 
@@ -132,11 +133,11 @@ Create `.github/PULL_REQUEST_TEMPLATE.md` with exactly this content:
 Run:
 
 ```bash
-rg -n '^## Git conventions$|chore\(deps\)|actually performed|Do not claim' .github/copilot-instructions.md
+rg -n '^## Git conventions$|chore\(deps\)|related Issue/discussion|command and outcome|Do not claim' .github/copilot-instructions.md
 rg -n '^## (Summary|Changes|Validation|Notes \(optional\))$' .github/PULL_REQUEST_TEMPLATE.md
 ```
 
-Expected: the first command reports all four guidance concepts; the second reports exactly four headings.
+Expected: the first command reports all five guidance concepts; the second reports exactly four headings.
 
 - [ ] **Step 6: Commit the guidance and plan**
 

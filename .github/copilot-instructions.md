@@ -19,5 +19,6 @@ When creating pull requests:
 - Use a Conventional Commit-compatible pull request title.
 - Follow the repository pull request template.
 - Explain the reason for the change and its outcome, not only the implementation.
-- Include only validation that was actually performed.
+- Include related Issue/discussion links.
+- For each validation actually performed, include its command and outcome.
 - Do not claim a test, build, lint, or manual check passed unless it was run.

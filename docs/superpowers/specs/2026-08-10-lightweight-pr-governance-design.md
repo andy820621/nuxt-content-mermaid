@@ -35,7 +35,8 @@ It will instruct AI tools to:
 - keep descriptions concise, imperative, and without a trailing period;
 - follow the pull request template;
 - explain why a change is needed, not only how it is implemented; and
-- report only validation that was actually performed.
+- include related Issue/discussion links; and
+- report each validation actually performed with its command and outcome.
 
 The instructions improve supported Copilot and agent workflows. They do not
 claim to control GitHub.com's commit-message generator.
@@ -44,9 +45,11 @@ claim to control GitHub.com's commit-message generator.
 
 Create `.github/PULL_REQUEST_TEMPLATE.md` with these sections:
 
-- `Summary`: a concise explanation of the purpose and outcome;
+- `Summary`: a concise explanation of the purpose and outcome, with related
+  Issue/discussion links;
 - `Changes`: the important implementation or documentation changes;
-- `Validation`: tests, builds, linting, or manual checks actually performed;
+- `Validation`: each test, build, lint, or manual check actually performed,
+  with its command and outcome;
 - `Notes` (optional): migrations, limitations, screenshots, or follow-up work.
 
 Each section will contain an HTML comment describing what belongs there. The
