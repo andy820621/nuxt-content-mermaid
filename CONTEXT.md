@@ -261,9 +261,9 @@ A version already published to npm that cannot reliably install, build, or compl
 _Avoid_: Failed CI run, flaky test
 
 **Manual Interaction Verification**:
-Human evaluation reserved for fullscreen behavior, zoom, pan, drag, clipboard behavior, mobile interaction, and visual readability, with an explicit pass criterion for every check. It runs when the maintainer confirms a relevant Release Impact Declaration or when impact remains uncertain.
+Human evaluation reserved for fullscreen behavior, zoom, pan, drag, clipboard behavior, mobile interaction, and visual readability, with an explicit pass criterion for every check. It runs only when the Release Impact Declaration marks interaction, styling, or browser API impact as confirmed or uncertain.
 _Avoid_: General regression testing, exploratory testing
 
 **Release Impact Declaration**:
-A release-time statement of whether the diff can affect package contents, runtime behavior, interaction, styling, browser APIs, or runtime dependencies. An agent recommends the classification from the diff, the maintainer confirms it, and uncertainty activates Manual Interaction Verification.
+A release-time statement of whether the diff can affect package contents, runtime behavior, interaction, styling, browser APIs, or runtime dependencies. An agent recommends the classification from the diff, and the maintainer confirms it. Manual Interaction Verification is activated only when interaction, styling, or browser API impact is confirmed or uncertain; package contents, runtime behavior, and runtime dependencies remain automated verification concerns.
 _Avoid_: Changed-file classifier, informal release judgment
