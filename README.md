@@ -94,7 +94,7 @@ to install it separately for this module.
 > // package.json
 > {
 >   "pnpm": {
->     "onlyBuiltDependencies": ["better-sqlite3"]
+>     "onlyBuiltDependencies": ["better-sqlite3"] // use "sqlite3" if that is your selected connector
 >   }
 > }
 > ```

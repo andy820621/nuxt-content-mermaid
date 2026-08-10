@@ -88,7 +88,7 @@ Mermaid 是本模組綁定的 Module-Owned Dependency，因此不必為了本模
 > // package.json
 > {
 >   "pnpm": {
->     "onlyBuiltDependencies": ["better-sqlite3"]
+>     "onlyBuiltDependencies": ["better-sqlite3"] // 若選用 sqlite3，請替換成 "sqlite3"
 >   }
 > }
 > ```
