@@ -1,174 +1,124 @@
 # Releasing
 
-Release preparation, Git publication, and npm publication are separate boundaries.
-The program owns reproducible verification and exact-tarball npm reconciliation;
-the maintainer owns the ordinary Git handoff.
+Every stable release has exactly two maintainer actions:
 
-## Before starting
+1. Create, review, and merge a Release PR.
+2. From GitHub Actions on `main`, run **Publish stable release** with the stable
+   exact version from that PR.
 
-- Check out `main` and leave its worktree clean.
-- Install dependencies and ensure npm authentication can publish
-  `@barzhsieh/nuxt-content-mermaid`.
-- Ensure [Volta](https://volta.sh/) is available. Preparation runs each frozen
-  Compatibility Profile under its exact Node runtime.
-- Choose an exact SemVer greater than `package.json`. It must not already exist
-  in npm.
-- Determine whether the playground production build is required. Run
-  `pnpm dev:build` before every major or minor release, and for any release whose
-  changes affect Nuxt Content integration, runtime registration, build
-  configuration, or relevant dependencies. Record the command and result in the
-  release checklist or the PR's Validation section. This is a risk-based
-  release-readiness check, not part of CI or `verify:source`.
-- Ensure `.release-evidence/<version>/` does not exist. Release evidence is
-  ephemeral and is never overwritten or migrated.
-- Do not change the package version, create the final tag, or publish manually.
+The workflow owns the immutable tarball, npm Trusted Publishing, public-registry
+verification, annotated tag, and GitHub Release. Do not create those release
+objects manually.
 
-## Prepare and verify
+## 1. Create and merge the Release PR
 
-Run the complete pre-publication gate:
+Start from a clean branch based on the current `main`, then prepare the version,
+changelog, and lockfile:
 
 ```bash
-pnpm release:prepare 3.0.0
+pnpm release:prepare-pr -- 3.0.0
 ```
 
-Preparation runs `pnpm verify:source`, creates an isolated release commit, packs
-exactly once, retains that tarball under `.release-evidence/3.0.0/`, freezes the
-`v3-minimum` and `v3-known-latest` profiles, verifies both profiles, and performs
-the required manual interaction checks. It stops at `status: verified`; it does
-not change formal `main`, create the final tag, contact a Git remote, or publish
-to npm.
+The version must be an exact stable `x.y.z`. The helper may change only
+`package.json`, `CHANGELOG.md`, and `pnpm-lock.yaml`; it does not commit, tag,
+push, create a GitHub Release, or publish. Review all three files and commit the
+intended changes before opening the PR.
 
-For a release that genuinely does not need interaction verification, record an
-explicit non-empty reason:
+Keep the **Release PR** section in the PR template and complete it:
 
-```bash
-pnpm release:prepare 3.0.1 --skip-manual "documentation-only release"
-```
+- Set **Target version** to the exact version in `package.json`.
+- For every Release Impact Declaration (RID) dimension, choose `affected`,
+  `unaffected`, or `uncertain` and provide concrete evidence. The six dimensions
+  are package contents, runtime behavior, interaction, styling/layout, browser
+  APIs, and runtime dependencies.
+- Manual Interaction Verification (MIV) is required when interaction,
+  styling/layout, or browser APIs is `affected` or `uncertain`. Set **Required**
+  to `yes` and record the test commit, environment, scenarios, and result. Set it
+  to `no` only when none of those three dimensions triggers MIV.
 
-Inspect `.release-evidence/3.0.0/release.json` without editing it. Record these
-values for the handoff:
+Wait for the existing required checks and review, then merge the Release PR.
+`source-verification` validates the target, all six RID entries, and conditional
+MIV; ordinary PRs remove the Release PR section.
 
-- `identity.sourceCommit`: the prepared commit that produced the artifact;
-- `preparationBranch`: normally `release-prep/v3.0.0`;
-- `identity.artifactIntegritySha512`: the retained tarball's npm SHA-512; and
-- `artifact.archivePath`: the only tarball publication may use.
+### If `main` advances after the merge
 
-Any release-code, evidence-schema, manifest-range, Version Profile, source, or
-artifact change invalidates the evidence. Inspect and move or remove the whole
-evidence directory, then prepare again; never migrate or reuse stale evidence.
+Do not dispatch a release for a commit that the merged Release PR did not cover.
+Create and merge a replacement Release PR from the new `main`. It must keep the
+target marker, account for the intervening diff in `CHANGELOG.md`, and provide a
+fresh RID/MIV assessment for the complete release commit.
 
-## Perform the Git handoff
+The same target version may be reused only while that exact version does not
+exist on npm. If it already exists, stop and reconcile the external state before
+choosing a corrective version.
 
-With `<sourceCommit>` copied from the frozen evidence, run:
+## 2. Run the Publish workflow
 
-```bash
-git merge --ff-only <sourceCommit>
-git tag -a v3.0.0 <sourceCommit> -m "v3.0.0"
-git push --atomic origin main v3.0.0
-git ls-remote origin refs/heads/main refs/tags/v3.0.0 'refs/tags/v3.0.0^{}'
-```
+In GitHub:
 
-Visually compare both the remote `main` object and the peeled
-`refs/tags/v3.0.0^{}` object with `identity.sourceCommit`. Do not proceed unless
-both match. The direct tag object may differ because an annotated tag has its
-own object; the peeled target must equal the source commit.
+1. Open **Actions** → **Publish stable release**.
+2. Choose **Run workflow**, select `main`, and enter the exact version merged by
+   the current Release PR.
+3. Start the run and monitor every job through `finalize`.
 
-These are explicit maintainer-owned Git operations, not release-journal states.
-Never force-update the branch or tag through the release program.
+The workflow fails closed unless it is a manual dispatch from the current
+`main`, the package and changelog match the version, the current commit is
+covered by a merged Release PR, npm state is safe, and tag/Release state does
+not conflict.
 
-## Publish the frozen tarball
+Read the job graph as a durability boundary:
 
-After the local and remote refs have been verified, run:
+| Job | Meaning when complete |
+| --- | --- |
+| `verify-and-pack` | Source and Release PR identity passed; one tarball and its checksum were created. npm is unchanged. |
+| `smoke` | The same tarball passed `v3-minimum` on Node 22.19.0 and `v3-known-latest` on Node 24.19.0. npm is unchanged. |
+| `publish` | The tarball's exact integrity is present on npm and `latest` points to it. |
+| `registry-smoke` | A fresh consumer passed against the exact public npm version. No tag or GitHub Release exists yet. |
+| `finalize` | The annotated `vX.Y.Z` tag targets the workflow commit and the matching GitHub Release exists. |
 
-```bash
-pnpm release:publish 3.0.0
-```
+Only a run that completes `finalize` is a completed release.
 
-Publication independently revalidates the clean local `main`, local tag, remote
-`main`, peeled remote tag, manifests, retained archive path, SHA-256, and npm
-SHA-512 before npm access. It queries the exact registry version first:
+## One-time npm Trusted Publisher setup
 
-- absent: publish the retained tarball with lifecycle scripts disabled, then
-  query the exact version again before recording `published`;
-- present with matching `dist.integrity`: record `published` without
-  republishing; or
-- present with different `dist.integrity`: stop with a fatal artifact conflict.
+After this workflow lands and before its first real release, configure the npm
+package **Settings → Trusted Publisher** with these exact values:
 
-It never rebuilds, repacks, accepts another tarball, or infers success merely
-from the npm command response.
+| Field | Value |
+| --- | --- |
+| Provider | GitHub Actions |
+| Organization or user | `andy820621` |
+| Repository | `nuxt-content-mermaid` |
+| Workflow filename | `publish.yml` |
+| Environment | Leave blank |
+| Allowed actions | `npm publish` only |
 
-After publication and Registry Smoke complete successfully, remove the local
-reachability anchor:
+The package may have only one Trusted Publisher. Update any existing publisher
+to these values and verify them character-for-character because npm does not
+validate the binding when it is saved. Do not create an `NPM_TOKEN` secret.
 
-```bash
-git branch -d release-prep/v3.0.0
-```
+No GitHub repository setting change is currently required: the workflow requests
+its job-level `id-token` and `contents` permissions, and the existing required
+checks retain their names. If organization policy later blocks OIDC or one of the
+workflow's official action majors, stop before publishing instead of adding a
+token fallback.
 
-## Narrow recovery rules
+After the first successful OIDC publication, set npm **Publishing access** to
+**Require two-factor authentication and disallow tokens**, then revoke the old
+automation token.
 
-### Preparation failure
+## Failure recovery
 
-The program removes the disposable worktree and preparation branch after a
-failed preparation. Inspect the invalid evidence directory, then move or remove
-that whole directory and rerun `pnpm release:prepare 3.0.0`. Do not reuse any
-partial artifact or profile result.
+Prefer **Re-run failed jobs** on the same workflow run whenever the table allows
+it. This preserves the original artifact. Never overwrite an npm version,
+force-move a tag, replace a conflicting GitHub Release, or infer success from an
+ambiguous response.
 
-### Local handoff completed but push not confirmed
-
-If local `main` was fast-forwarded but push has not succeeded, do not rerun
-preparation. Correct the local annotated tag if needed and continue from the
-frozen evidence.
-
-If the atomic push reports an error or its response is lost, run:
-
-```bash
-git ls-remote origin refs/heads/main refs/tags/v3.0.0 'refs/tags/v3.0.0^{}'
-```
-
-- If both remote targets resolve to `sourceCommit`, proceed to npm publication.
-- If neither ref exists, rerun the same atomic push.
-- If only one ref matches, or either points elsewhere, stop for manual Git
-  diagnosis. Do not force-update, roll back, replace a tag, or start a new
-  release through the program.
-
-### npm result is ambiguous
-
-Rerun the same idempotent command:
-
-```bash
-pnpm release:publish 3.0.0
-```
-
-It rechecks local and remote identity and the exact npm `dist.integrity` before
-deciding whether publication is still necessary. Indeterminate lookup or
-publication evidence remains `verified` with `lastFailure`; keep the frozen
-evidence and retained tarball in place.
-
-### Registry Smoke failure
-
-Publication and registry health are independent. A first Registry Smoke failure
-records `registryHealth.status: investigation` without reversing publication.
-After infrastructure diagnosis, use only this one retry:
-
-```bash
-pnpm release:registry-smoke 3.0.0
-```
-
-The first attempt and retry both use the complete frozen `v3-known-latest`
-profile stored in the release evidence. They never resolve current registry
-latest versions or accept a profile override.
-
-Treat only `registryHealth.status: unhealthy` after the independent retry as a
-confirmed package defect. A maintainer may then manually deprecate only that
-exact version and prepare a normal corrective release. Never unpublish,
-auto-deprecate, auto-publish a patch, move a dist-tag, or perform automatic
-rollback.
-
-## Evidence boundary
-
-`.release-evidence/<version>/release.json` and the retained tarball are local,
-gitignored, ephemeral evidence. The journal records facts proven by the script:
-`verified` means the source and retained artifact passed every gate; `published`
-means the exact npm version has matching integrity. Git publication remains a
-human-owned boundary that `release:publish` rechecks rather than inferring from
-a timestamp.
+| Failure point | Recovery |
+| --- | --- |
+| Preflight, source, pack, or compatibility fails before npm access | Fix the problem through a new Release PR. If `main` and the release baseline have not changed, rerunning failed jobs on the original run is also safe. Reuse the target version only while the exact npm version is absent. |
+| The `npm publish` response is ambiguous | Re-run the failed jobs on the same run. The publish job downloads the original artifact, verifies its checksum, and uses exact registry state to publish, skip, or stop. Do not bump, repack, or publish manually first. |
+| The exact npm version exists with matching integrity | Treat it as the same release. Publishing is skipped and the workflow continues through post-check, Registry Smoke, and finalization. |
+| Exact integrity, `latest`, tag, or GitHub Release conflicts, or a lookup is indeterminate | Stop. Do not move the dist-tag, rebuild the tag, or overwrite the Release. Reconcile the external state manually, then use a corrective PR or a dedicated recovery issue. |
+| Registry Smoke fails transiently | Re-run the failed job on the same run. Keep the npm version unchanged; tag and GitHub Release have not been created. |
+| Registry Smoke confirms a package defect | Do not overwrite or unpublish the version. Deprecate that exact version, prepare a corrective Release PR, and run a complete new release. |
+| Finalization partially fails | Re-run the failed `finalize` job. Matching annotated-tag and Release state is completed idempotently; any different target stops the run. |
+| The original workflow artifact expired | Start a new dispatch. Its newly packed artifact must match the exact npm integrity before the workflow may continue; otherwise stop and open a recovery issue. |

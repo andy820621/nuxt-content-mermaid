@@ -78,6 +78,7 @@ function createOperations() {
     operations: {
       createWorkspace: vi.fn(async () => workspace),
       createArtifact: vi.fn(async () => artifact),
+      loadArtifact: vi.fn(async () => artifact),
       inspectArchive: vi.fn(async () => undefined),
       installConsumer: vi.fn(async (): Promise<ConsumerInstallResult> => ({
         packageVersion: artifact.packageVersion,
@@ -99,11 +100,11 @@ function createOperations() {
   }
 }
 
-function createRequest(): PackageArtifactVerificationRequest {
+function createRequest(artifact: PackageArtifact): PackageArtifactVerificationRequest {
   return {
     packageSource: {
-      kind: 'pack',
-      repositoryRoot: '/repo',
+      kind: 'artifact',
+      artifact,
     },
     profile: knownLatestProfile,
   }
@@ -147,16 +148,12 @@ function createChildEvidence(
 }
 
 describe('package artifact verification runner', () => {
-  it('creates one artifact, reuses it for every stage, and reports evidence', async () => {
+  it('reuses one supplied artifact for every stage and reports evidence', async () => {
     const { artifact, operations, workspace } = createOperations()
 
-    const evidence = await runPackageArtifactVerification(createRequest(), operations)
+    const evidence = await runPackageArtifactVerification(createRequest(artifact), operations)
 
-    expect(operations.createArtifact).toHaveBeenCalledOnce()
-    expect(operations.createArtifact).toHaveBeenCalledWith({
-      repositoryRoot: '/repo',
-      artifactDirectory: workspace.artifactDirectory,
-    })
+    expect(operations.createArtifact).not.toHaveBeenCalled()
     expect(operations.inspectArchive).toHaveBeenCalledWith({
       archiveDirectory: workspace.archiveDirectory,
       artifact,
@@ -207,7 +204,7 @@ describe('package artifact verification runner', () => {
   })
 
   it('retains shallow requested and resolved toolchain evidence for a final profile', async () => {
-    const { operations } = createOperations()
+    const { artifact, operations } = createOperations()
     operations.installConsumer.mockResolvedValueOnce({
       packageVersion: '2.2.3',
       profileVersions: knownLatestProfileWithExpectedResolutions.versions,
@@ -216,8 +213,8 @@ describe('package artifact verification runner', () => {
 
     const evidence = await runPackageArtifactVerification({
       packageSource: {
-        kind: 'pack',
-        repositoryRoot: '/repo',
+        kind: 'artifact',
+        artifact,
       },
       profile: knownLatestProfileWithExpectedResolutions,
     }, operations)
@@ -234,7 +231,7 @@ describe('package artifact verification runner', () => {
   })
 
   it('fails installation when a final profile does not report its expected resolutions', async () => {
-    const { operations } = createOperations()
+    const { artifact, operations } = createOperations()
     operations.installConsumer.mockResolvedValueOnce({
       packageVersion: '2.2.3',
       profileVersions: knownLatestProfileWithExpectedResolutions.versions,
@@ -243,8 +240,8 @@ describe('package artifact verification runner', () => {
     const failure: ReleaseVerificationFailure
       = await runPackageArtifactVerification({
         packageSource: {
-          kind: 'pack',
-          repositoryRoot: '/repo',
+          kind: 'artifact',
+          artifact,
         },
         profile: knownLatestProfileWithExpectedResolutions,
       }, operations).then(
@@ -265,12 +262,12 @@ describe('package artifact verification runner', () => {
     }))
   })
 
-  it('verifies a retained artifact without packing another archive', async () => {
+  it('verifies an artifact without packing another archive', async () => {
     const { artifact, operations, workspace } = createOperations()
 
     const evidence = await runPackageArtifactVerification({
       packageSource: {
-        kind: 'retained',
+        kind: 'artifact',
         artifact,
       },
       profile: knownLatestProfile,
@@ -313,12 +310,12 @@ describe('package artifact verification runner', () => {
   })
 
   it('rejects a mismatched Node runtime before creating temporary state', async () => {
-    const { operations } = createOperations()
+    const { artifact, operations } = createOperations()
     const requestedNodeVersion = '0.0.1'
 
     const failure: ReleaseVerificationFailure
       = await runPackageArtifactVerification({
-        ...createRequest(),
+        ...createRequest(artifact),
         profile: {
           ...knownLatestProfile,
           nodeVersion: requestedNodeVersion,
@@ -357,11 +354,11 @@ describe('package artifact verification runner', () => {
   })
 
   it('stops after a required stage fails, reports the stage, and still cleans up', async () => {
-    const { operations, workspace } = createOperations()
+    const { artifact, operations, workspace } = createOperations()
     operations.verifyTypes.mockRejectedValueOnce(new Error('type contract failed'))
 
     const failure: ReleaseVerificationFailure
-      = await runPackageArtifactVerification(createRequest(), operations)
+      = await runPackageArtifactVerification(createRequest(artifact), operations)
         .then(
           () => { throw new Error('expected verification to fail') },
           (error: unknown) => error as ReleaseVerificationFailure,
@@ -391,11 +388,11 @@ describe('package artifact verification runner', () => {
   })
 
   it('treats cleanup failure as a required-stage failure', async () => {
-    const { operations } = createOperations()
+    const { artifact, operations } = createOperations()
     operations.cleanupWorkspace.mockRejectedValueOnce(new Error('cleanup failed'))
 
     const failure: ReleaseVerificationFailure
-      = await runPackageArtifactVerification(createRequest(), operations)
+      = await runPackageArtifactVerification(createRequest(artifact), operations)
         .then(
           () => { throw new Error('expected verification to fail') },
           (error: unknown) => error as ReleaseVerificationFailure,

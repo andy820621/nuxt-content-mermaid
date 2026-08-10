@@ -10,3 +10,21 @@ export function parseExactSemver(value) {
   }
   return match
 }
+
+export function parseStableSemver(value) {
+  const parsed = parseExactSemver(value)
+  return parsed && !parsed[4] && !parsed[5] ? parsed : null
+}
+
+export function compareStableSemver(left, right) {
+  const leftVersion = parseStableSemver(left)
+  const rightVersion = parseStableSemver(right)
+  if (!leftVersion || !rightVersion) {
+    throw new Error('Version comparison requires two stable exact versions')
+  }
+  for (let index = 1; index <= 3; index += 1) {
+    const difference = Number(leftVersion[index]) - Number(rightVersion[index])
+    if (difference !== 0) return Math.sign(difference)
+  }
+  return 0
+}

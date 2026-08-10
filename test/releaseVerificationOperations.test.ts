@@ -2,11 +2,15 @@ import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createReleaseVerificationOperations, runCommand } from '../scripts/release-verification/operations.mjs'
+import {
+  createReleaseVerificationOperations,
+  formatArtifactChecksum,
+  runCommand,
+} from '../scripts/release-verification/operations.mjs'
 import {
   classifyInfrastructureCause,
   ReleaseVerificationInfrastructureError,
@@ -154,6 +158,15 @@ async function createPackageArchive(manifest: Record<string, unknown>, files: st
   }
   await execFileAsync('tar', ['-czf', archivePath, '-C', sourceDirectory, 'package'])
   return archivePath
+}
+
+async function writeArtifactChecksum(archivePath: string, integrityOverride?: string) {
+  const archiveBytes = await readFile(archivePath)
+  const integrity = integrityOverride
+    ?? `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`
+  const checksumPath = join(dirname(archivePath), 'artifact.sha512')
+  await writeFile(checksumPath, `${integrity}  ${basename(archivePath)}\n`)
+  return checksumPath
 }
 
 function createContractManifest(overrides: Record<string, unknown> = {}) {
@@ -664,6 +677,13 @@ describe('package archive inspection', () => {
 })
 
 describe('package artifact creation', () => {
+  it('formats the immutable artifact checksum contract', () => {
+    expect(formatArtifactChecksum(createArtifactFixture({
+      filename: 'package-3.0.0.tgz',
+      integritySha512: 'sha512-Zml4dHVyZQ==',
+    }))).toBe('sha512-Zml4dHVyZQ==  package-3.0.0.tgz\n')
+  })
+
   it('returns the identity of the single tarball produced by pnpm pack', async () => {
     const repositoryRoot = await createTemporaryDirectory('package-repository')
     const artifactDirectory = await createTemporaryDirectory('package-artifact')
@@ -735,6 +755,99 @@ describe('package artifact creation', () => {
       repositoryRoot,
       artifactDirectory,
     })).rejects.toThrow('pnpm pack must produce exactly one tarball; found 2')
+  })
+})
+
+describe('existing package artifact loading', () => {
+  it('reconstructs deterministic identity from one checksummed tarball', async () => {
+    const archivePath = await createPackageArchive(
+      createContractManifest(),
+      ['dist/module.mjs', 'dist/types.d.mts'],
+    )
+    const checksumPath = await writeArtifactChecksum(archivePath)
+    const commandRunner = vi.fn(runCommand)
+    const operations = createReleaseVerificationOperations({
+      templateDirectory: '/unused',
+      commandRunner,
+    })
+    const archiveBytes = await readFile(archivePath)
+
+    await expect(operations.loadArtifact({
+      archivePath,
+      checksumPath,
+    })).resolves.toEqual({
+      archivePath,
+      filename: basename(archivePath),
+      sha256: createHash('sha256').update(archiveBytes).digest('hex'),
+      integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
+      packlist: [
+        'dist/module.mjs',
+        'dist/types.d.mts',
+        'package.json',
+      ],
+      packageName: '@barzhsieh/nuxt-content-mermaid',
+      packageVersion: '2.2.3',
+      packageContract: {
+        node: '>=22.19.0',
+        nuxt: '^4.1.0',
+        nuxtContent: '>=3.5.0 <4.0.0',
+        nuxtKit: '^4.5.2',
+        mermaid: '~11.16.1',
+      },
+    })
+    expect(commandRunner.mock.calls.flatMap(([invocation]) => (
+      [invocation.command, ...invocation.args]
+    )).join(' ')).not.toMatch(/pnpm pack|prepack|prepare/)
+  })
+
+  it('checks SHA-512 before inspecting the archive', async () => {
+    const archivePath = await createPackageArchive(createContractManifest(), [])
+    const checksumPath = await writeArtifactChecksum(
+      archivePath,
+      'sha512-ZGlmZmVyZW50',
+    )
+    const commandRunner = vi.fn()
+    const operations = createReleaseVerificationOperations({
+      templateDirectory: '/unused',
+      commandRunner,
+    })
+
+    await expect(operations.loadArtifact({
+      archivePath,
+      checksumPath,
+    })).rejects.toThrow('SHA-512 mismatch')
+    expect(commandRunner).not.toHaveBeenCalled()
+  })
+
+  it('rejects a second tarball in the workflow artifact directory', async () => {
+    const archivePath = await createPackageArchive(createContractManifest(), [])
+    const checksumPath = await writeArtifactChecksum(archivePath)
+    await writeFile(join(dirname(archivePath), 'second.tgz'), 'second')
+    const operations = createReleaseVerificationOperations({
+      templateDirectory: '/unused',
+    })
+
+    await expect(operations.loadArtifact({
+      archivePath,
+      checksumPath,
+    })).rejects.toThrow('exactly one tarball; found 2')
+  })
+
+  it('rejects an unsafe archive entry while reconstructing the packlist', async () => {
+    const archivePath = await createPackageArchive(createContractManifest(), [])
+    const checksumPath = await writeArtifactChecksum(archivePath)
+    const commandRunner = vi.fn(async () => ({
+      stdout: 'package/package.json\npackage/../outside.mjs\n',
+    }))
+    const operations = createReleaseVerificationOperations({
+      templateDirectory: '/unused',
+      commandRunner,
+    })
+
+    await expect(operations.loadArtifact({
+      archivePath,
+      checksumPath,
+    })).rejects.toThrow('unsafe entry: package/../outside.mjs')
   })
 })
 

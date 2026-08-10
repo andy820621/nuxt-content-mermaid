@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createReleaseVerificationOperations } from './operations.mjs'
 import { selectVersionProfile } from './profiles.mjs'
@@ -8,7 +8,7 @@ import {
   runPackageArtifactVerification,
 } from './runner.mjs'
 
-const OPTION_NAMES = new Set(['package-source', 'profile'])
+const OPTION_NAMES = new Set(['archive', 'checksum', 'package-source', 'profile'])
 
 export function parseVerificationSelection(argv) {
   const options = new Map()
@@ -33,8 +33,22 @@ export function parseVerificationSelection(argv) {
   }
 
   const packageSource = options.get('package-source') ?? 'pack'
-  if (packageSource !== 'pack') {
+  if (packageSource !== 'pack' && packageSource !== 'artifact') {
     throw new Error(`Unsupported package source: ${packageSource}`)
+  }
+
+  const archivePath = options.get('archive')
+  const checksumPath = options.get('checksum')
+  if (packageSource === 'artifact') {
+    if (!archivePath || !checksumPath) {
+      throw new Error('Artifact package source requires --archive and --checksum')
+    }
+    if (!isAbsolute(archivePath) || !isAbsolute(checksumPath)) {
+      throw new Error('Artifact archive and checksum paths must be absolute')
+    }
+  }
+  else if (archivePath || checksumPath) {
+    throw new Error('--archive and --checksum are only valid with artifact package source')
   }
 
   const profileId = options.get('profile')
@@ -44,6 +58,7 @@ export function parseVerificationSelection(argv) {
 
   return {
     packageSource,
+    ...(archivePath && checksumPath ? { archivePath, checksumPath } : {}),
     profileId,
   }
 }
@@ -67,13 +82,34 @@ export async function runReleaseVerificationCli({
 }) {
   const selection = parseVerificationSelection(argv)
   const profile = selectVersionProfile(selection.profileId)
-  const packageSource = {
-    kind: selection.packageSource,
-    repositoryRoot,
+  let creationWorkspace
+  try {
+    let artifact
+    if (selection.packageSource === 'artifact') {
+      artifact = await operations.loadArtifact({
+        archivePath: selection.archivePath,
+        checksumPath: selection.checksumPath,
+      })
+    }
+    else {
+      creationWorkspace = await operations.createWorkspace()
+      artifact = await operations.createArtifact({
+        repositoryRoot,
+        artifactDirectory: creationWorkspace.artifactDirectory,
+      })
+    }
+    const evidence = await runners.single({
+      packageSource: { kind: 'artifact', artifact },
+      profile,
+    }, operations)
+    writeEvidence(evidence)
+    return evidence
   }
-  const evidence = await runners.single({ packageSource, profile }, operations)
-  writeEvidence(evidence)
-  return evidence
+  finally {
+    if (creationWorkspace) {
+      await operations.cleanupWorkspace(creationWorkspace.root)
+    }
+  }
 }
 
 async function main() {

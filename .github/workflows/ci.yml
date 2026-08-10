@@ -11,13 +11,21 @@ on:
 jobs:
   source-verification:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
           node-version: '24.19.0'
+
+      - name: Validate Release PR declaration
+        if: github.event_name == 'pull_request'
+        run: node scripts/release-verification/release-workflow.mjs validate-pr --event-path "$GITHUB_EVENT_PATH"
 
       - run: npm i -g --force corepack@latest && corepack enable
 
@@ -35,6 +43,8 @@ jobs:
 
   final-compatibility-profiles:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: false
