@@ -24,10 +24,11 @@ export default defineNuxtConfig({
 
 ### useMermaidTheme Basic Usage
 
+After this module is registered in Nuxt, `useMermaidTheme` is available as a
+Nuxt auto-import. Do not import it from the package root.
+
 ```vue
 <script setup>
-import { useMermaidTheme } from '@barzhsieh/nuxt-content-mermaid'
-
 const { setMermaidTheme, currentTheme } = useMermaidTheme()
 
 function toggleTheme() {
@@ -154,7 +155,7 @@ When resolving the Mermaid theme, the following priority order applies (from hig
    - Dark mode → Strict Semantic Resolution: `darkTheme ?? 'dark'`
    - Light mode → Strict Semantic Resolution: `lightTheme ?? 'default'`
 
-4. **Base Theme** - `loader.init.theme` in `nuxt.config.ts`
+4. **Resolved Base Theme** - `loader.init.theme` in `nuxt.config.ts`
    ```typescript
    contentMermaid: {
      loader: {
@@ -163,15 +164,9 @@ When resolving the Mermaid theme, the following priority order applies (from hig
    }
    ```
 
-5. **Default Theme** - Final fallback to `theme.light` or `'default'`
-   ```typescript
-   contentMermaid: {
-     theme: {
-       light: 'default',
-       // dark: 'dark' // Even if not set, fallback won't use dark
-     }
-   }
-   ```
+   If omitted, the package runtime snapshot provides `'default'`. `theme.light`
+   is selected only by light color mode or the manual `'light'` strategy; it is
+   not a separate base-theme layer.
 
 ## Coexistence with @nuxtjs/color-mode
 

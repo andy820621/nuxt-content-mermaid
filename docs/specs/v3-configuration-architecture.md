@@ -257,4 +257,8 @@ Implementation is complete only when tests cover:
 - exactly-once `not-found` and `load-failed` diagnostics before Built-in fallback with `debug` both enabled and disabled, without routing through `components.error`;
 - Custom Renderer mount and render failures remaining under Custom Renderer ownership without Built-in fallback;
 - logical invalidation, stale work, staging cleanup, strict and sandbox commit, Committed Diagram preservation, one-error-per-conflict, and latest-only recovery;
-- lint, unit tests, type tests, package build, playground production build, and relevant Nuxt browser fixtures.
+- lint, unit tests, type tests, package build, and relevant Nuxt browser fixtures.
+
+Playground production build is outside this architecture's mandatory
+verification boundary. Its risk-based release-readiness policy is owned by
+[`release-verification.md`](./release-verification.md).
