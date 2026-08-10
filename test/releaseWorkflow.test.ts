@@ -167,6 +167,14 @@ describe('Release PR validation', () => {
     })).toThrow('target marker')
   })
 
+  it('rejects an invalid target marker on a replacement Release PR', () => {
+    expect(() => validateReleasePullRequest({
+      body: '<!-- release-pr-target -->\n- Target version: `<x.y.z>`',
+      baseVersion: '3.0.0',
+      headVersion: '3.0.0',
+    })).toThrow('target marker')
+  })
+
   it('recognizes a replacement Release PR by target marker alone', () => {
     expect(validateReleasePullRequest({
       body: releaseBody(),
@@ -279,6 +287,14 @@ describe('publish preflight', () => {
         body: releaseBody(),
       })),
     }, 'merged Release PR'],
+    ['merged PR is not a Release PR', {
+      readMergedReleasePullRequest: vi.fn(async () => ({
+        state: 'merged',
+        baseRef: 'main',
+        mergeCommitSha: 'release-sha',
+        body: '## Summary\n\nOrdinary change.',
+      })),
+    }, 'merged Release PR'],
     ['fresh release already has a tag', {
       readTagState: vi.fn(async () => ({
         state: 'present',
@@ -363,6 +379,19 @@ describe('npm publication reconciliation', () => {
       archivePath: packageArtifact.archivePath,
     })
   })
+
+  it.each(['3.0.0', '3.0.1'])(
+    'does not publish when npm latest is %s',
+    async (latestVersion) => {
+      const effects = publishEffects([{
+        exact: { state: 'absent' },
+        latestVersion,
+      }])
+
+      await expect(runNpmPublish({ request, effects })).rejects.toThrow('strictly greater')
+      expect(effects.publishArtifact).not.toHaveBeenCalled()
+    },
+  )
 
   it('skips publish when exact integrity already matches', async () => {
     const effects = publishEffects([publishedNpmState, publishedNpmState])

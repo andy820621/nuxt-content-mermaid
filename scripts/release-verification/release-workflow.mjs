@@ -55,11 +55,14 @@ function hasEvidence(value) {
     && !/^(?:n\/?a|todo|tbd|none|\.\.\.)$/i.test(normalized)
 }
 
-function parseTargetVersion(body) {
+function parseReleaseTarget(body) {
   const marker = /<!--\s*release-pr-target\s*-->/i.exec(body)
-  if (!marker) return null
+  if (!marker) return { hasMarker: false, targetVersion: null }
   const target = /Target version:\s*`([^`]+)`/i.exec(body.slice(marker.index))
-  return target && parseStableSemver(target[1]) ? target[1] : null
+  return {
+    hasMarker: true,
+    targetVersion: target && parseStableSemver(target[1]) ? target[1] : null,
+  }
 }
 
 function parseImpactDeclaration(body) {
@@ -111,9 +114,9 @@ function parseManualVerification(body) {
 }
 
 export function validateReleasePullRequest({ body = '', baseVersion, headVersion }) {
-  const targetVersion = parseTargetVersion(body)
+  const { hasMarker, targetVersion } = parseReleaseTarget(body)
   const versionChanged = baseVersion !== headVersion
-  if (!targetVersion && !versionChanged) return { isReleasePullRequest: false }
+  if (!hasMarker && !versionChanged) return { isReleasePullRequest: false }
   if (!targetVersion) {
     throw new Error('Release PR package version change requires a valid target marker')
   }
@@ -250,11 +253,14 @@ export async function runPreflight({ request, effects }) {
     || pullRequest.mergeCommitSha !== request.sourceCommit) {
     throw new Error('github.sha does not correspond to a merged Release PR on main')
   }
-  validateReleasePullRequest({
+  const validation = validateReleasePullRequest({
     body: pullRequest.body,
     baseVersion: request.targetVersion,
     headVersion: request.targetVersion,
   })
+  if (!validation.isReleasePullRequest) {
+    throw new Error('github.sha does not correspond to a merged Release PR on main')
+  }
   extractChangelogSection(await effects.readChangelog(), request.targetVersion)
 
   const tagName = `v${request.targetVersion}`
@@ -304,6 +310,9 @@ export async function runNpmPublish({ request, effects, maxAttempts = 6 }) {
     action = 'skipped'
   }
   else {
+    if (compareStableSemver(request.targetVersion, initial.latestVersion) <= 0) {
+      throw new Error('A fresh release target must be strictly greater than npm latest')
+    }
     action = 'published'
     try {
       await effects.publishArtifact({ archivePath: artifact.archivePath })
