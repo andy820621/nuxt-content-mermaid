@@ -7,11 +7,19 @@ import { tryOnScopeDispose } from './shared/tryOnScopeDispose'
 
 type ExpandState = 'idle' | 'opening' | 'open' | 'closing'
 
-interface ExpandMetrics {
+interface ExpandRect {
   top: number
   left: number
   width: number
   height: number
+}
+
+interface ExpandMetrics {
+  sourceDiagram: ExpandRect
+  sourceClip: ExpandRect
+  expandedClip: ExpandRect
+  sourceOffsetX: number
+  sourceOffsetY: number
   translateX: number
   translateY: number
   scale: number
@@ -19,6 +27,7 @@ interface ExpandMetrics {
 
 interface UseMermaidExpandOptions {
   getExpandTarget: () => SVGElement | null
+  getExpandViewport: () => HTMLElement | null
   expandOptions: ExpandOptions
   isBlocked?: Ref<boolean>
 }
@@ -66,6 +75,22 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   const allowOverlayClose = options.expandOptions.invokeCloseOn?.overlayClick !== false
   const allowCloseButton = options.expandOptions.invokeCloseOn?.closeButtonClick !== false
 
+  const shouldDisableTransition = computed(() => shouldRefreshExpand.value || zoom.isPointerDown.value)
+
+  const expandClipStyle = computed<CSSProperties>(() => {
+    const metrics = expandMetrics.value
+    if (!metrics) return {}
+
+    const rect = isExpanded.value ? metrics.expandedClip : metrics.sourceClip
+    return {
+      top: `${rect.top}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+      transitionDuration: shouldDisableTransition.value ? '0ms' : undefined,
+    }
+  })
+
   const expandTargetStyle = computed<CSSProperties>(() => {
     const metrics = expandMetrics.value
     if (!metrics) return {}
@@ -73,14 +98,14 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const { transform } = zoom.transformStyle.value
 
     return {
-      top: `${metrics.top}px`,
-      left: `${metrics.left}px`,
-      width: `${metrics.width}px`,
-      height: `${metrics.height}px`,
+      top: `${isExpanded.value ? 0 : metrics.sourceOffsetY}px`,
+      left: `${isExpanded.value ? 0 : metrics.sourceOffsetX}px`,
+      width: `${metrics.sourceDiagram.width}px`,
+      height: `${metrics.sourceDiagram.height}px`,
       transform: isExpanded.value
         ? transform
         : 'translate(0px, 0px) scale(1)',
-      transitionDuration: (shouldRefreshExpand.value || zoom.isPointerDown.value) ? '0ms' : undefined,
+      transitionDuration: shouldDisableTransition.value ? '0ms' : undefined,
     }
   })
 
@@ -141,6 +166,21 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     }
   }
 
+  function intersectRects(...rects: ExpandRect[]): ExpandRect | null {
+    const left = Math.max(...rects.map(rect => rect.left))
+    const top = Math.max(...rects.map(rect => rect.top))
+    const right = Math.min(...rects.map(rect => rect.left + rect.width))
+    const bottom = Math.min(...rects.map(rect => rect.top + rect.height))
+    if (right <= left || bottom <= top) return null
+
+    return {
+      top,
+      left,
+      width: right - left,
+      height: bottom - top,
+    }
+  }
+
   function getLockedViewportWidth() {
     const width = document.documentElement.clientWidth || window.innerWidth
     return Math.max(1, Math.round(width))
@@ -197,27 +237,57 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function calculateExpandMetrics(target: SVGElement): ExpandMetrics | null {
-    const rect = target.getBoundingClientRect()
-    if (!rect.width || !rect.height) return null
+    const sourceRect = target.getBoundingClientRect()
+    if (!sourceRect.width || !sourceRect.height) return null
+
+    const viewport = options.getExpandViewport()
+    if (!viewport) return null
+    const viewportRect = viewport.getBoundingClientRect()
 
     const margin = resolveExpandMargin()
     const { width, height } = getLayoutViewportSize()
     const viewportWidth = Math.max(1, width - margin * 2)
     const viewportHeight = Math.max(1, height - margin * 2)
-    const scaleX = viewportWidth / rect.width
-    const scaleY = viewportHeight / rect.height
+    const sourceDiagram = {
+      top: sourceRect.top,
+      left: sourceRect.left,
+      width: sourceRect.width,
+      height: sourceRect.height,
+    }
+    const sourceViewport = {
+      top: viewportRect.top + viewport.clientTop,
+      left: viewportRect.left + viewport.clientLeft,
+      width: viewport.clientWidth,
+      height: viewport.clientHeight,
+    }
+    const sourceClip = intersectRects(
+      sourceDiagram,
+      sourceViewport,
+      { top: 0, left: 0, width, height },
+    )
+    if (!sourceClip) return null
+
+    const expandedClip = {
+      top: margin,
+      left: margin,
+      width: viewportWidth,
+      height: viewportHeight,
+    }
+    const scaleX = viewportWidth / sourceRect.width
+    const scaleY = viewportHeight / sourceRect.height
     const scale = Number.isFinite(scaleX) && Number.isFinite(scaleY)
       ? Math.min(scaleX, scaleY)
       : 1
     const safeScale = scale > 0 ? scale : 1
 
     return {
-      top: rect.top,
-      left: rect.left,
-      width: rect.width,
-      height: rect.height,
-      translateX: width / 2 - (rect.left + rect.width * safeScale / 2),
-      translateY: height / 2 - (rect.top + rect.height * safeScale / 2),
+      sourceDiagram,
+      sourceClip,
+      expandedClip,
+      sourceOffsetX: sourceDiagram.left - sourceClip.left,
+      sourceOffsetY: sourceDiagram.top - sourceClip.top,
+      translateX: (viewportWidth - sourceRect.width * safeScale) / 2,
+      translateY: (viewportHeight - sourceRect.height * safeScale) / 2,
       scale: safeScale,
     }
   }
@@ -322,8 +392,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       scale: metrics.scale,
       translateX: metrics.translateX,
       translateY: metrics.translateY,
-      top: metrics.top,
-      left: metrics.left,
+      top: metrics.expandedClip.top,
+      left: metrics.expandedClip.left,
     })
 
     expandState.value = 'opening'
@@ -535,8 +605,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       scale: metrics.scale,
       translateX: metrics.translateX,
       translateY: metrics.translateY,
-      top: metrics.top,
-      left: metrics.left,
+      top: metrics.expandedClip.top,
+      left: metrics.expandedClip.left,
     })
 
     shouldRefreshExpand.value = true
@@ -650,6 +720,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   return {
     setExpandModal,
     setExpandTargetWrap,
+    expandClipStyle,
     expandTargetStyle,
     isExpandActive,
     isVisible,

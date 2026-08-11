@@ -86,7 +86,7 @@ describe('expand/fullscreen toolbars', async () => {
     expect(await page.locator('body > .ncm-expand-modal').count()).toBe(1)
     expect(await page.locator('.mermaid-wrapper.ncm-expand-hidden #mock-svg').count()).toBe(1)
     expect(await page.locator('.ncm-expand-modal > .ncm-expand-overlay.ncm-expand-overlay-visible').count()).toBe(1)
-    expect(await page.locator('.ncm-expand-content > .ncm-expand-target > svg[id^="mock-svg-ncm-"]').count()).toBe(1)
+    expect(await page.locator('.ncm-expand-clip > .ncm-expand-target > svg[id^="mock-svg-ncm-"]').count()).toBe(1)
     expect(await page.getByLabel('Minimize diagram').getAttribute('type')).toBe('button')
 
     const overlayZoomInfo = page.locator('.ncm-zoom-toolbar--overlay .ncm-zoom-info')
@@ -172,6 +172,45 @@ describe('expand/fullscreen toolbars', async () => {
 
     expect(await readPageStyles(page)).toEqual(restoredPageStyles)
     expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+  })
+
+  it('closes a horizontally scrolled diagram into the visible source viewport', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await page.goto(url('/'))
+    await page.waitForSelector('#mock-svg', { state: 'visible', timeout: 5000 })
+
+    const source = await page.evaluate(() => {
+      const wrapper = document.querySelector<HTMLElement>('#diagram-root .mermaid-wrapper')!
+      const svg = document.querySelector<SVGSVGElement>('#mock-svg')!
+      wrapper.scrollLeft = wrapper.scrollWidth - wrapper.clientWidth
+      const wrapperRect = wrapper.getBoundingClientRect()
+      return {
+        scrollLeft: wrapper.scrollLeft,
+        viewportLeft: wrapperRect.left + wrapper.clientLeft,
+        svgLeft: svg.getBoundingClientRect().left,
+      }
+    })
+    expect(source.scrollLeft).toBeGreaterThan(0)
+    expect(source.svgLeft).toBeLessThan(source.viewportLeft)
+
+    await page.locator('#diagram-root').getByLabel('Expand diagram').click()
+    await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
+    await page.getByLabel('Minimize diagram').click()
+
+    const closingClipLefts = await page.evaluate(async () => {
+      const samples: number[] = []
+      for (let index = 0; index < 8; index++) {
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+        const clip = document.querySelector<HTMLElement>('.ncm-expand-clip')
+        if (clip) samples.push(clip.getBoundingClientRect().left)
+      }
+      return samples
+    })
+    expect(closingClipLefts.length).toBeGreaterThan(0)
+    expect(Math.min(...closingClipLefts)).toBeGreaterThanOrEqual(Math.min(32, source.viewportLeft) - 1)
+
+    await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
+    expect(await page.locator('#diagram-root .mermaid-wrapper').evaluate(wrapper => wrapper.scrollLeft)).toBe(source.scrollLeft)
   })
 
   it('proves the complete fullscreen lifecycle and cleanup through the Package User path', { timeout: 20000 }, async () => {

@@ -17,9 +17,10 @@ const mermaidStub = {
 
     const id = source.includes('SECONDARY') ? 'mock-svg-secondary' : 'mock-svg'
     const preserveAspectRatio = id === 'mock-svg' ? ' preserveAspectRatio="xMinYMin meet"' : ''
+    const width = id === 'mock-svg' ? 1600 : 600
     return {
       diagramType: 'flowchart',
-      svg: `<svg id="${id}" width="600" height="400"${preserveAspectRatio}></svg>`,
+      svg: `<svg id="${id}" width="${width}" height="400"${preserveAspectRatio}></svg>`,
     }
   },
 }

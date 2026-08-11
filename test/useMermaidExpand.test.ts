@@ -40,6 +40,22 @@ function createSvgStub(rect: { top: number, left: number, width: number, height:
   return svg
 }
 
+function createViewportStub(
+  rect: { top: number, left: number, width: number, height: number },
+  scrollLeft = 0,
+) {
+  return {
+    nodeType: 1,
+    clientLeft: 0,
+    clientTop: 0,
+    clientWidth: rect.width,
+    clientHeight: rect.height,
+    scrollLeft,
+    scrollTop: 0,
+    getBoundingClientRect: () => rect,
+  }
+}
+
 function createElement(className = '') {
   const children: unknown[] = []
   let textContent = ''
@@ -104,19 +120,31 @@ function createBrowser() {
   }
 }
 
-function setupExpand(options: ExpandOptions = DEFAULT_EXPAND_OPTIONS) {
-  const svg = createSvgStub({ top: 10, left: 20, width: 200, height: 100 })
+function setupExpand(
+  options: ExpandOptions = DEFAULT_EXPAND_OPTIONS,
+  geometry: {
+    svg?: { top: number, left: number, width: number, height: number }
+    viewport?: { top: number, left: number, width: number, height: number }
+    scrollLeft?: number
+  } = {},
+) {
+  const svg = createSvgStub(geometry.svg ?? { top: 10, left: 20, width: 200, height: 100 })
+  const viewport = createViewportStub(
+    geometry.viewport ?? { top: 0, left: 0, width: 1000, height: 800 },
+    geometry.scrollLeft,
+  )
   const target = createElement('ncm-expand-target')
   const modal = createElement('ncm-expand-modal')
   const blocked = ref(false)
   const expand = useMermaidExpand({
     getExpandTarget: () => svg as unknown as SVGElement,
+    getExpandViewport: () => viewport as unknown as HTMLElement,
     expandOptions: options,
     isBlocked: blocked,
   })
   expand.setExpandTargetWrap(target as unknown as Element)
   expand.setExpandModal(modal as unknown as Element)
-  return { expand, svg, target, modal, blocked }
+  return { expand, svg, viewport, target, modal, blocked }
 }
 
 async function openExpand(expand: ReturnType<typeof useMermaidExpand>, browser: ReturnType<typeof createBrowser>) {
@@ -163,6 +191,38 @@ describe('useMermaidExpand', () => {
     expect(target.textContent).toBe('')
     expect(document.body.style).toMatchObject({ overflow: 'auto', width: '80px' })
     expect(document.documentElement.style).toMatchObject({ overflow: 'visible', width: '120px' })
+  })
+
+  it('closes a horizontally scrolled diagram into its visible source slice', async () => {
+    const ctx = setupExpand(DEFAULT_EXPAND_OPTIONS, {
+      svg: { top: 100, left: -748, width: 1348, height: 240 },
+      viewport: { top: 100, left: 300, width: 300, height: 240 },
+      scrollLeft: 1048,
+    })
+
+    ctx.expand.toggle()
+    await nextTick()
+
+    expect(ctx.expand.expandClipStyle.value).toMatchObject({
+      top: '100px',
+      left: '300px',
+      width: '300px',
+      height: '240px',
+    })
+    expect(ctx.expand.expandTargetStyle.value).toMatchObject({
+      top: '0px',
+      left: '-1048px',
+      width: '1348px',
+      height: '240px',
+      transform: 'translate(0px, 0px) scale(1)',
+    })
+
+    browser.flushRafs()
+    ctx.expand.toggle()
+
+    expect(ctx.expand.expandClipStyle.value.left).toBe('300px')
+    expect(ctx.expand.expandTargetStyle.value.left).toBe('-1048px')
+    expect(ctx.viewport.scrollLeft).toBe(1048)
   })
 
   it.each([
