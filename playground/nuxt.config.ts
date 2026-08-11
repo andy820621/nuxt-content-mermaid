@@ -40,7 +40,7 @@ export default defineNuxtConfig({
     components: {
       // renderer: 'MyMermaid',
       // spinner: 'MySpinner',
-      // error: 'MermaidError',
+      error: 'MermaidError',
     },
     toolbar: {
       title: 'Snapshot at app initialization',

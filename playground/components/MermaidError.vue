@@ -11,11 +11,18 @@ const message = computed(() => {
     return props.error.message
   return String(props.error ?? 'Unknown error')
 })
+
+const stack = computed(() => {
+  if (props.error instanceof Error)
+    return props.error.stack ?? props.error.message
+  return String(props.error ?? 'Unknown error')
+})
 </script>
 
 <template>
   <div class="mermaid-error">
     <p>Mermaid rendering failed: {{ message }}</p>
+    <pre class="mermaid-error__stack">{{ stack }}</pre>
 
     <details>
       <summary>View original mermaid definition</summary>

@@ -17,9 +17,8 @@ graph TD
 ## Syntax Error Chart (should display full error stack)
 
 ```mermaid
-graph TD
-    A --> 
-    B --> C
+flowchart TD
+    A --
 ```
 
 ## Another Normal Chart (Test Queue Mechanism)
