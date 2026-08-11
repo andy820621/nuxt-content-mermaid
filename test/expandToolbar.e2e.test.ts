@@ -11,6 +11,14 @@ const parsePercent = (value: string | null) => {
 }
 
 type BrowserPage = Awaited<ReturnType<typeof createPage>>
+type RectGeometry = { top: number, left: number, width: number, height: number }
+
+const rectDistance = (from: RectGeometry, to: RectGeometry) => Math.hypot(
+  from.top - to.top,
+  from.left - to.left,
+  from.width - to.width,
+  from.height - to.height,
+)
 
 const restoredPageStyles = {
   bodyOverflow: '',
@@ -172,6 +180,108 @@ describe('expand/fullscreen toolbars', async () => {
 
     expect(await readPageStyles(page)).toEqual(restoredPageStyles)
     expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+  })
+
+  it.each([
+    { label: 'a diagram without horizontal overflow', rootSelector: '#secondary-root', scrollPosition: 'left' },
+    { label: 'the left edge of a horizontally scrollable diagram', rootSelector: '#diagram-root', scrollPosition: 'left' },
+    { label: 'the right edge of a horizontally scrollable diagram', rootSelector: '#diagram-root', scrollPosition: 'right' },
+  ])('opens $label from its visible source slice', { timeout: 20000 }, async ({ rootSelector, scrollPosition }) => {
+    const page = await createPage()
+    await page.goto(url('/'))
+    await page.waitForSelector(`${rootSelector} .mermaid-wrapper svg`, { state: 'visible', timeout: 5000 })
+    const transitionStyle = await page.addStyleTag({
+      content: `
+        .ncm-expand-clip,
+        .ncm-expand-target {
+          transition-duration: 3s !important;
+          transition-timing-function: linear !important;
+        }
+      `,
+    })
+
+    const opening = await page.evaluate(async ({ rootSelector, scrollPosition }) => {
+      const root = document.querySelector<HTMLElement>(rootSelector)!
+      root.scrollIntoView({ block: 'center' })
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
+      const wrapper = root.querySelector<HTMLElement>('.mermaid-wrapper')!
+      const svg = wrapper.querySelector<SVGSVGElement>('.mermaid > svg')!
+      wrapper.scrollLeft = scrollPosition === 'right'
+        ? wrapper.scrollWidth - wrapper.clientWidth
+        : 0
+
+      const sourceRect = svg.getBoundingClientRect()
+      const viewportRect = wrapper.getBoundingClientRect()
+      const sourceClip = {
+        top: Math.max(sourceRect.top, viewportRect.top + wrapper.clientTop, 0),
+        left: Math.max(sourceRect.left, viewportRect.left + wrapper.clientLeft, 0),
+        right: Math.min(sourceRect.right, viewportRect.left + wrapper.clientLeft + wrapper.clientWidth, window.innerWidth),
+        bottom: Math.min(sourceRect.bottom, viewportRect.top + wrapper.clientTop + wrapper.clientHeight, window.innerHeight),
+      }
+
+      const cloneMounted = new Promise<void>((resolve) => {
+        const observer = new MutationObserver(() => {
+          if (!document.querySelector('.ncm-expand-target > svg')) return
+          observer.disconnect()
+          resolve()
+        })
+        observer.observe(document.body, { childList: true, subtree: true })
+      })
+
+      root.querySelector<HTMLButtonElement>('[aria-label="Expand diagram"]')!.click()
+      await cloneMounted
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
+      const clipRect = document.querySelector<HTMLElement>('.ncm-expand-clip')!.getBoundingClientRect()
+      const targetRect = document.querySelector<HTMLElement>('.ncm-expand-target')!.getBoundingClientRect()
+      return {
+        source: {
+          top: sourceRect.top,
+          left: sourceRect.left,
+          width: sourceRect.width,
+          height: sourceRect.height,
+        },
+        expectedClip: {
+          top: sourceClip.top,
+          left: sourceClip.left,
+          width: sourceClip.right - sourceClip.left,
+          height: sourceClip.bottom - sourceClip.top,
+        },
+        clip: {
+          top: clipRect.top,
+          left: clipRect.left,
+          width: clipRect.width,
+          height: clipRect.height,
+        },
+        target: {
+          top: targetRect.top,
+          left: targetRect.left,
+          width: targetRect.width,
+          height: targetRect.height,
+        },
+      }
+    }, { rootSelector, scrollPosition })
+
+    await transitionStyle.evaluate(style => style.parentNode?.removeChild(style))
+    await page.evaluate(() => {
+      document.getAnimations().forEach(animation => animation.finish())
+    })
+    const destination = await page.evaluate(() => {
+      const clipRect = document.querySelector<HTMLElement>('.ncm-expand-clip')!.getBoundingClientRect()
+      const targetRect = document.querySelector<HTMLElement>('.ncm-expand-target')!.getBoundingClientRect()
+      return {
+        clip: { top: clipRect.top, left: clipRect.left, width: clipRect.width, height: clipRect.height },
+        target: { top: targetRect.top, left: targetRect.left, width: targetRect.width, height: targetRect.height },
+      }
+    })
+
+    expect(rectDistance(opening.target, opening.source)).toBeLessThan(rectDistance(opening.target, destination.target))
+    expect(rectDistance(opening.clip, opening.expectedClip)).toBeLessThan(rectDistance(opening.clip, destination.clip))
+
+    await page.getByLabel('Minimize diagram').click()
+    await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
   })
 
   it('closes a horizontally scrolled diagram into the visible source viewport', { timeout: 20000 }, async () => {

@@ -407,11 +407,18 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
         return
       }
 
+      // Give the teleported clone one painted source frame before applying its destination geometry.
       openingRaf = requestAnimationFrame(() => {
-        openingRaf = undefined
-        if (expandState.value !== 'opening') return
-        isExpanded.value = true
-        expandState.value = 'open'
+        if (expandState.value !== 'opening') {
+          openingRaf = undefined
+          return
+        }
+        openingRaf = requestAnimationFrame(() => {
+          openingRaf = undefined
+          if (expandState.value !== 'opening') return
+          isExpanded.value = true
+          expandState.value = 'open'
+        })
       })
     })
   }
