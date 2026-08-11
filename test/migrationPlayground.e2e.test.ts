@@ -74,4 +74,66 @@ describe('v3 migration playground', async () => {
     expect(await renderedText()).toContain('RECOVERED')
     expect(await recoveryPhase()).toBe('conflict')
   })
+
+  it('keeps the class diagram on the content axis throughout expand and minimize', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid/classdiagram/finance-ledger'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 15000 })
+    await page.addStyleTag({
+      content: `
+        html {
+          width: calc(100% - 15px);
+        }
+        .ncm-expand-clip,
+        .ncm-expand-target {
+          transition-duration: 600ms !important;
+          transition-timing-function: linear !important;
+        }
+      `,
+    })
+
+    const result = await page.evaluate(async () => {
+      Object.defineProperty(document.documentElement, 'clientWidth', {
+        configurable: true,
+        get: () => window.innerWidth - 15,
+      })
+      const centerX = (element: Element) => {
+        const rect = element.getBoundingClientRect()
+        return rect.left + rect.width / 2
+      }
+      const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+      const source = document.querySelector<SVGSVGElement>('.mermaid-block .mermaid > svg')!
+      const sourceCenter = centerX(source)
+      const gutter = window.innerWidth - document.documentElement.clientWidth
+
+      document.querySelector<HTMLButtonElement>('.mermaid-block [aria-label="Expand diagram"]')!.click()
+      const opening: number[] = []
+      for (let index = 0; index < 48; index++) {
+        await nextFrame()
+        const target = document.querySelector<HTMLElement>('.ncm-expand-target')
+        if (target) opening.push(centerX(target))
+      }
+
+      document.querySelector<HTMLButtonElement>('[aria-label="Minimize diagram"]')!.click()
+      const closing: number[] = []
+      for (let index = 0; index < 48; index++) {
+        await nextFrame()
+        const target = document.querySelector<HTMLElement>('.ncm-expand-target')
+        if (target) closing.push(centerX(target))
+      }
+
+      return { sourceCenter, gutter, innerWidth: window.innerWidth, opening, closing }
+    })
+
+    expect(result.gutter).toBeGreaterThan(0)
+    expect(result.sourceCenter).toBeCloseTo((result.innerWidth - result.gutter) / 2, 0)
+    expect(result.opening.length).toBeGreaterThan(2)
+    expect(result.closing.length).toBeGreaterThan(2)
+    expect(Math.max(...result.opening.map(center => Math.abs(center - result.sourceCenter)))).toBeLessThanOrEqual(0.25)
+    expect(Math.max(...result.closing.map(center => Math.abs(center - result.sourceCenter)))).toBeLessThanOrEqual(0.25)
+  })
 })

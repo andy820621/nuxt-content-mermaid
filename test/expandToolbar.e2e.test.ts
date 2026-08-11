@@ -192,7 +192,7 @@ describe('expand/fullscreen toolbars', async () => {
     expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
   })
 
-  it('keeps a centered source stationary while expanded motion reverses one path', { timeout: 20000 }, async () => {
+  it('keeps the source stationary while expanded motion reverses one content-plane path', { timeout: 20000 }, async () => {
     const page = await createPage()
     await page.goto(url('/'))
     await page.waitForSelector('#mock-svg-secondary', { state: 'visible', timeout: 5000 })
@@ -264,7 +264,7 @@ describe('expand/fullscreen toolbars', async () => {
 
       return {
         gutter,
-        viewportCenter: window.innerWidth / 2,
+        contentViewportCenter: (window.innerWidth - gutter) / 2,
         sourceBefore: { left: sourceBefore.left, center: sourceBefore.left + sourceBefore.width / 2 },
         sourceWhileLocked: { left: sourceWhileLocked.left, center: sourceWhileLocked.left + sourceWhileLocked.width / 2 },
         sourceAfter: { left: sourceAfter.left, center: sourceAfter.left + sourceAfter.width / 2 },
@@ -277,11 +277,11 @@ describe('expand/fullscreen toolbars', async () => {
     expect(result.sourceWhileLocked.left).toBeCloseTo(result.sourceBefore.left, 0)
     expect(result.sourceAfter.left).toBeCloseTo(result.sourceBefore.left, 0)
     expect(result.opening[0]).toBeCloseTo(result.sourceBefore.center, 0)
-    expect(result.opening.at(-1)).toBeCloseTo(result.viewportCenter, 0)
-    expect(result.closing[0]).toBeCloseTo(result.viewportCenter, 0)
-    const minCenter = Math.min(result.sourceBefore.center, result.viewportCenter)
-    const maxCenter = Math.max(result.sourceBefore.center, result.viewportCenter)
-    const openingDirection = result.viewportCenter >= result.sourceBefore.center ? 1 : -1
+    expect(result.opening.at(-1)).toBeCloseTo(result.contentViewportCenter, 0)
+    expect(result.closing[0]).toBeCloseTo(result.contentViewportCenter, 0)
+    const minCenter = Math.min(result.sourceBefore.center, result.contentViewportCenter)
+    const maxCenter = Math.max(result.sourceBefore.center, result.contentViewportCenter)
+    const openingDirection = result.contentViewportCenter >= result.sourceBefore.center ? 1 : -1
     expect(Math.min(...result.closing)).toBeGreaterThanOrEqual(minCenter - 0.25)
     expect(Math.max(...result.closing)).toBeLessThanOrEqual(maxCenter + 0.25)
     expectMonotonic(result.opening, openingDirection)

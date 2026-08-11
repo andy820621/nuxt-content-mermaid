@@ -83,6 +83,7 @@ function createElement(className = '') {
 
 function createBrowser() {
   let rafId = 0
+  let transitionDuration = '0s'
   const rafs = new Map<number, FrameRequestCallback>()
   const rafHistory: FrameRequestCallback[] = []
   const viewportState = { width: 1000, height: 800, gutter: 20 }
@@ -104,7 +105,7 @@ function createBrowser() {
     innerHeight: viewportState.height,
     visualViewport,
     document: documentTarget,
-    getComputedStyle: vi.fn(() => ({ transitionDuration: '0s' })),
+    getComputedStyle: vi.fn(() => ({ transitionDuration })),
   })
 
   vi.stubGlobal('document', documentTarget)
@@ -122,6 +123,9 @@ function createBrowser() {
     windowTarget,
     visualViewport,
     rafHistory,
+    setTransitionDuration(value: string) {
+      transitionDuration = value
+    },
     resizeViewport(width: number, height: number, scrollHeight: number) {
       viewportState.width = width
       viewportState.height = height
@@ -201,7 +205,7 @@ describe('useMermaidExpand', () => {
     expect(expand.isExpandActive.value).toBe(true)
     expect(expand.isVisible.value).toBe(true)
     expect(target.children).toHaveLength(1)
-    expect(expand.expandTargetStyle.value.transform).toContain('scale(5)')
+    expect(expand.expandTargetStyle.value.transform).toContain('scale(4.9)')
     expect(document.body.style.overflow).toBe('hidden')
     expect(document.documentElement.style.overflow).toBe('hidden')
 
@@ -322,13 +326,18 @@ describe('useMermaidExpand', () => {
     expect(ctx.expand.isVisible.value).toBe(true)
   })
 
-  it.each(['resize', 'orientationchange', 'visual viewport resize'])('refits after %s and cancels delayed refresh on close', async (eventName) => {
+  it.each([
+    { eventName: 'resize', changesLayoutViewport: true },
+    { eventName: 'orientationchange', changesLayoutViewport: true },
+    { eventName: 'visual viewport resize', changesLayoutViewport: false },
+  ])('refits after $eventName when layout geometry changes and cancels delayed work on close', async ({ eventName, changesLayoutViewport }) => {
     const ctx = setupExpand()
     await openExpand(ctx.expand, browser)
+    if (changesLayoutViewport) browser.resizeViewport(900, 700, 1200)
     const target = eventName === 'visual viewport resize' ? browser.visualViewport : browser.windowTarget
     target.dispatch(eventName === 'visual viewport resize' ? 'resize' : eventName)
     browser.flushRafs()
-    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBe('0ms')
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBe(changesLayoutViewport ? '0ms' : undefined)
 
     ctx.expand.toggle()
     finishClose(ctx.target)
@@ -364,7 +373,7 @@ describe('useMermaidExpand', () => {
     expect(document.body.style.width).toBe('80px')
   })
 
-  it('keeps layout viewport coordinates when the visual viewport excludes the scrollbar', async () => {
+  it('keeps the scrollbar-excluded content viewport as the expand coordinate plane', async () => {
     browser.visualViewport.width = 980
     const ctx = setupExpand()
 
@@ -372,8 +381,42 @@ describe('useMermaidExpand', () => {
 
     expect(document.documentElement.style.width).toBe('980px')
     expect(document.body.style.width).toBe('980px')
-    expect(ctx.expand.expandClipStyle.value.width).toBe('1000px')
-    expect(ctx.expand.expandTargetStyle.value.transform).toContain('scale(5)')
+    expect(ctx.expand.expandClipStyle.value.width).toBe('980px')
+    expect(ctx.expand.expandTargetStyle.value.transform).toContain('scale(4.9)')
+  })
+
+  it('keeps one opening snapshot through scrollbar and viewport resize events', async () => {
+    browser.visualViewport.width = 980
+    browser.setTransitionDuration('0.3s')
+    const ctx = setupExpand()
+
+    ctx.expand.toggle()
+    await nextTick()
+    browser.flushRafs()
+    await nextTick()
+    browser.flushRafs()
+    await nextTick()
+
+    browser.visualViewport.width = 1000
+    browser.visualViewport.dispatch('resize')
+    browser.flushRafs()
+
+    expect(ctx.expand.isVisible.value).toBe(true)
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBeUndefined()
+    expect(ctx.expand.expandClipStyle.value.width).toBe('980px')
+
+    browser.resizeViewport(800, 600, 1200)
+    browser.windowTarget.dispatch('resize')
+    browser.flushRafs()
+
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBeUndefined()
+    expect(ctx.expand.expandClipStyle.value.width).toBe('980px')
+
+    ctx.target.dispatch('transitionend', { propertyName: 'transform' })
+    browser.flushRafs()
+
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBe('0ms')
+    expect(ctx.expand.expandClipStyle.value.width).toBe('780px')
   })
 
   it.each(['close', 'replacement', 'scope disposal'])('cancels active interaction, hints, listeners and pending work on %s', async (ending) => {
