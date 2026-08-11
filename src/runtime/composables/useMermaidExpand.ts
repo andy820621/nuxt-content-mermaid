@@ -160,11 +160,12 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function getLayoutViewportSize() {
-    const viewport = window.visualViewport
-    const scale = viewport?.scale ?? 1
+    // The fixed overlay is positioned in layout-viewport coordinates. A desktop
+    // visual viewport excludes the classic scrollbar, so using it here would
+    // both misplace the expanded destination and hide the scrollbar gutter.
     return {
-      width: (viewport?.width ?? window.innerWidth) * scale,
-      height: (viewport?.height ?? window.innerHeight) * scale,
+      width: window.innerWidth,
+      height: window.innerHeight,
     }
   }
 

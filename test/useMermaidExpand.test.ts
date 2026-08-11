@@ -364,6 +364,18 @@ describe('useMermaidExpand', () => {
     expect(document.body.style.width).toBe('80px')
   })
 
+  it('keeps layout viewport coordinates when the visual viewport excludes the scrollbar', async () => {
+    browser.visualViewport.width = 980
+    const ctx = setupExpand()
+
+    await openExpand(ctx.expand, browser)
+
+    expect(document.documentElement.style.width).toBe('980px')
+    expect(document.body.style.width).toBe('980px')
+    expect(ctx.expand.expandClipStyle.value.width).toBe('1000px')
+    expect(ctx.expand.expandTargetStyle.value.transform).toContain('scale(5)')
+  })
+
   it.each(['close', 'replacement', 'scope disposal'])('cancels active interaction, hints, listeners and pending work on %s', async (ending) => {
     const scope = effectScope()
     const ctx = scope.run(() => setupExpand())!

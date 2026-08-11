@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Keep the source Mermaid renderer stationary while expanded mode animates monotonically between the visible source slice and the complete visual viewport.
+**Goal:** Keep the source Mermaid renderer stationary while expanded mode animates monotonically between the visible source slice and the complete layout viewport.
 
 **Architecture:** Treat source measurement and document scroll locking as one expand-session transaction. Capture the pre-lock layout width and scrollbar gutter before changing overflow, pin the underlying page to that coordinate space, and let the existing clip/diagram layers animate to the full viewport through the existing `isExpanded` state.
 
@@ -203,7 +203,7 @@ git commit -m "fix: stabilize expanded transition coordinates"
 - Modify: `src/runtime/composables/useMermaidExpand.ts:184-202,583-605`
 
 **Interfaces:**
-- Consumes: the private expand-session `scrollbarGutter`, the current visual viewport, and document `scrollHeight`.
+- Consumes: the private expand-session `scrollbarGutter`, the current layout viewport, and document `scrollHeight`.
 - Produces: non-animated resize refresh that never clears the active width lock before remeasurement.
 
 - [ ] **Step 1: Make the unit browser stub reproduce scrollbar disappearance**
@@ -321,6 +321,28 @@ Expected: both files pass with no unhandled errors or warnings.
 git add test/useMermaidExpand.test.ts src/runtime/composables/useMermaidExpand.ts
 git commit -m "fix: preserve expanded layout across resize"
 ```
+
+### Task 2a: Align the fixed overlay with the layout viewport
+
+Real-browser verification exposed a browser-boundary case that the first stub did not model: before scroll lock, Chromium reported `innerWidth=1280`, `documentElement.clientWidth=1265`, and `visualViewport.width=1265`. Using the visual viewport for the fixed overlay therefore hid the 15px gutter and produced a 1265px destination even though the scrollbar-free overlay occupies 1280px.
+
+**Files:**
+- Modify: `test/useMermaidExpand.test.ts`
+- Modify: `src/runtime/composables/useMermaidExpand.ts`
+
+- [ ] **Step 1: Add a failing browser-boundary unit test**
+
+Set the stubbed `visualViewport.width` to 980 while leaving `window.innerWidth` at 1000 and pre-lock `clientWidth` at 980. Assert that opening pins the document to 980px while the expanded clip remains 1000px wide.
+
+Expected RED: the old implementation leaves the original 120px document width because it subtracts 980 from 980 and concludes that no scrollbar gutter exists.
+
+- [ ] **Step 2: Use layout viewport dimensions for fixed-overlay geometry**
+
+Return `window.innerWidth` and `window.innerHeight` from `getLayoutViewportSize()`. Keep visual viewport resize listeners as refresh triggers, but do not mix their scrollbar-reduced width with the fixed overlay's layout-viewport coordinates.
+
+- [ ] **Step 3: Re-run the focused unit and expand browser tests**
+
+Expected GREEN: the new boundary test passes, the document remains pinned, and the existing opening/closing and resize regressions remain green.
 
 ### Task 3: Verify real playground behavior and the complete PR baseline
 

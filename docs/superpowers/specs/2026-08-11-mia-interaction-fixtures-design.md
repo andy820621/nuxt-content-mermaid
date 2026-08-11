@@ -26,7 +26,7 @@ The expanded overlay has two independent geometric objects:
 
 Treating those objects as one rectangle caused the current close animation bug. A raw SVG rectangle can extend far outside the source scroll viewport, so it is not a valid close destination.
 
-Both objects also belong to one **expand session coordinate space**. Source geometry, document layout width, visual viewport size, and scrollbar gutter must be captured before scroll locking mutates the document. The document layout stays pinned to that snapshot while the overlay is active, while the overlay destination may use the complete visual viewport. Mixing pre-lock source measurements with post-lock document layout is invalid even when the animation endpoints appear individually correct.
+Both objects also belong to one **expand session coordinate space**. Source geometry, document layout width, full layout viewport size, and scrollbar gutter must be captured before scroll locking mutates the document. The document layout stays pinned to that snapshot while the overlay is active, while the overlay destination may use the complete layout viewport. Mixing pre-lock source measurements with post-lock document layout is invalid even when the animation endpoints appear individually correct.
 
 The following invariants apply:
 
@@ -65,8 +65,10 @@ Opening begins by creating one session snapshot before changing document styles.
 - the scroll viewport's inner client rectangle, excluding its border and scrollbar;
 - the intersection of those rectangles with the layout viewport, which is the source clip visible on screen;
 - the document's pre-lock `clientWidth`;
-- the complete visual viewport used by the overlay; and
+- the complete layout viewport used by the fixed overlay; and
 - the vertical scrollbar gutter, derived from the difference between the complete viewport and pre-lock layout width.
+
+The full overlay width is `window.innerWidth`, not `visualViewport.width`. On desktop browsers with classic scrollbars, `visualViewport.width` excludes the scrollbar just like `documentElement.clientWidth`; subtracting those values falsely reports a zero gutter and also centers the expanded destination in the narrower source coordinate space. The overlay's `position: fixed` geometry and CSS viewport units belong to the layout viewport, so its width and height are measured with `window.innerWidth` and `window.innerHeight`. Visual viewport resize events remain refresh triggers, but do not redefine the overlay coordinate system.
 
 The captured application styles and platform scrollbar gutter remain immutable for the session. Only an explicit viewport resize may replace the current source and expanded geometry with values derived from that baseline.
 
@@ -75,7 +77,7 @@ The source geometry and document scroll lock are one transaction. Scroll locking
 The session therefore has two intentional destinations:
 
 - **source destination:** the unchanged pre-lock page layout and currently visible source slice; and
-- **expanded destination:** the complete visual viewport after applying the configured margin.
+- **expanded destination:** the complete layout viewport after applying the configured margin.
 
 For a centered diagram on a page with a 15px scrollbar, moving from a 1265px source layout to a 1280px expanded viewport legitimately moves the diagram center from 632.5px to 640px. That movement must be monotonic. The underlying source remains at 632.5px throughout the session, so it never creates a second apparent motion when the translucent overlay appears or disappears.
 
@@ -88,7 +90,7 @@ The closed-state geometry is:
 
 The open-state geometry is:
 
-- clip frame: the complete visual viewport after applying the configured expanded margin; and
+- clip frame: the complete layout viewport after applying the configured expanded margin; and
 - cloned diagram: centered and scaled to fit that viewport, then controlled by the existing zoom/pan state.
 
 One `isExpanded` state change drives both layers with the same duration and timing function. The clip frame transitions its position and size while hiding overflow; the diagram plane transitions between its source-relative offset and expanded zoom transform. Closing changes the same state in the opposite direction and keeps both the overlay and document lock alive until the target transition completes. Only then may cleanup remove the clone and restore every captured document style.
