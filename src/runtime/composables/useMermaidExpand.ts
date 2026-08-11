@@ -15,11 +15,10 @@ interface ExpandRect {
 }
 
 interface ExpandMetrics {
+  coordinatePlane: ExpandRect
   sourceDiagram: ExpandRect
   sourceClip: ExpandRect
   expandedClip: ExpandRect
-  sourceOffsetX: number
-  sourceOffsetY: number
   translateX: number
   translateY: number
   scale: number
@@ -83,10 +82,11 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
     const rect = isExpanded.value ? metrics.expandedClip : metrics.sourceClip
     return {
-      top: `${rect.top}px`,
-      left: `${rect.left}px`,
-      width: `${rect.width}px`,
-      height: `${rect.height}px`,
+      top: `${metrics.coordinatePlane.top}px`,
+      left: `${metrics.coordinatePlane.left}px`,
+      width: `${metrics.coordinatePlane.width}px`,
+      height: `${metrics.coordinatePlane.height}px`,
+      clipPath: toClipPath(rect, metrics.coordinatePlane),
       transitionDuration: shouldDisableTransition.value ? '0ms' : undefined,
     }
   })
@@ -98,8 +98,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const { transform } = zoom.transformStyle.value
 
     return {
-      top: `${isExpanded.value ? 0 : metrics.sourceOffsetY}px`,
-      left: `${isExpanded.value ? 0 : metrics.sourceOffsetX}px`,
+      top: `${metrics.sourceDiagram.top}px`,
+      left: `${metrics.sourceDiagram.left}px`,
       width: `${metrics.sourceDiagram.width}px`,
       height: `${metrics.sourceDiagram.height}px`,
       transform: isExpanded.value
@@ -187,6 +187,14 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     }
   }
 
+  function toClipPath(rect: ExpandRect, plane: ExpandRect) {
+    const top = Math.max(0, rect.top - plane.top)
+    const left = Math.max(0, rect.left - plane.left)
+    const right = Math.max(0, plane.width - left - rect.width)
+    const bottom = Math.max(0, plane.height - top - rect.height)
+    return `inset(${top}px ${right}px ${bottom}px ${left}px)`
+  }
+
   function getLockedViewportWidth() {
     const width = document.documentElement.clientWidth || window.innerWidth
     return Math.max(1, Math.round(width))
@@ -250,6 +258,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
     const margin = resolveExpandMargin()
     const { width, height } = getExpandCoordinateViewportSize()
+    const coordinatePlane = { top: 0, left: 0, width, height }
     const viewportWidth = Math.max(1, width - margin * 2)
     const viewportHeight = Math.max(1, height - margin * 2)
     const sourceDiagram = {
@@ -267,7 +276,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const sourceClip = intersectRects(
       sourceDiagram,
       sourceViewport,
-      { top: 0, left: 0, width, height },
+      coordinatePlane,
     )
     if (!sourceClip) return null
 
@@ -285,13 +294,12 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const safeScale = scale > 0 ? scale : 1
 
     return {
+      coordinatePlane,
       sourceDiagram,
       sourceClip,
       expandedClip,
-      sourceOffsetX: sourceDiagram.left - sourceClip.left,
-      sourceOffsetY: sourceDiagram.top - sourceClip.top,
-      translateX: (viewportWidth - sourceRect.width * safeScale) / 2,
-      translateY: (viewportHeight - sourceRect.height * safeScale) / 2,
+      translateX: expandedClip.left + (expandedClip.width - sourceRect.width * safeScale) / 2 - sourceDiagram.left,
+      translateY: expandedClip.top + (expandedClip.height - sourceRect.height * safeScale) / 2 - sourceDiagram.top,
       scale: safeScale,
     }
   }
@@ -397,8 +405,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       scale: metrics.scale,
       translateX: metrics.translateX,
       translateY: metrics.translateY,
-      top: metrics.expandedClip.top,
-      left: metrics.expandedClip.left,
+      top: metrics.sourceDiagram.top,
+      left: metrics.sourceDiagram.left,
     })
 
     expandState.value = 'opening'
@@ -628,11 +636,10 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function hasSameExpandMetrics(left: ExpandMetrics, right: ExpandMetrics) {
-    return hasSameRect(left.sourceDiagram, right.sourceDiagram)
+    return hasSameRect(left.coordinatePlane, right.coordinatePlane)
+      && hasSameRect(left.sourceDiagram, right.sourceDiagram)
       && hasSameRect(left.sourceClip, right.sourceClip)
       && hasSameRect(left.expandedClip, right.expandedClip)
-      && left.sourceOffsetX === right.sourceOffsetX
-      && left.sourceOffsetY === right.sourceOffsetY
       && left.translateX === right.translateX
       && left.translateY === right.translateY
       && left.scale === right.scale
@@ -654,8 +661,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       scale: metrics.scale,
       translateX: metrics.translateX,
       translateY: metrics.translateY,
-      top: metrics.expandedClip.top,
-      left: metrics.expandedClip.left,
+      top: metrics.sourceDiagram.top,
+      left: metrics.sourceDiagram.left,
     })
 
     shouldRefreshExpand.value = true

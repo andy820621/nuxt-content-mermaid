@@ -193,13 +193,13 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
   overflow: hidden;
   pointer-events: none;
   z-index: 2;
-  transition: top 0.3s, left 0.3s, width 0.3s, height 0.3s;
+  transition: clip-path 0.3s;
 }
 
 .ncm-expand-target {
   position: absolute;
   transform-origin: top left;
-  transition: top 0.3s, left 0.3s, transform 0.3s;
+  transition: transform 0.3s;
   cursor: inherit;
   pointer-events: auto;
 }

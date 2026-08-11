@@ -219,7 +219,7 @@ describe('useMermaidExpand', () => {
     expect(document.documentElement.style).toMatchObject({ overflow: 'visible', width: '120px' })
   })
 
-  it('keeps the visible source slice for one paint frame before expanding', async () => {
+  it('keeps the visible source slice in one viewport coordinate plane while opening', async () => {
     const ctx = setupExpand(DEFAULT_EXPAND_OPTIONS, {
       svg: { top: 100, left: -748, width: 1348, height: 240 },
       viewport: { top: 100, left: 300, width: 300, height: 240 },
@@ -229,32 +229,31 @@ describe('useMermaidExpand', () => {
     ctx.expand.toggle()
     await nextTick()
 
-    expect(ctx.expand.isVisible.value).toBe(false)
     expect(ctx.expand.expandClipStyle.value).toMatchObject({
-      top: '100px',
-      left: '300px',
-      width: '300px',
-      height: '240px',
+      top: '0px',
+      left: '0px',
+      width: '980px',
+      height: '800px',
+      clipPath: 'inset(100px 380px 460px 300px)',
     })
     expect(ctx.expand.expandTargetStyle.value).toMatchObject({
-      top: '0px',
-      left: '-1048px',
+      top: '100px',
+      left: '-748px',
+      width: '1348px',
+      height: '240px',
       transform: 'translate(0px, 0px) scale(1)',
     })
 
     browser.flushRafs()
     await nextTick()
-
-    expect(ctx.expand.isVisible.value).toBe(false)
-    expect(ctx.expand.expandClipStyle.value.left).toBe('300px')
-    expect(ctx.expand.expandTargetStyle.value.left).toBe('-1048px')
-
     browser.flushRafs()
     await nextTick()
 
-    expect(ctx.expand.isVisible.value).toBe(true)
-    expect(ctx.expand.expandClipStyle.value.left).toBe('0px')
-    expect(ctx.expand.expandTargetStyle.value.left).toBe('0px')
+    expect(ctx.expand.expandClipStyle.value.clipPath).toBe('inset(0px 0px 0px 0px)')
+    expect(ctx.expand.expandTargetStyle.value).toMatchObject({
+      top: '100px',
+      left: '-748px',
+    })
   })
 
   it('closes a horizontally scrolled diagram into its visible source slice', async () => {
@@ -268,14 +267,15 @@ describe('useMermaidExpand', () => {
     await nextTick()
 
     expect(ctx.expand.expandClipStyle.value).toMatchObject({
-      top: '100px',
-      left: '300px',
-      width: '300px',
-      height: '240px',
+      top: '0px',
+      left: '0px',
+      width: '980px',
+      height: '800px',
+      clipPath: 'inset(100px 380px 460px 300px)',
     })
     expect(ctx.expand.expandTargetStyle.value).toMatchObject({
-      top: '0px',
-      left: '-1048px',
+      top: '100px',
+      left: '-748px',
       width: '1348px',
       height: '240px',
       transform: 'translate(0px, 0px) scale(1)',
@@ -284,8 +284,8 @@ describe('useMermaidExpand', () => {
     browser.flushRafs()
     ctx.expand.toggle()
 
-    expect(ctx.expand.expandClipStyle.value.left).toBe('300px')
-    expect(ctx.expand.expandTargetStyle.value.left).toBe('-1048px')
+    expect(ctx.expand.expandClipStyle.value.clipPath).toBe('inset(100px 380px 460px 300px)')
+    expect(ctx.expand.expandTargetStyle.value.left).toBe('-748px')
     expect(ctx.viewport.scrollLeft).toBe(1048)
   })
 
