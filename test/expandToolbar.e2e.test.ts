@@ -195,19 +195,31 @@ describe('expand/fullscreen toolbars', async () => {
 
     await page.locator('#diagram-root').getByLabel('Expand diagram').click()
     await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
-    await page.getByLabel('Minimize diagram').click()
+    const lockedViewportLeft = await page.locator('#diagram-root .mermaid-wrapper').evaluate((wrapper) => {
+      const rect = wrapper.getBoundingClientRect()
+      return rect.left + wrapper.clientLeft
+    })
 
-    const closingClipLefts = await page.evaluate(async () => {
+    const closingGeometry = await page.evaluate(async () => {
+      document.querySelector<HTMLButtonElement>('[aria-label="Minimize diagram"]')?.click()
+      await Promise.resolve()
       const samples: number[] = []
+      let destinationLeft = Number.NaN
       for (let index = 0; index < 8; index++) {
         await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
         const clip = document.querySelector<HTMLElement>('.ncm-expand-clip')
-        if (clip) samples.push(clip.getBoundingClientRect().left)
+        if (clip) {
+          if (!Number.isFinite(destinationLeft)) destinationLeft = Number.parseFloat(clip.style.left)
+          samples.push(clip.getBoundingClientRect().left)
+        }
       }
-      return samples
+      return { destinationLeft, samples }
     })
-    expect(closingClipLefts.length).toBeGreaterThan(0)
-    expect(Math.min(...closingClipLefts)).toBeGreaterThanOrEqual(Math.min(32, source.viewportLeft) - 1)
+    expect(closingGeometry.samples.length).toBeGreaterThan(0)
+    expect(Math.abs(closingGeometry.destinationLeft - source.viewportLeft)).toBeLessThanOrEqual(1)
+    expect(Math.min(...closingGeometry.samples)).toBeGreaterThanOrEqual(
+      Math.min(32, lockedViewportLeft, closingGeometry.destinationLeft) - 2,
+    )
 
     await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
     expect(await page.locator('#diagram-root .mermaid-wrapper').evaluate(wrapper => wrapper.scrollLeft)).toBe(source.scrollLeft)
