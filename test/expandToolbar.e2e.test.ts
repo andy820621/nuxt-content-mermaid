@@ -89,7 +89,10 @@ describe('expand/fullscreen toolbars', async () => {
     await page.waitForSelector('#mock-svg', { state: 'visible', timeout: 5000 })
 
     await page.locator('#diagram-root').getByLabel('Expand diagram').click()
-    await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
+    await page.waitForSelector('.ncm-expand-modal > .ncm-expand-overlay.ncm-expand-overlay-visible', {
+      state: 'visible',
+      timeout: 5000,
+    })
 
     expect(await page.locator('body > .ncm-expand-modal').count()).toBe(1)
     expect(await page.locator('.mermaid-wrapper.ncm-expand-hidden #mock-svg').count()).toBe(1)
