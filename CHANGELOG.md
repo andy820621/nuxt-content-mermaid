@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.0.0
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.3...v3.0.0)
+
+### ⚠️ Breaking Changes
+
+- Adopt the Nuxt 4 dependency contract: Node.js `>=22.19.0`, Nuxt `^4.1.0`, and `@nuxt/content >=3.5.0 <4.0.0` are now required ([6f8643e](https://github.com/andy820621/nuxt-content-mermaid/commit/6f8643e)). Nuxt 3 users should remain on the frozen 2.x line.
+- Define the v3 configuration contract and public types ([#33](https://github.com/andy820621/nuxt-content-mermaid/pull/33)): rename the removed `mermaidContent` alias to `contentMermaid`, keep `enabled` in build-time module configuration, and transport only pure data through public runtime configuration.
+- Route configuration authored in Markdown through the `pageConfig` prop ([9507482](https://github.com/andy820621/nuxt-content-mermaid/commit/9507482)). Direct component usage continues to use `config`; supplying both sources is an error.
+- Remove the undocumented package-root `transformMermaidCodeBlocks` export ([#15](https://github.com/andy820621/nuxt-content-mermaid/pull/15)). Install the module through its default export and let it own Markdown transformation.
+
+### 🚀 Highlights
+
+- Add SSR-safe, transactional Mermaid rendering so stale or failed renders cannot replace the latest successfully committed diagram ([#5](https://github.com/andy820621/nuxt-content-mermaid/pull/5), [#24](https://github.com/andy820621/nuxt-content-mermaid/pull/24), [#35](https://github.com/andy820621/nuxt-content-mermaid/pull/35)).
+- Isolate configuration by Nuxt application and component invocation, with frozen runtime snapshots and deterministic recovery from reactive source conflicts ([#34](https://github.com/andy820621/nuxt-content-mermaid/pull/34), [#37](https://github.com/andy820621/nuxt-content-mermaid/pull/37), [#40](https://github.com/andy820621/nuxt-content-mermaid/pull/40), [#41](https://github.com/andy820621/nuxt-content-mermaid/pull/41)).
+- Make renderer selection and fallback handoff deterministic, with public diagnostics when renderer resolution fails ([#49](https://github.com/andy820621/nuxt-content-mermaid/pull/49), [#51](https://github.com/andy820621/nuxt-content-mermaid/pull/51), [#52](https://github.com/andy820621/nuxt-content-mermaid/pull/52)).
+
+### 📘 Migration
+
+Follow the [v3 migration guide](./docs/en/MIGRATION_V3.md) for configuration examples and the [dependency and migration contract](./docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT.md) for the complete 3.x support policy.
+
+### ❤️ Contributors
+
+- [@BarZ](https://github.com/andy820621) - <andy820621@gmail.com>
+
 ## v2.2.3
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.2...v2.2.3)
