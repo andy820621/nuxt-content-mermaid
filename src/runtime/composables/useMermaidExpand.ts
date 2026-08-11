@@ -190,13 +190,14 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
   function updateLockedWidth() {
     if (!scrollState.lockedWidth || document.body.style.overflow !== 'hidden') return
-    document.documentElement.style.width = ''
-    document.body.style.width = ''
-    // Force reflow so the layout viewport picks up the latest size.
-    void document.body.offsetHeight
-    const clientWidth = getLockedViewportWidth()
-    document.documentElement.style.width = `${clientWidth}px`
-    document.body.style.width = `${clientWidth}px`
+
+    const { width, height } = getLayoutViewportSize()
+    const needsVerticalScrollbar = document.documentElement.scrollHeight > height
+    const gutter = needsVerticalScrollbar ? scrollState.scrollbarGutter : 0
+    const layoutWidth = Math.max(1, Math.round(width - gutter))
+    scrollState.layoutWidth = layoutWidth
+    document.documentElement.style.width = `${layoutWidth}px`
+    document.body.style.width = `${layoutWidth}px`
   }
 
   function clearResizeTimers() {

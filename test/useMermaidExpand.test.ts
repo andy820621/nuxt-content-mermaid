@@ -85,13 +85,23 @@ function createBrowser() {
   let rafId = 0
   const rafs = new Map<number, FrameRequestCallback>()
   const rafHistory: FrameRequestCallback[] = []
-  const visualViewport = createEventTarget({ width: 1000, height: 800, scale: 1 })
-  const documentElement = { style: { overflow: 'visible', width: '120px', userSelect: 'text' }, clientWidth: 980 }
+  const viewportState = { width: 1000, height: 800, gutter: 20 }
+  const visualViewport = createEventTarget({ width: viewportState.width, height: viewportState.height, scale: 1 })
+  const documentElement = {
+    style: { overflow: 'visible', width: '120px', userSelect: 'text' },
+    clientHeight: viewportState.height,
+    scrollHeight: 1200,
+  }
+  Object.defineProperty(documentElement, 'clientWidth', {
+    get: () => documentElement.style.overflow === 'hidden'
+      ? viewportState.width
+      : viewportState.width - viewportState.gutter,
+  })
   const body = { style: { overflow: 'auto', width: '80px', userSelect: 'text' }, offsetHeight: 0 }
   const documentTarget = createEventTarget({ documentElement, body })
   const windowTarget = createEventTarget({
-    innerWidth: 1000,
-    innerHeight: 800,
+    innerWidth: viewportState.width,
+    innerHeight: viewportState.height,
     visualViewport,
     document: documentTarget,
     getComputedStyle: vi.fn(() => ({ transitionDuration: '0s' })),
@@ -112,6 +122,16 @@ function createBrowser() {
     windowTarget,
     visualViewport,
     rafHistory,
+    resizeViewport(width: number, height: number, scrollHeight: number) {
+      viewportState.width = width
+      viewportState.height = height
+      windowTarget.innerWidth = width
+      windowTarget.innerHeight = height
+      visualViewport.width = width
+      visualViewport.height = height
+      documentElement.clientHeight = height
+      documentElement.scrollHeight = scrollHeight
+    },
     flushRafs() {
       const pending = [...rafs.entries()]
       rafs.clear()
@@ -317,6 +337,31 @@ describe('useMermaidExpand', () => {
 
     expect(ctx.expand.isExpandActive.value).toBe(false)
     expect(document.body.style.overflow).toBe('auto')
+  })
+
+  it('derives resized layout width from the session gutter without unlocking', async () => {
+    const ctx = setupExpand()
+    await openExpand(ctx.expand, browser)
+
+    expect(document.documentElement.style.width).toBe('980px')
+    expect(document.body.style.width).toBe('980px')
+
+    browser.resizeViewport(800, 600, 1200)
+    browser.windowTarget.dispatch('resize')
+    browser.flushRafs()
+    expect(document.documentElement.style.width).toBe('780px')
+    expect(document.body.style.width).toBe('780px')
+
+    browser.resizeViewport(800, 1400, 1200)
+    browser.windowTarget.dispatch('resize')
+    browser.flushRafs()
+    expect(document.documentElement.style.width).toBe('800px')
+    expect(document.body.style.width).toBe('800px')
+
+    ctx.expand.toggle()
+    finishClose(ctx.target)
+    expect(document.documentElement.style.width).toBe('120px')
+    expect(document.body.style.width).toBe('80px')
   })
 
   it.each(['close', 'replacement', 'scope disposal'])('cancels active interaction, hints, listeners and pending work on %s', async (ending) => {
