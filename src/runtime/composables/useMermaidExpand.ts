@@ -143,6 +143,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     bodyWidth: '',
     htmlOverflow: '',
     htmlWidth: '',
+    scrollbarGutter: 0,
+    layoutWidth: 0,
     lockedWidth: false,
     locked: false,
   }
@@ -184,10 +186,6 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   function getLockedViewportWidth() {
     const width = document.documentElement.clientWidth || window.innerWidth
     return Math.max(1, Math.round(width))
-  }
-
-  function shouldLockWidth() {
-    return window.innerWidth - document.documentElement.clientWidth > 0
   }
 
   function updateLockedWidth() {
@@ -666,15 +664,18 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     scrollState.bodyWidth = document.body.style.width
     scrollState.htmlOverflow = document.documentElement.style.overflow
     scrollState.htmlWidth = document.documentElement.style.width
-    scrollState.lockedWidth = shouldLockWidth()
+    const layoutWidth = getLockedViewportWidth()
+    const viewportWidth = getLayoutViewportSize().width
+    scrollState.layoutWidth = layoutWidth
+    scrollState.scrollbarGutter = Math.max(0, Math.round(viewportWidth - layoutWidth))
+    scrollState.lockedWidth = scrollState.scrollbarGutter > 0
     scrollState.locked = true
+    if (scrollState.lockedWidth) {
+      document.documentElement.style.width = `${layoutWidth}px`
+      document.body.style.width = `${layoutWidth}px`
+    }
     document.documentElement.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
-    if (scrollState.lockedWidth) {
-      const clientWidth = getLockedViewportWidth()
-      document.documentElement.style.width = `${clientWidth}px`
-      document.body.style.width = `${clientWidth}px`
-    }
   }
 
   function enableBodyScroll() {
@@ -687,6 +688,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     document.body.style.overflow = scrollState.bodyOverflow
     scrollState.bodyOverflow = ''
     scrollState.bodyWidth = ''
+    scrollState.scrollbarGutter = 0
+    scrollState.layoutWidth = 0
     scrollState.lockedWidth = false
     scrollState.locked = false
   }

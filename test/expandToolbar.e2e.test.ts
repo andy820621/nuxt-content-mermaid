@@ -20,6 +20,13 @@ const rectDistance = (from: RectGeometry, to: RectGeometry) => Math.hypot(
   from.height - to.height,
 )
 
+function expectMonotonic(values: number[], direction: 1 | -1) {
+  expect(values.length).toBeGreaterThan(2)
+  for (let index = 1; index < values.length; index++) {
+    expect((values[index]! - values[index - 1]!) * direction).toBeGreaterThanOrEqual(-0.25)
+  }
+}
+
 const restoredPageStyles = {
   bodyOverflow: '',
   bodyWidth: '',
@@ -183,6 +190,102 @@ describe('expand/fullscreen toolbars', async () => {
 
     expect(await readPageStyles(page)).toEqual(restoredPageStyles)
     expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
+  })
+
+  it('keeps a centered source stationary while expanded motion reverses one path', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await page.goto(url('/'))
+    await page.waitForSelector('#mock-svg-secondary', { state: 'visible', timeout: 5000 })
+    await page.addStyleTag({
+      content: `
+        body {
+          width: calc(100% - 20px);
+        }
+        html[style*="overflow: hidden"] body {
+          width: 100%;
+        }
+        #secondary-root {
+          width: 600px;
+          margin-inline: auto;
+        }
+        .ncm-expand-clip,
+        .ncm-expand-target {
+          transition-duration: 600ms !important;
+          transition-timing-function: linear !important;
+        }
+      `,
+    })
+
+    const result = await page.evaluate(async () => {
+      Object.defineProperty(document.documentElement, 'clientWidth', {
+        configurable: true,
+        get: () => document.documentElement.style.overflow === 'hidden'
+          ? window.innerWidth
+          : window.innerWidth - 20,
+      })
+      const root = document.querySelector<HTMLElement>('#secondary-root')!
+      const source = root.querySelector<SVGSVGElement>('.mermaid > svg')!
+      root.scrollIntoView({ block: 'center' })
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
+      const centerX = (element: Element) => {
+        const rect = element.getBoundingClientRect()
+        return rect.left + rect.width / 2
+      }
+      const sourceBefore = source.getBoundingClientRect()
+      const gutter = window.innerWidth - document.documentElement.clientWidth
+      const cloneMounted = new Promise<void>((resolve) => {
+        const observer = new MutationObserver(() => {
+          if (!document.querySelector('.ncm-expand-target > svg')) return
+          observer.disconnect()
+          resolve()
+        })
+        observer.observe(document.body, { childList: true, subtree: true })
+      })
+
+      root.querySelector<HTMLButtonElement>('[aria-label="Expand diagram"]')!.click()
+      await cloneMounted
+      const sourceWhileLocked = source.getBoundingClientRect()
+      const opening: number[] = []
+      for (let index = 0; index < 48; index++) {
+        const target = document.querySelector<HTMLElement>('.ncm-expand-target')
+        if (target) opening.push(centerX(target))
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+      }
+
+      document.querySelector<HTMLButtonElement>('[aria-label="Minimize diagram"]')!.click()
+      const closing: number[] = []
+      for (let index = 0; index < 48; index++) {
+        const target = document.querySelector<HTMLElement>('.ncm-expand-target')
+        if (target) closing.push(centerX(target))
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+      }
+      const sourceAfter = source.getBoundingClientRect()
+
+      return {
+        gutter,
+        viewportCenter: window.innerWidth / 2,
+        sourceBefore: { left: sourceBefore.left, center: sourceBefore.left + sourceBefore.width / 2 },
+        sourceWhileLocked: { left: sourceWhileLocked.left, center: sourceWhileLocked.left + sourceWhileLocked.width / 2 },
+        sourceAfter: { left: sourceAfter.left, center: sourceAfter.left + sourceAfter.width / 2 },
+        opening,
+        closing,
+      }
+    })
+
+    expect(result.gutter).toBeGreaterThan(0)
+    expect(result.sourceWhileLocked.left).toBeCloseTo(result.sourceBefore.left, 0)
+    expect(result.sourceAfter.left).toBeCloseTo(result.sourceBefore.left, 0)
+    expect(result.opening[0]).toBeCloseTo(result.sourceBefore.center, 0)
+    expect(result.opening.at(-1)).toBeCloseTo(result.viewportCenter, 0)
+    expect(result.closing[0]).toBeCloseTo(result.viewportCenter, 0)
+    const minCenter = Math.min(result.sourceBefore.center, result.viewportCenter)
+    const maxCenter = Math.max(result.sourceBefore.center, result.viewportCenter)
+    const openingDirection = result.viewportCenter >= result.sourceBefore.center ? 1 : -1
+    expect(Math.min(...result.closing)).toBeGreaterThanOrEqual(minCenter - 0.25)
+    expect(Math.max(...result.closing)).toBeLessThanOrEqual(maxCenter + 0.25)
+    expectMonotonic(result.opening, openingDirection)
+    expectMonotonic(result.closing, openingDirection === 1 ? -1 : 1)
   })
 
   it.each([
