@@ -9,6 +9,7 @@ const props = defineProps<{
   options: ExpandOptions
   blocked: boolean
   getExpandTarget: () => SVGElement | null
+  getExpandViewport: () => HTMLElement | null
   overlayStyle?: CSSProperties
   contentStyle?: CSSProperties
   iconSize?: number
@@ -27,6 +28,7 @@ const targetHasMargin = computed(() => typeof props.options.margin === 'number' 
 const {
   setExpandModal,
   setExpandTargetWrap,
+  expandClipStyle,
   expandTargetStyle,
   isExpandActive,
   isVisible,
@@ -44,6 +46,7 @@ const {
   showZoomHint,
 } = useMermaidExpand({
   getExpandTarget: props.getExpandTarget,
+  getExpandViewport: props.getExpandViewport,
   expandOptions: props.options,
   isBlocked: blocked,
 })
@@ -77,13 +80,18 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
         :style="contentStyle"
       >
         <div
-          :ref="setExpandTargetWrap"
-          class="ncm-expand-target"
-          :class="{
-            'ncm-expand-target-with-margin': targetHasMargin,
-          }"
-          :style="expandTargetStyle"
-        />
+          class="ncm-expand-clip"
+          :style="expandClipStyle"
+        >
+          <div
+            :ref="setExpandTargetWrap"
+            class="ncm-expand-target"
+            :class="{
+              'ncm-expand-target-with-margin': targetHasMargin,
+            }"
+            :style="expandTargetStyle"
+          />
+        </div>
 
         <!-- Zoom Toolbar -->
         <MermaidZoomToolbar
@@ -180,13 +188,20 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
   z-index: 1;
 }
 
+.ncm-expand-clip {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+  transition: clip-path 0.3s;
+}
+
 .ncm-expand-target {
   position: absolute;
   transform-origin: top left;
   transition: transform 0.3s;
   cursor: inherit;
   pointer-events: auto;
-  z-index: 2;
 }
 
 .ncm-expand-target.ncm-expand-target-with-margin {
@@ -255,6 +270,7 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
 
 @media (prefers-reduced-motion: reduce) {
   .ncm-expand-overlay,
+  .ncm-expand-clip,
   .ncm-expand-target,
   .ncm-hint-fade-enter-active,
   .ncm-hint-fade-leave-active {

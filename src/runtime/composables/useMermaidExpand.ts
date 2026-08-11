@@ -7,11 +7,18 @@ import { tryOnScopeDispose } from './shared/tryOnScopeDispose'
 
 type ExpandState = 'idle' | 'opening' | 'open' | 'closing'
 
-interface ExpandMetrics {
+interface ExpandRect {
   top: number
   left: number
   width: number
   height: number
+}
+
+interface ExpandMetrics {
+  coordinatePlane: ExpandRect
+  sourceDiagram: ExpandRect
+  sourceClip: ExpandRect
+  expandedClip: ExpandRect
   translateX: number
   translateY: number
   scale: number
@@ -19,6 +26,7 @@ interface ExpandMetrics {
 
 interface UseMermaidExpandOptions {
   getExpandTarget: () => SVGElement | null
+  getExpandViewport: () => HTMLElement | null
   expandOptions: ExpandOptions
   isBlocked?: Ref<boolean>
 }
@@ -58,13 +66,30 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     minScale: 0.1,
     maxScale: 10,
   })
-  const isVisible = computed(() => expandState.value === 'open')
+  const isVisible = computed(() => isExpanded.value)
   const allowTargetClick = options.expandOptions.invokeOpenOn?.diagramClick !== false
   const allowCloseByEsc = options.expandOptions.invokeCloseOn?.esc !== false
   const allowCloseByWheel = options.expandOptions.invokeCloseOn?.wheel !== false
   const allowCloseBySwipe = options.expandOptions.invokeCloseOn?.swipe !== false
   const allowOverlayClose = options.expandOptions.invokeCloseOn?.overlayClick !== false
   const allowCloseButton = options.expandOptions.invokeCloseOn?.closeButtonClick !== false
+
+  const shouldDisableTransition = computed(() => shouldRefreshExpand.value || zoom.isPointerDown.value)
+
+  const expandClipStyle = computed<CSSProperties>(() => {
+    const metrics = expandMetrics.value
+    if (!metrics) return {}
+
+    const rect = isExpanded.value ? metrics.expandedClip : metrics.sourceClip
+    return {
+      top: `${metrics.coordinatePlane.top}px`,
+      left: `${metrics.coordinatePlane.left}px`,
+      width: `${metrics.coordinatePlane.width}px`,
+      height: `${metrics.coordinatePlane.height}px`,
+      clipPath: toClipPath(rect, metrics.coordinatePlane),
+      transitionDuration: shouldDisableTransition.value ? '0ms' : undefined,
+    }
+  })
 
   const expandTargetStyle = computed<CSSProperties>(() => {
     const metrics = expandMetrics.value
@@ -73,14 +98,14 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     const { transform } = zoom.transformStyle.value
 
     return {
-      top: `${metrics.top}px`,
-      left: `${metrics.left}px`,
-      width: `${metrics.width}px`,
-      height: `${metrics.height}px`,
+      top: `${metrics.sourceDiagram.top}px`,
+      left: `${metrics.sourceDiagram.left}px`,
+      width: `${metrics.sourceDiagram.width}px`,
+      height: `${metrics.sourceDiagram.height}px`,
       transform: isExpanded.value
         ? transform
         : 'translate(0px, 0px) scale(1)',
-      transitionDuration: (shouldRefreshExpand.value || zoom.isPointerDown.value) ? '0ms' : undefined,
+      transitionDuration: shouldDisableTransition.value ? '0ms' : undefined,
     }
   })
 
@@ -111,6 +136,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   let expandRefreshRaf: number | undefined
+  let hasDeferredResize = false
   // Wait for UI transition to settle (e.g., keyboard, address bar, rotation)
   const resizeRefreshDelay = 180
   const scrollState = {
@@ -118,6 +144,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     bodyWidth: '',
     htmlOverflow: '',
     htmlWidth: '',
+    scrollbarGutter: 0,
+    layoutWidth: 0,
     lockedWidth: false,
     locked: false,
   }
@@ -132,13 +160,39 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     return Math.max(0, margin)
   }
 
-  function getLayoutViewportSize() {
-    const viewport = window.visualViewport
-    const scale = viewport?.scale ?? 1
+  function getExpandCoordinateViewportSize() {
+    // Keep the transition in the same content coordinate plane captured before
+    // scroll lock. The overlay may grow into the scrollbar gutter, but changing
+    // that plane mid-transition would move a centered diagram sideways.
     return {
-      width: (viewport?.width ?? window.innerWidth) * scale,
-      height: (viewport?.height ?? window.innerHeight) * scale,
+      width: scrollState.locked && scrollState.layoutWidth > 0
+        ? scrollState.layoutWidth
+        : document.documentElement.clientWidth || window.innerWidth,
+      height: window.innerHeight,
     }
+  }
+
+  function intersectRects(...rects: ExpandRect[]): ExpandRect | null {
+    const left = Math.max(...rects.map(rect => rect.left))
+    const top = Math.max(...rects.map(rect => rect.top))
+    const right = Math.min(...rects.map(rect => rect.left + rect.width))
+    const bottom = Math.min(...rects.map(rect => rect.top + rect.height))
+    if (right <= left || bottom <= top) return null
+
+    return {
+      top,
+      left,
+      width: right - left,
+      height: bottom - top,
+    }
+  }
+
+  function toClipPath(rect: ExpandRect, plane: ExpandRect) {
+    const top = Math.max(0, rect.top - plane.top)
+    const left = Math.max(0, rect.left - plane.left)
+    const right = Math.max(0, plane.width - left - rect.width)
+    const bottom = Math.max(0, plane.height - top - rect.height)
+    return `inset(${top}px ${right}px ${bottom}px ${left}px)`
   }
 
   function getLockedViewportWidth() {
@@ -146,19 +200,17 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     return Math.max(1, Math.round(width))
   }
 
-  function shouldLockWidth() {
-    return window.innerWidth - document.documentElement.clientWidth > 0
-  }
-
   function updateLockedWidth() {
     if (!scrollState.lockedWidth || document.body.style.overflow !== 'hidden') return
-    document.documentElement.style.width = ''
-    document.body.style.width = ''
-    // Force reflow so the layout viewport picks up the latest size.
-    void document.body.offsetHeight
-    const clientWidth = getLockedViewportWidth()
-    document.documentElement.style.width = `${clientWidth}px`
-    document.body.style.width = `${clientWidth}px`
+
+    const width = window.innerWidth
+    const height = window.innerHeight
+    const needsVerticalScrollbar = document.documentElement.scrollHeight > height
+    const gutter = needsVerticalScrollbar ? scrollState.scrollbarGutter : 0
+    const layoutWidth = Math.max(1, Math.round(width - gutter))
+    scrollState.layoutWidth = layoutWidth
+    document.documentElement.style.width = `${layoutWidth}px`
+    document.body.style.width = `${layoutWidth}px`
   }
 
   function clearResizeTimers() {
@@ -197,27 +249,57 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function calculateExpandMetrics(target: SVGElement): ExpandMetrics | null {
-    const rect = target.getBoundingClientRect()
-    if (!rect.width || !rect.height) return null
+    const sourceRect = target.getBoundingClientRect()
+    if (!sourceRect.width || !sourceRect.height) return null
+
+    const viewport = options.getExpandViewport()
+    if (!viewport) return null
+    const viewportRect = viewport.getBoundingClientRect()
 
     const margin = resolveExpandMargin()
-    const { width, height } = getLayoutViewportSize()
+    const { width, height } = getExpandCoordinateViewportSize()
+    const coordinatePlane = { top: 0, left: 0, width, height }
     const viewportWidth = Math.max(1, width - margin * 2)
     const viewportHeight = Math.max(1, height - margin * 2)
-    const scaleX = viewportWidth / rect.width
-    const scaleY = viewportHeight / rect.height
+    const sourceDiagram = {
+      top: sourceRect.top,
+      left: sourceRect.left,
+      width: sourceRect.width,
+      height: sourceRect.height,
+    }
+    const sourceViewport = {
+      top: viewportRect.top + viewport.clientTop,
+      left: viewportRect.left + viewport.clientLeft,
+      width: viewport.clientWidth,
+      height: viewport.clientHeight,
+    }
+    const sourceClip = intersectRects(
+      sourceDiagram,
+      sourceViewport,
+      coordinatePlane,
+    )
+    if (!sourceClip) return null
+
+    const expandedClip = {
+      top: margin,
+      left: margin,
+      width: viewportWidth,
+      height: viewportHeight,
+    }
+    const scaleX = viewportWidth / sourceRect.width
+    const scaleY = viewportHeight / sourceRect.height
     const scale = Number.isFinite(scaleX) && Number.isFinite(scaleY)
       ? Math.min(scaleX, scaleY)
       : 1
     const safeScale = scale > 0 ? scale : 1
 
     return {
-      top: rect.top,
-      left: rect.left,
-      width: rect.width,
-      height: rect.height,
-      translateX: width / 2 - (rect.left + rect.width * safeScale / 2),
-      translateY: height / 2 - (rect.top + rect.height * safeScale / 2),
+      coordinatePlane,
+      sourceDiagram,
+      sourceClip,
+      expandedClip,
+      translateX: expandedClip.left + (expandedClip.width - sourceRect.width * safeScale) / 2 - sourceDiagram.left,
+      translateY: expandedClip.top + (expandedClip.height - sourceRect.height * safeScale) / 2 - sourceDiagram.top,
       scale: safeScale,
     }
   }
@@ -299,6 +381,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     expandState.value = 'idle'
     isExpanded.value = false
     shouldRefreshExpand.value = false
+    hasDeferredResize = false
     showZoomHint.value = false
     expandMetrics.value = null
     enableBodyScroll()
@@ -322,8 +405,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       scale: metrics.scale,
       translateX: metrics.translateX,
       translateY: metrics.translateY,
-      top: metrics.top,
-      left: metrics.left,
+      top: metrics.sourceDiagram.top,
+      left: metrics.sourceDiagram.left,
     })
 
     expandState.value = 'opening'
@@ -337,11 +420,18 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
         return
       }
 
+      // Give the teleported clone one painted source frame before applying its destination geometry.
       openingRaf = requestAnimationFrame(() => {
-        openingRaf = undefined
-        if (expandState.value !== 'opening') return
-        isExpanded.value = true
-        expandState.value = 'open'
+        if (expandState.value !== 'opening') {
+          openingRaf = undefined
+          return
+        }
+        openingRaf = requestAnimationFrame(() => {
+          openingRaf = undefined
+          if (expandState.value !== 'opening') return
+          isExpanded.value = true
+          ensureExpandTransitionEnd()
+        })
       })
     })
   }
@@ -353,6 +443,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       return
     }
     cancelPendingWork()
+    hasDeferredResize = false
     expandState.value = 'closing'
     isExpanded.value = false
     ensureExpandTransitionEnd()
@@ -369,20 +460,33 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
   function handleExpandTransitionEnd(event: TransitionEvent) {
     if (event.propertyName !== 'transform') return
-    if (expandState.value === 'closing') {
-      resetExpand()
-    }
+    if (expandState.value === 'opening') finishOpening()
+    else if (expandState.value === 'closing') resetExpand()
+  }
+
+  function finishOpening() {
+    if (expandState.value !== 'opening') return
+    clearTimeout(expandTransitionTimeout)
+    expandTransitionTimeout = undefined
+    expandState.value = 'open'
+    if (!hasDeferredResize) return
+    hasDeferredResize = false
+    scheduleExpandRefresh()
   }
 
   function ensureExpandTransitionEnd() {
     if (!expandTargetWrap.value) return
     const duration = window.getComputedStyle(expandTargetWrap.value).transitionDuration
     const durationMs = Number.parseFloat(duration) * (duration.endsWith('ms') ? 1 : 1000)
-    if (!durationMs) return
+    if (!durationMs) {
+      if (expandState.value === 'opening') finishOpening()
+      return
+    }
 
     clearTimeout(expandTransitionTimeout)
     expandTransitionTimeout = setTimeout(() => {
-      if (expandState.value === 'closing') resetExpand()
+      if (expandState.value === 'opening') finishOpening()
+      else if (expandState.value === 'closing') resetExpand()
     }, durationMs + 50)
   }
 
@@ -516,18 +620,40 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function handleExpandResize() {
-    if (!isExpandActive.value) return
+    if (expandState.value === 'opening') {
+      hasDeferredResize = true
+      return
+    }
+    if (expandState.value !== 'open') return
     scheduleExpandRefresh()
   }
 
+  function hasSameRect(left: ExpandRect, right: ExpandRect) {
+    return left.top === right.top
+      && left.left === right.left
+      && left.width === right.width
+      && left.height === right.height
+  }
+
+  function hasSameExpandMetrics(left: ExpandMetrics, right: ExpandMetrics) {
+    return hasSameRect(left.coordinatePlane, right.coordinatePlane)
+      && hasSameRect(left.sourceDiagram, right.sourceDiagram)
+      && hasSameRect(left.sourceClip, right.sourceClip)
+      && hasSameRect(left.expandedClip, right.expandedClip)
+      && left.translateX === right.translateX
+      && left.translateY === right.translateY
+      && left.scale === right.scale
+  }
+
   function refreshExpandMetrics() {
-    if (!isExpandActive.value) return
+    if (expandState.value !== 'open') return
     updateLockedWidth()
 
     const svg = options.getExpandTarget()
     if (!svg) return
     const metrics = calculateExpandMetrics(svg)
     if (!metrics) return
+    if (expandMetrics.value && hasSameExpandMetrics(expandMetrics.value, metrics)) return
     expandMetrics.value = metrics
 
     // Re-init zoom on resize (Fit)
@@ -535,8 +661,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       scale: metrics.scale,
       translateX: metrics.translateX,
       translateY: metrics.translateY,
-      top: metrics.top,
-      left: metrics.left,
+      top: metrics.sourceDiagram.top,
+      left: metrics.sourceDiagram.left,
     })
 
     shouldRefreshExpand.value = true
@@ -589,15 +715,18 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     scrollState.bodyWidth = document.body.style.width
     scrollState.htmlOverflow = document.documentElement.style.overflow
     scrollState.htmlWidth = document.documentElement.style.width
-    scrollState.lockedWidth = shouldLockWidth()
+    const layoutWidth = getLockedViewportWidth()
+    const viewportWidth = window.innerWidth
+    scrollState.layoutWidth = layoutWidth
+    scrollState.scrollbarGutter = Math.max(0, Math.round(viewportWidth - layoutWidth))
+    scrollState.lockedWidth = scrollState.scrollbarGutter > 0
     scrollState.locked = true
+    if (scrollState.lockedWidth) {
+      document.documentElement.style.width = `${layoutWidth}px`
+      document.body.style.width = `${layoutWidth}px`
+    }
     document.documentElement.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
-    if (scrollState.lockedWidth) {
-      const clientWidth = getLockedViewportWidth()
-      document.documentElement.style.width = `${clientWidth}px`
-      document.body.style.width = `${clientWidth}px`
-    }
   }
 
   function enableBodyScroll() {
@@ -610,6 +739,8 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     document.body.style.overflow = scrollState.bodyOverflow
     scrollState.bodyOverflow = ''
     scrollState.bodyWidth = ''
+    scrollState.scrollbarGutter = 0
+    scrollState.layoutWidth = 0
     scrollState.lockedWidth = false
     scrollState.locked = false
   }
@@ -650,6 +781,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   return {
     setExpandModal,
     setExpandTargetWrap,
+    expandClipStyle,
     expandTargetStyle,
     isExpandActive,
     isVisible,

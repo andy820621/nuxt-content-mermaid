@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onErrorCaptured, ref, shallowRef } from 'vue'
+import { computed, onErrorCaptured, ref, shallowRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { PageMermaidConfig } from '../../src/types/config'
 
@@ -13,6 +13,9 @@ const directConfig = {
 
 const recoveryPageConfig = shallowRef<PageMermaidConfig>()
 const recoveryDirectConfig = shallowRef<MermaidConfig>(directConfig)
+const recoveryDefinition = ref('flowchart LR; DIRECT-->ACTIVE')
+const encodedRecoveryDefinition = computed(() => encodeURIComponent(recoveryDefinition.value))
+const recoveryPhase = ref<'direct' | 'conflict' | 'recovered'>('direct')
 const sourceConflictCount = ref(0)
 const showSnapshotAfterMutation = ref(false)
 
@@ -35,11 +38,15 @@ function mutateRuntimeTransport() {
 }
 
 function enterSourceConflict() {
+  recoveryDefinition.value = 'flowchart LR; CONFLICT-->BLOCKED'
   recoveryPageConfig.value = conflictPageConfig
+  recoveryPhase.value = 'conflict'
 }
 
 function recoverSourceConflict() {
+  recoveryDefinition.value = 'flowchart LR; RECOVERED-->DIRECT'
   recoveryPageConfig.value = undefined
+  recoveryPhase.value = 'recovered'
 }
 </script>
 
@@ -156,9 +163,12 @@ function recoverSourceConflict() {
         <p>
           Captured conflict episodes: <output id="source-conflict-count">{{ sourceConflictCount }}</output>
         </p>
+        <p>
+          Recovery phase: <output id="source-conflict-phase">{{ recoveryPhase }}</output>
+        </p>
         <Mermaid
           id="conflict-recovery-example"
-          code="flowchart%20LR%3B%20CONFLICT--%3ERECOVERED"
+          :code="encodedRecoveryDefinition"
           :page-config="recoveryPageConfig"
           :config="recoveryDirectConfig"
           :toolbar="{ title: 'Direct Mermaid Config' }"

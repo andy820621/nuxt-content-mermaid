@@ -40,6 +40,22 @@ function createSvgStub(rect: { top: number, left: number, width: number, height:
   return svg
 }
 
+function createViewportStub(
+  rect: { top: number, left: number, width: number, height: number },
+  scrollLeft = 0,
+) {
+  return {
+    nodeType: 1,
+    clientLeft: 0,
+    clientTop: 0,
+    clientWidth: rect.width,
+    clientHeight: rect.height,
+    scrollLeft,
+    scrollTop: 0,
+    getBoundingClientRect: () => rect,
+  }
+}
+
 function createElement(className = '') {
   const children: unknown[] = []
   let textContent = ''
@@ -67,18 +83,29 @@ function createElement(className = '') {
 
 function createBrowser() {
   let rafId = 0
+  let transitionDuration = '0s'
   const rafs = new Map<number, FrameRequestCallback>()
   const rafHistory: FrameRequestCallback[] = []
-  const visualViewport = createEventTarget({ width: 1000, height: 800, scale: 1 })
-  const documentElement = { style: { overflow: 'visible', width: '120px', userSelect: 'text' }, clientWidth: 980 }
+  const viewportState = { width: 1000, height: 800, gutter: 20 }
+  const visualViewport = createEventTarget({ width: viewportState.width, height: viewportState.height, scale: 1 })
+  const documentElement = {
+    style: { overflow: 'visible', width: '120px', userSelect: 'text' },
+    clientHeight: viewportState.height,
+    scrollHeight: 1200,
+  }
+  Object.defineProperty(documentElement, 'clientWidth', {
+    get: () => documentElement.style.overflow === 'hidden'
+      ? viewportState.width
+      : viewportState.width - viewportState.gutter,
+  })
   const body = { style: { overflow: 'auto', width: '80px', userSelect: 'text' }, offsetHeight: 0 }
   const documentTarget = createEventTarget({ documentElement, body })
   const windowTarget = createEventTarget({
-    innerWidth: 1000,
-    innerHeight: 800,
+    innerWidth: viewportState.width,
+    innerHeight: viewportState.height,
     visualViewport,
     document: documentTarget,
-    getComputedStyle: vi.fn(() => ({ transitionDuration: '0s' })),
+    getComputedStyle: vi.fn(() => ({ transitionDuration })),
   })
 
   vi.stubGlobal('document', documentTarget)
@@ -96,6 +123,19 @@ function createBrowser() {
     windowTarget,
     visualViewport,
     rafHistory,
+    setTransitionDuration(value: string) {
+      transitionDuration = value
+    },
+    resizeViewport(width: number, height: number, scrollHeight: number) {
+      viewportState.width = width
+      viewportState.height = height
+      windowTarget.innerWidth = width
+      windowTarget.innerHeight = height
+      visualViewport.width = width
+      visualViewport.height = height
+      documentElement.clientHeight = height
+      documentElement.scrollHeight = scrollHeight
+    },
     flushRafs() {
       const pending = [...rafs.entries()]
       rafs.clear()
@@ -104,23 +144,37 @@ function createBrowser() {
   }
 }
 
-function setupExpand(options: ExpandOptions = DEFAULT_EXPAND_OPTIONS) {
-  const svg = createSvgStub({ top: 10, left: 20, width: 200, height: 100 })
+function setupExpand(
+  options: ExpandOptions = DEFAULT_EXPAND_OPTIONS,
+  geometry: {
+    svg?: { top: number, left: number, width: number, height: number }
+    viewport?: { top: number, left: number, width: number, height: number }
+    scrollLeft?: number
+  } = {},
+) {
+  const svg = createSvgStub(geometry.svg ?? { top: 10, left: 20, width: 200, height: 100 })
+  const viewport = createViewportStub(
+    geometry.viewport ?? { top: 0, left: 0, width: 1000, height: 800 },
+    geometry.scrollLeft,
+  )
   const target = createElement('ncm-expand-target')
   const modal = createElement('ncm-expand-modal')
   const blocked = ref(false)
   const expand = useMermaidExpand({
     getExpandTarget: () => svg as unknown as SVGElement,
+    getExpandViewport: () => viewport as unknown as HTMLElement,
     expandOptions: options,
     isBlocked: blocked,
   })
   expand.setExpandTargetWrap(target as unknown as Element)
   expand.setExpandModal(modal as unknown as Element)
-  return { expand, svg, target, modal, blocked }
+  return { expand, svg, viewport, target, modal, blocked }
 }
 
 async function openExpand(expand: ReturnType<typeof useMermaidExpand>, browser: ReturnType<typeof createBrowser>) {
   expand.toggle()
+  await nextTick()
+  browser.flushRafs()
   await nextTick()
   browser.flushRafs()
   await nextTick()
@@ -151,7 +205,7 @@ describe('useMermaidExpand', () => {
     expect(expand.isExpandActive.value).toBe(true)
     expect(expand.isVisible.value).toBe(true)
     expect(target.children).toHaveLength(1)
-    expect(expand.expandTargetStyle.value.transform).toContain('scale(5)')
+    expect(expand.expandTargetStyle.value.transform).toContain('scale(4.9)')
     expect(document.body.style.overflow).toBe('hidden')
     expect(document.documentElement.style.overflow).toBe('hidden')
 
@@ -163,6 +217,76 @@ describe('useMermaidExpand', () => {
     expect(target.textContent).toBe('')
     expect(document.body.style).toMatchObject({ overflow: 'auto', width: '80px' })
     expect(document.documentElement.style).toMatchObject({ overflow: 'visible', width: '120px' })
+  })
+
+  it('keeps the visible source slice in one viewport coordinate plane while opening', async () => {
+    const ctx = setupExpand(DEFAULT_EXPAND_OPTIONS, {
+      svg: { top: 100, left: -748, width: 1348, height: 240 },
+      viewport: { top: 100, left: 300, width: 300, height: 240 },
+      scrollLeft: 1048,
+    })
+
+    ctx.expand.toggle()
+    await nextTick()
+
+    expect(ctx.expand.expandClipStyle.value).toMatchObject({
+      top: '0px',
+      left: '0px',
+      width: '980px',
+      height: '800px',
+      clipPath: 'inset(100px 380px 460px 300px)',
+    })
+    expect(ctx.expand.expandTargetStyle.value).toMatchObject({
+      top: '100px',
+      left: '-748px',
+      width: '1348px',
+      height: '240px',
+      transform: 'translate(0px, 0px) scale(1)',
+    })
+
+    browser.flushRafs()
+    await nextTick()
+    browser.flushRafs()
+    await nextTick()
+
+    expect(ctx.expand.expandClipStyle.value.clipPath).toBe('inset(0px 0px 0px 0px)')
+    expect(ctx.expand.expandTargetStyle.value).toMatchObject({
+      top: '100px',
+      left: '-748px',
+    })
+  })
+
+  it('closes a horizontally scrolled diagram into its visible source slice', async () => {
+    const ctx = setupExpand(DEFAULT_EXPAND_OPTIONS, {
+      svg: { top: 100, left: -748, width: 1348, height: 240 },
+      viewport: { top: 100, left: 300, width: 300, height: 240 },
+      scrollLeft: 1048,
+    })
+
+    ctx.expand.toggle()
+    await nextTick()
+
+    expect(ctx.expand.expandClipStyle.value).toMatchObject({
+      top: '0px',
+      left: '0px',
+      width: '980px',
+      height: '800px',
+      clipPath: 'inset(100px 380px 460px 300px)',
+    })
+    expect(ctx.expand.expandTargetStyle.value).toMatchObject({
+      top: '100px',
+      left: '-748px',
+      width: '1348px',
+      height: '240px',
+      transform: 'translate(0px, 0px) scale(1)',
+    })
+
+    browser.flushRafs()
+    ctx.expand.toggle()
+
+    expect(ctx.expand.expandClipStyle.value.clipPath).toBe('inset(100px 380px 460px 300px)')
+    expect(ctx.expand.expandTargetStyle.value.left).toBe('-748px')
+    expect(ctx.viewport.scrollLeft).toBe(1048)
   })
 
   it.each([
@@ -202,13 +326,18 @@ describe('useMermaidExpand', () => {
     expect(ctx.expand.isVisible.value).toBe(true)
   })
 
-  it.each(['resize', 'orientationchange', 'visual viewport resize'])('refits after %s and cancels delayed refresh on close', async (eventName) => {
+  it.each([
+    { eventName: 'resize', changesLayoutViewport: true },
+    { eventName: 'orientationchange', changesLayoutViewport: true },
+    { eventName: 'visual viewport resize', changesLayoutViewport: false },
+  ])('refits after $eventName when layout geometry changes and cancels delayed work on close', async ({ eventName, changesLayoutViewport }) => {
     const ctx = setupExpand()
     await openExpand(ctx.expand, browser)
+    if (changesLayoutViewport) browser.resizeViewport(900, 700, 1200)
     const target = eventName === 'visual viewport resize' ? browser.visualViewport : browser.windowTarget
     target.dispatch(eventName === 'visual viewport resize' ? 'resize' : eventName)
     browser.flushRafs()
-    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBe('0ms')
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBe(changesLayoutViewport ? '0ms' : undefined)
 
     ctx.expand.toggle()
     finishClose(ctx.target)
@@ -217,6 +346,77 @@ describe('useMermaidExpand', () => {
 
     expect(ctx.expand.isExpandActive.value).toBe(false)
     expect(document.body.style.overflow).toBe('auto')
+  })
+
+  it('derives resized layout width from the session gutter without unlocking', async () => {
+    const ctx = setupExpand()
+    await openExpand(ctx.expand, browser)
+
+    expect(document.documentElement.style.width).toBe('980px')
+    expect(document.body.style.width).toBe('980px')
+
+    browser.resizeViewport(800, 600, 1200)
+    browser.windowTarget.dispatch('resize')
+    browser.flushRafs()
+    expect(document.documentElement.style.width).toBe('780px')
+    expect(document.body.style.width).toBe('780px')
+
+    browser.resizeViewport(800, 1400, 1200)
+    browser.windowTarget.dispatch('resize')
+    browser.flushRafs()
+    expect(document.documentElement.style.width).toBe('800px')
+    expect(document.body.style.width).toBe('800px')
+
+    ctx.expand.toggle()
+    finishClose(ctx.target)
+    expect(document.documentElement.style.width).toBe('120px')
+    expect(document.body.style.width).toBe('80px')
+  })
+
+  it('keeps the scrollbar-excluded content viewport as the expand coordinate plane', async () => {
+    browser.visualViewport.width = 980
+    const ctx = setupExpand()
+
+    await openExpand(ctx.expand, browser)
+
+    expect(document.documentElement.style.width).toBe('980px')
+    expect(document.body.style.width).toBe('980px')
+    expect(ctx.expand.expandClipStyle.value.width).toBe('980px')
+    expect(ctx.expand.expandTargetStyle.value.transform).toContain('scale(4.9)')
+  })
+
+  it('keeps one opening snapshot through scrollbar and viewport resize events', async () => {
+    browser.visualViewport.width = 980
+    browser.setTransitionDuration('0.3s')
+    const ctx = setupExpand()
+
+    ctx.expand.toggle()
+    await nextTick()
+    browser.flushRafs()
+    await nextTick()
+    browser.flushRafs()
+    await nextTick()
+
+    browser.visualViewport.width = 1000
+    browser.visualViewport.dispatch('resize')
+    browser.flushRafs()
+
+    expect(ctx.expand.isVisible.value).toBe(true)
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBeUndefined()
+    expect(ctx.expand.expandClipStyle.value.width).toBe('980px')
+
+    browser.resizeViewport(800, 600, 1200)
+    browser.windowTarget.dispatch('resize')
+    browser.flushRafs()
+
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBeUndefined()
+    expect(ctx.expand.expandClipStyle.value.width).toBe('980px')
+
+    ctx.target.dispatch('transitionend', { propertyName: 'transform' })
+    browser.flushRafs()
+
+    expect(ctx.expand.expandTargetStyle.value.transitionDuration).toBe('0ms')
+    expect(ctx.expand.expandClipStyle.value.width).toBe('780px')
   })
 
   it.each(['close', 'replacement', 'scope disposal'])('cancels active interaction, hints, listeners and pending work on %s', async (ending) => {

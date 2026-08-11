@@ -63,6 +63,9 @@ const invalidPageProps: MermaidComponentProps = { pageConfig: { sequence: { acto
 // @ts-expect-error configuration source props are mutually exclusive
 const invalidComponentProps: MermaidComponentProps = { pageConfig: {}, config: {} }
 
+// @ts-expect-error application-level null remains invalid outside the Markdown transport
+const invalidNullPageProps: MermaidComponentProps = { pageConfig: null }
+
 declare const nuxtConfig: NuxtConfig
 declare const resolvedPublicRuntimeConfig: PublicRuntimeConfig
 
@@ -89,6 +92,7 @@ void [
   invalidRuntimeEnabled,
   invalidPageProps,
   invalidComponentProps,
+  invalidNullPageProps,
 ]
 
 export type { LegacyPublicRuntimeAliasIsUnclaimed }

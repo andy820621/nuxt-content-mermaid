@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAsyncData } from '#app'
+import { useAsyncData, useRoute } from '#app'
 import { computed, onErrorCaptured, reactive, ref, resolveComponent, shallowRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { PageMermaidConfig } from '../../../src/types/config'
@@ -74,11 +74,20 @@ const reactiveConflictPageConfig = shallowRef<PageMermaidConfig | undefined>({ t
 const reactiveConflictDirectConfig = shallowRef<MermaidConfig>()
 const reactiveConflictCode = ref('graph TD;REACTIVE_CONFLICT-->LEGAL')
 const MermaidComponent = resolveComponent('Mermaid')
+const route = useRoute()
 const { data: markdownPage } = await useAsyncData('markdown-page-config', () =>
   queryCollection('content').path('/markdown-page-config').select('path', 'config', 'body').first(),
 )
+const { data: markdownMissingPageConfig } = await useAsyncData('markdown-missing-page-config', () =>
+  queryCollection('content').path('/markdown-missing-page-config').select('path', 'config', 'body').first(),
+)
 
 onErrorCaptured((error) => {
+  if (route.path === '/markdown-missing-page-config') {
+    // Let the error reach Nuxt so this fixture exposes SSR regressions as HTTP 500.
+    return
+  }
+
   const fingerprint = error as { name?: string, code?: string }
   componentErrorCount.value++
   componentErrorFingerprint.value = {
@@ -196,7 +205,21 @@ function reenterReactiveConflict() {
 </script>
 
 <template>
-  <main>
+  <main v-if="route.path === '/markdown-missing-page-config'">
+    <section id="markdown-missing-page-config">
+      <ContentRenderer
+        v-if="markdownMissingPageConfig"
+        :value="markdownMissingPageConfig"
+      />
+      <output
+        id="markdown-missing-page-config-status"
+        :data-loaded="String(Boolean(markdownMissingPageConfig))"
+        :data-path="markdownMissingPageConfig?.path"
+      />
+    </section>
+  </main>
+
+  <main v-else>
     <div class="controls">
       <button
         id="primary-fail"

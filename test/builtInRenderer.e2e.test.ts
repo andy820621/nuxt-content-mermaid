@@ -224,6 +224,27 @@ describe('built-in renderer integration', async () => {
     await page.locator('#markdown-page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
+  it('SSR renders Content-authored Markdown without Page Mermaid Config through runtime-only fallback', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/markdown-missing-page-config'))
+
+    expect(response?.status()).toBe(200)
+    expect(await page.locator('#markdown-missing-page-config-status').getAttribute('data-loaded')).toBe('true')
+    await waitForRuns(page, 1)
+
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[0]
+    })).toEqual(expect.objectContaining({
+      source: expect.stringContaining('MARKDOWN_MISSING_PAGE_CONFIG'),
+      theme: 'default',
+      securityLevel: 'strict',
+      unknownMermaidExtensionEnabled: false,
+    }))
+
+    await releaseNext(page)
+    await page.locator('#markdown-missing-page-config svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
   it('revalidates reactive Page Mermaid Config updates through the shared seam', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialDiagram(page)

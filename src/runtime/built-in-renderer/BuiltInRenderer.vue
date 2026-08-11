@@ -402,6 +402,10 @@ function getMermaidSvg(): SVGSVGElement | null {
   return svg instanceof SVGSVGElement ? svg : null
 }
 
+function getMermaidViewport(): HTMLDivElement | null {
+  return mermaidWrapper.value
+}
+
 function stopLazyObservation() {
   const activeObserver = observer
   observer = null
@@ -691,6 +695,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       :options="expandOptions"
       :blocked="isExpandBlocked"
       :get-expand-target="getMermaidSvg"
+      :get-expand-viewport="getMermaidViewport"
       :overlay-style="cursorVariables"
       :content-style="cursorVariables"
       :icon-size="iconSize"
