@@ -23,7 +23,19 @@ function createEventTarget<T extends Record<string, unknown>>(extra: T = {} as T
   }
 }
 
-function createBrowser() {
+function createSvgAttributeStub(initialValue?: string) {
+  const attributes = new Map<string, string>()
+  if (initialValue !== undefined) attributes.set('preserveAspectRatio', initialValue)
+
+  return {
+    hasAttribute: (name: string) => attributes.has(name),
+    getAttribute: (name: string) => attributes.get(name) ?? null,
+    setAttribute: vi.fn((name: string, value: string) => attributes.set(name, value)),
+    removeAttribute: vi.fn((name: string) => attributes.delete(name)),
+  }
+}
+
+function createBrowser(initialAspectRatio: string | null = 'xMinYMin meet') {
   let rafId = 0
   const rafs = new Map<number, FrameRequestCallback>()
   const rafHistory: FrameRequestCallback[] = []
@@ -66,11 +78,13 @@ function createBrowser() {
     }),
   })
   const viewportTarget = createEventTarget({ nodeType: 1 })
+  const svg = createSvgAttributeStub(initialAspectRatio ?? undefined)
   let renderRect = { top: 20, left: 30, width: 200, height: 100 }
   const renderTarget = {
     nodeType: 1,
     style: { transform: '', transformOrigin: '', cursor: '' },
     getBoundingClientRect: () => renderRect,
+    querySelector: (selector: string) => selector === 'svg' ? svg : null,
   }
 
   vi.stubGlobal('document', documentTarget)
@@ -85,6 +99,7 @@ function createBrowser() {
     fullscreenTarget,
     viewportTarget,
     renderTarget,
+    svg,
     rafHistory,
     setRenderRect(rect: typeof renderRect) {
       renderRect = rect
@@ -160,6 +175,7 @@ describe('useMermaidFullscreen', () => {
     await enterFullscreen(fullscreen)
 
     expect(fullscreen.isActive.value).toBe(true)
+    expect(browser.svg.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
     expect(browser.renderTarget.style.transform).toBe('translate(0px, 0px) scale(1)')
     expect(browser.windowTarget.listenerCount('wheel')).toBe(1)
     expect(browser.documentTarget.listenerCount('keydown')).toBeGreaterThan(0)
@@ -206,6 +222,21 @@ describe('useMermaidFullscreen', () => {
     expect(document.body.style.userSelect).toBe('text')
     expect(document.documentElement.style.userSelect).toBe('text')
     expect(browser.windowTarget.listenerCount('wheel')).toBe(0)
+    expect(browser.svg.getAttribute('preserveAspectRatio')).toBe('xMinYMin meet')
+  })
+
+  it('removes the fullscreen-only aspect ratio when the SVG originally omitted it', async () => {
+    browser = createBrowser(null)
+    const mounted = mountFullscreen(browser)
+
+    await enterFullscreen(mounted.fullscreen)
+    expect(browser.svg.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
+
+    await mounted.fullscreen.toggle()
+    await nextTick()
+
+    expect(browser.svg.getAttribute('preserveAspectRatio')).toBeNull()
+    expect(browser.svg.removeAttribute).toHaveBeenCalledWith('preserveAspectRatio')
   })
 
   it.each(['exit', 'replacement', 'unmount'])('cancels hint, gesture, scheduled viewport work and routing on %s', async (ending) => {
@@ -258,6 +289,7 @@ describe('useMermaidFullscreen', () => {
     expect(browser.windowTarget.listenerCount('wheel')).toBe(0)
     expect(browser.documentTarget.listenerCount('keydown')).toBe(0)
     expect(cancelAnimationFrame).toHaveBeenCalled()
+    expect(browser.svg.getAttribute('preserveAspectRatio')).toBe('xMinYMin meet')
 
     vi.runAllTimers()
     browser.flushRafs()

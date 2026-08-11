@@ -13,6 +13,12 @@ interface UseMermaidFullscreenOptions extends ConfigurableDocument, Configurable
   getRenderTarget: () => HTMLElement | null
 }
 
+interface SvgAspectRatioSnapshot {
+  target: SVGElement
+  hadAttribute: boolean
+  value: string | null
+}
+
 export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
   const browserDocument = options.document
     ?? (typeof document === 'undefined' ? undefined : document)
@@ -47,6 +53,33 @@ export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
   }))
   let styledTarget: HTMLElement | null = null
   let originalTargetStyle = { transform: '', transformOrigin: '', cursor: '' }
+  let aspectRatioSnapshot: SvgAspectRatioSnapshot | null = null
+
+  function restoreFullscreenSvg() {
+    const snapshot = aspectRatioSnapshot
+    aspectRatioSnapshot = null
+    if (!snapshot) return
+
+    if (snapshot.hadAttribute) {
+      snapshot.target.setAttribute('preserveAspectRatio', snapshot.value ?? '')
+    }
+    else {
+      snapshot.target.removeAttribute('preserveAspectRatio')
+    }
+  }
+
+  function centerFullscreenSvg() {
+    restoreFullscreenSvg()
+    const target = renderTarget.value?.querySelector<SVGElement>('svg')
+    if (!target) return
+
+    aspectRatioSnapshot = {
+      target,
+      hadAttribute: target.hasAttribute('preserveAspectRatio'),
+      value: target.getAttribute('preserveAspectRatio'),
+    }
+    target.setAttribute('preserveAspectRatio', 'xMidYMid meet')
+  }
 
   function restoreTargetStyle() {
     if (!styledTarget) return
@@ -95,6 +128,7 @@ export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
   function stopLifecycle() {
     interactionActive.value = false
     restoreTargetStyle()
+    restoreFullscreenSvg()
     lifecycleId++
     hideZoomHint()
     clearScheduledViewportWork()
@@ -119,6 +153,7 @@ export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
   function startLifecycle() {
     const id = ++lifecycleId
     interactionActive.value = true
+    centerFullscreenSvg()
     hasShownZoomHint = false
     hideZoomHint()
     nextTick(() => initializeViewport(id))

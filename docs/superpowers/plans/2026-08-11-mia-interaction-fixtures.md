@@ -29,7 +29,7 @@
 - `src/runtime/built-in-renderer/BuiltInRenderer.vue`: supplies `.mermaid-wrapper` as the internal expanded viewport.
 - `test/useMermaidExpand.test.ts`: unit contract for scrolled clip geometry, animation completion, and cleanup.
 - `test/expandToolbar.e2e.test.ts`: real browser coverage for the two-layer expanded DOM and fullscreen attribute lifecycle in the package-user fixture.
-- `test/fixtures/expand-toolbar/app.vue`: supplies a wide, scrollable SVG and a Journey-style fullscreen attribute to make browser regressions deterministic.
+- `test/fixtures/expand-toolbar/mermaid-stub.ts`: supplies a wide, scrollable SVG and a Journey-style fullscreen attribute to make browser regressions deterministic.
 - `playground/content/test-debug.md`: contains a parser-proven invalid Mermaid definition.
 - `test/debugPlayground.e2e.test.ts`: real Nuxt Content/browser regression for the debug route.
 - `playground/pages/migration.vue`: exposes distinct direct, conflict-candidate, and recovered definitions and phase output.
@@ -42,7 +42,7 @@
 **Files:**
 - Modify: `test/useMermaidFullscreen.test.ts`
 - Modify: `src/runtime/composables/useMermaidFullscreen.ts`
-- Modify: `test/fixtures/expand-toolbar/app.vue`
+- Modify: `test/fixtures/expand-toolbar/mermaid-stub.ts`
 - Modify: `test/expandToolbar.e2e.test.ts`
 
 **Interfaces:**
@@ -153,7 +153,7 @@ Expected: all tests pass, including exit, replacement, unmount, and originally a
 
 - [ ] **Step 6: Add deterministic browser coverage**
 
-Give the mock SVG in `test/fixtures/expand-toolbar/app.vue` the Journey value:
+Give the primary mock SVG emitted by `test/fixtures/expand-toolbar/mermaid-stub.ts` the Journey value:
 
 ```html
 <svg id="mock-svg" preserveAspectRatio="xMinYMin meet" ...>
@@ -182,7 +182,7 @@ Expected: PASS and exact restoration after exit.
 - [ ] **Step 8: Commit the fullscreen fix**
 
 ```bash
-git add src/runtime/composables/useMermaidFullscreen.ts test/useMermaidFullscreen.test.ts test/fixtures/expand-toolbar/app.vue test/expandToolbar.e2e.test.ts
+git add src/runtime/composables/useMermaidFullscreen.ts test/useMermaidFullscreen.test.ts test/fixtures/expand-toolbar/mermaid-stub.ts test/expandToolbar.e2e.test.ts
 git commit -m "fix: center Journey diagrams in fullscreen"
 ```
 
@@ -195,7 +195,7 @@ git commit -m "fix: center Journey diagrams in fullscreen"
 - Modify: `src/runtime/composables/useMermaidExpand.ts`
 - Modify: `src/runtime/components/MermaidExpandOverlay.vue`
 - Modify: `src/runtime/built-in-renderer/BuiltInRenderer.vue`
-- Modify: `test/fixtures/expand-toolbar/app.vue`
+- Modify: `test/fixtures/expand-toolbar/mermaid-stub.ts`
 - Modify: `test/expandToolbar.e2e.test.ts`
 
 **Interfaces:**
@@ -421,7 +421,7 @@ Expected: PASS; no flyaway toward the off-screen SVG origin and all prior close/
 - [ ] **Step 12: Commit the clip-aware transition**
 
 ```bash
-git add src/runtime/composables/useMermaidExpand.ts src/runtime/components/MermaidExpandOverlay.vue src/runtime/built-in-renderer/BuiltInRenderer.vue test/useMermaidExpand.test.ts test/fixtures/expand-toolbar/app.vue test/expandToolbar.e2e.test.ts
+git add src/runtime/composables/useMermaidExpand.ts src/runtime/components/MermaidExpandOverlay.vue src/runtime/built-in-renderer/BuiltInRenderer.vue test/useMermaidExpand.test.ts test/fixtures/expand-toolbar/mermaid-stub.ts test/expandToolbar.e2e.test.ts
 git commit -m "fix: close expanded diagrams into visible viewport"
 ```
 

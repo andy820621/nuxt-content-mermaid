@@ -179,9 +179,11 @@ describe('expand/fullscreen toolbars', async () => {
     await installFullscreenStub(page)
     await page.goto(url('/'))
     await page.waitForSelector('#mock-svg', { state: 'visible', timeout: 5000 })
+    expect(await page.locator('#mock-svg').getAttribute('preserveAspectRatio')).toBe('xMinYMin meet')
 
     await page.locator('#diagram-root').getByLabel('Enter fullscreen').click({ timeout: 5000 })
     await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'visible', timeout: 5000 })
+    expect(await page.locator('#mock-svg').getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
     expect(await page.locator('.ncm-fullscreen-zoom-hint').count()).toBe(0)
     expect(await page.locator('#diagram-root .mermaid-block > .ncm-zoom-toolbar--fullscreen').count()).toBe(1)
     expect(await page.locator('#diagram-root .mermaid-wrapper.ncm-fullscreen-zoom > .mermaid').count()).toBe(1)
@@ -229,6 +231,7 @@ describe('expand/fullscreen toolbars', async () => {
 
     await page.locator('#diagram-root').getByLabel('Exit fullscreen').click({ timeout: 5000 })
     await page.waitForSelector('.ncm-zoom-toolbar--fullscreen', { state: 'detached', timeout: 5000 })
+    expect(await page.locator('#mock-svg').getAttribute('preserveAspectRatio')).toBe('xMinYMin meet')
     expect(await readOutsideRouting(page)).toEqual({ wheel: false, key: false })
     expect(await readPageStyles(page)).toEqual(restoredPageStyles)
 
