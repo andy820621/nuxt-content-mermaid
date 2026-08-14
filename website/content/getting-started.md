@@ -85,3 +85,5 @@ Use the symptom you can observe; each path stops at the smallest likely boundary
 | **Source stays visible** | Confirm the fence says `mermaid`, JavaScript is enabled, and the browser console has no hydration or Mermaid error. | Reload the direct content route; if the source remains, reduce it to the three-node example above. |
 
 If the reduced example still fails on a declared-compatible combination, record the exact package, Nuxt, Nuxt Content, Node, connector, build error, and browser error before opening a GitHub issue. This inline routing is intentionally bounded to reaching the first render.
+
+Continue with [Troubleshooting](/troubleshooting#install-fails) for confirm, next-step, escalation, and Contract Gap classification boundaries.

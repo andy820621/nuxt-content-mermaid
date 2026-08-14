@@ -42,20 +42,35 @@ describe('documentation website application boundary', () => {
     })
   })
 
-  it('owns its content collection and both route queries without root or playground authority', async () => {
-    const [contentConfig, homePage, gettingStartedPage] = await Promise.all([
+  it('owns its content collection and public route queries without root or playground authority', async () => {
+    const [
+      contentConfig,
+      homePage,
+      gettingStartedPage,
+      troubleshootingPage,
+      migrationPage,
+      nuxtConfig,
+    ] = await Promise.all([
       readFile('website/content.config.ts', 'utf8'),
       readFile('website/pages/index.vue', 'utf8'),
       readFile('website/pages/getting-started.vue', 'utf8'),
+      readFile('website/pages/troubleshooting.vue', 'utf8'),
+      readFile('website/pages/migration/v3.vue', 'utf8'),
+      readFile('website/nuxt.config.ts', 'utf8'),
     ])
 
     expect(contentConfig).toContain('pages: defineCollection({')
     expect(contentConfig).toContain('source: \'**/*.md\'')
+    expect(contentConfig).toMatch(/pageId: z\.enum\(\[[^\]]*'troubleshooting'[^\]]*'migration-v3'[^\]]*\]\)/)
     expect(contentConfig).not.toMatch(/(?:\.\.\/)+(?:content\.config|playground)|from ['"].*playground/)
 
     expect(homePage).toMatch(/queryCollection\('pages'\)\.path\('\/'\)\.first\(\)/)
     expect(gettingStartedPage).toMatch(/queryCollection\('pages'\)\.path\('\/getting-started'\)\.first\(\)/)
-    for (const routeSource of [homePage, gettingStartedPage]) {
+    expect(troubleshootingPage).toMatch(/queryCollection\('pages'\)\.path\('\/troubleshooting'\)\.first\(\)/)
+    expect(migrationPage).toMatch(/queryCollection\('pages'\)\.path\('\/migration\/v3'\)\.first\(\)/)
+    expect(nuxtConfig).toMatch(/routes:\s*\[[^\]]*'\/troubleshooting'[^\]]*'\/migration\/v3'[^\]]*\]/)
+
+    for (const routeSource of [homePage, gettingStartedPage, troubleshootingPage, migrationPage]) {
       expect(routeSource).not.toMatch(/queryCollection\('(?!pages')[^']+'\)|from ['"].*(?:content\.config|playground)/)
     }
   })

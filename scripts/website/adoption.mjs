@@ -29,14 +29,16 @@ async function expectAccessibleStructure(page) {
       h1Count: levels.filter(level => level === 1).length,
       headingJump: levels.some((level, index) => index > 0 && level > levels[index - 1] + 1),
       unnamedControlCount: unnamedControls.length,
-      labelledNavCount: body.querySelectorAll('nav[aria-label]').length,
+      primaryNavCount: body.querySelectorAll('nav[aria-label="Primary navigation"]').length,
+      unnamedNavCount: body.querySelectorAll('nav:not([aria-label])').length,
     }
   })
 
   expectEvidence(result.h1Count === 1, 'page must expose exactly one h1')
   expectEvidence(!result.headingJump, 'heading levels must not jump')
   expectEvidence(result.unnamedControlCount === 0, 'interactive controls must have discernible names')
-  expectEvidence(result.labelledNavCount === 1, 'primary navigation must have an accessible name')
+  expectEvidence(result.primaryNavCount === 1, 'primary navigation must have an accessible name')
+  expectEvidence(result.unnamedNavCount === 0, 'every navigation landmark must have an accessible name')
 }
 
 async function expectNoCriticalAccessibilityViolations(page) {
@@ -70,6 +72,102 @@ async function expectGettingStartedCoreContent(page) {
   for (const symptom of ['install fails', 'build fails', 'source stays visible']) {
     expectEvidence(pageText?.toLowerCase().includes(symptom), `inline recovery must route the ${symptom} symptom`)
   }
+}
+
+async function expectSearchMetadata(page, canonicalPath) {
+  const canonical = page.locator('link[rel="canonical"]')
+  expectEvidence(await canonical.count() === 1, `${canonicalPath} canonical must be unique`)
+  expectEvidence(await canonical.getAttribute('href') === canonicalPath, `${canonicalPath} canonical mismatch`)
+
+  const robots = page.locator('meta[name="robots"]')
+  expectEvidence(await robots.count() === 1, `${canonicalPath} robots metadata must be unique`)
+  expectEvidence(await robots.getAttribute('content') === 'index, follow', `${canonicalPath} must remain indexable`)
+}
+
+async function expectFragmentTargets(page, fragmentIds) {
+  for (const id of fragmentIds) {
+    expectEvidence(await page.locator(`#${id}`).count() === 1, `fragment #${id} must resolve uniquely`)
+  }
+}
+
+async function expectTaskLink(page, href, label) {
+  const link = page.locator(`a[href="${href}"]`)
+  expectEvidence(await link.count() === 1, `${label} link must be unique`)
+  expectEvidence(await link.isVisible(), `${label} link must be visible`)
+  return link
+}
+
+async function expectBrowserFindTerms(page, terms) {
+  for (const term of terms) {
+    const found = await page.evaluate((query) => {
+      window.getSelection()?.removeAllRanges()
+      return window.find(query, false, false, true, false, false, false)
+    }, term)
+    expectEvidence(found, `browser find must locate ${term}`)
+  }
+}
+
+async function expectTroubleshootingCoreContent(page) {
+  await expectVisibleText(page, '[data-page-id="troubleshooting"]', PACKAGE_IDENTITY, 'Troubleshooting artifact identity')
+  await expectVisibleText(page, '#install-fails', 'Install fails', 'install symptom')
+  await expectVisibleText(page, '#build-fails', 'Build fails', 'build symptom')
+  await expectVisibleText(page, '#source-stays-visible', 'Source stays visible', 'render symptom')
+  await expectVisibleText(page, '#before-you-open-an-issue', 'Before you open an issue', 'escalation boundary')
+  await expectFragmentTargets(page, [
+    'install-fails',
+    'build-fails',
+    'source-stays-visible',
+    'before-you-open-an-issue',
+  ])
+  await expectTaskLink(page, '/getting-started#install', 'installation recovery')
+  await expectTaskLink(page, '/migration/v3#rename-the-module-key', 'migration recovery')
+
+  const pageText = await page.locator('[data-page-id="troubleshooting"]').textContent()
+  expectEvidence((pageText?.match(/### Confirm/g) ?? []).length === 0, 'rendered Troubleshooting must not expose Markdown heading syntax')
+  expectEvidence((pageText?.match(/Confirm/g) ?? []).length >= 3, 'every troubleshooting symptom must expose a confirmation step')
+  expectEvidence((pageText?.match(/Next step/g) ?? []).length >= 3, 'every troubleshooting symptom must expose a next step')
+  expectEvidence((pageText?.match(/Escalation threshold/g) ?? []).length >= 3, 'every troubleshooting symptom must expose an escalation threshold')
+  for (const term of ['clean Package User reproduction', 'Declared-Compatible Combination', 'Contract Gap']) {
+    expectEvidence(pageText?.includes(term), `Troubleshooting must preserve ${term}`)
+  }
+}
+
+const MIGRATION_FRAGMENTS = [
+  'rename-the-module-key',
+  'keep-module-activation-at-build-time',
+  'transport-only-pure-data-at-runtime',
+  'choose-page-or-direct-mermaid-config',
+  'account-for-property-presence-merge',
+  'treat-expand-booleans-as-resets',
+  'recognize-only-public-diagnostics-and-rendering-guarantees',
+  'remove-package-root-transform-imports',
+  'migration-checklist',
+]
+
+const MIGRATION_FIND_TERMS = [
+  'contentMermaid',
+  'Module Activation',
+  'pure data',
+  'Page Mermaid Config',
+  'Direct Mermaid Config',
+  'Property-Presence Merge',
+  'expand: false',
+  'Minimal Public Diagnostic Fingerprint',
+  'transformMermaidCodeBlocks',
+  'Migration checklist',
+]
+
+async function expectMigrationCoreContent(page) {
+  await expectVisibleText(page, '[data-page-id="migration-v3"]', PACKAGE_IDENTITY, 'Migration artifact identity')
+  await expectFragmentTargets(page, MIGRATION_FRAGMENTS)
+  await expectTaskLink(page, '/getting-started#prerequisites', 'new installation path')
+  await expectTaskLink(page, '/troubleshooting#build-fails', 'migration recovery')
+
+  const pageText = await page.locator('[data-page-id="migration-v3"]').textContent()
+  for (const term of MIGRATION_FIND_TERMS) {
+    expectEvidence(pageText?.includes(term), `Migration entry must contain ${term}`)
+  }
+  expectEvidence(pageText?.includes('Run the application\'s production build'), 'Migration checklist must end in a usable build check')
 }
 
 async function focusByKeyboard(page, target) {
@@ -235,6 +333,74 @@ export async function observeGettingStartedHydrated({ page }) {
   }
 }
 
+export async function observeTroubleshootingWithoutJavaScript({ page }) {
+  await expectAccessibleStructure(page)
+  await expectSearchMetadata(page, '/troubleshooting')
+  await expectTroubleshootingCoreContent(page)
+  return {
+    boundedSymptoms: 3,
+    classificationBoundary: true,
+    indexable: true,
+  }
+}
+
+export async function observeTroubleshootingHydrated({ page }) {
+  await expectAccessibleStructure(page)
+  const criticalAccessibilityViolations = await expectNoCriticalAccessibilityViolations(page)
+  await expectSearchMetadata(page, '/troubleshooting')
+  await expectTroubleshootingCoreContent(page)
+  await expectBrowserFindTerms(page, ['Install fails', 'Escalation threshold', 'Contract Gap'])
+
+  const migrationLink = await expectTaskLink(page, '/migration/v3#rename-the-module-key', 'migration recovery')
+  await migrationLink.focus()
+  await page.keyboard.press('Enter')
+  await page.locator('[data-page-id="migration-v3"][data-hydration-state="hydrated"]').waitFor()
+  expectEvidence(new URL(page.url()).pathname === '/migration/v3', 'Troubleshooting task flow must reach Migration')
+  expectEvidence(new URL(page.url()).hash === '#rename-the-module-key', 'Troubleshooting task flow must preserve the migration fragment')
+  expectEvidence(await page.locator('#rename-the-module-key').count() === 1, 'migration task-flow fragment must resolve')
+
+  return {
+    browserFind: true,
+    taskFlow: true,
+    accessibleStructure: true,
+    criticalAccessibilityViolations,
+  }
+}
+
+export async function observeMigrationWithoutJavaScript({ page }) {
+  await expectAccessibleStructure(page)
+  await expectSearchMetadata(page, '/migration/v3')
+  await expectMigrationCoreContent(page)
+  return {
+    requiredTopics: 8,
+    usableChecklist: true,
+    indexable: true,
+  }
+}
+
+export async function observeMigrationHydrated({ page }) {
+  await expectAccessibleStructure(page)
+  const criticalAccessibilityViolations = await expectNoCriticalAccessibilityViolations(page)
+  await expectSearchMetadata(page, '/migration/v3')
+  await expectMigrationCoreContent(page)
+  await expectBrowserFindTerms(page, MIGRATION_FIND_TERMS)
+
+  const troubleshootingLink = await expectTaskLink(page, '/troubleshooting#build-fails', 'migration recovery')
+  await troubleshootingLink.focus()
+  await page.keyboard.press('Enter')
+  await page.locator('[data-page-id="troubleshooting"][data-hydration-state="hydrated"]').waitFor()
+  expectEvidence(new URL(page.url()).pathname === '/troubleshooting', 'Migration task flow must reach Troubleshooting')
+  expectEvidence(new URL(page.url()).hash === '#build-fails', 'Migration task flow must preserve the troubleshooting fragment')
+  expectEvidence(await page.locator('#build-fails').count() === 1, 'troubleshooting task-flow fragment must resolve')
+
+  return {
+    browserFind: true,
+    taskFlow: true,
+    accessibleStructure: true,
+    criticalAccessibilityViolations,
+  }
+}
+
 export const WEBSITE_STATIC_CASES = [
   {
     id: 'home',
@@ -260,5 +426,29 @@ export const WEBSITE_STATIC_CASES = [
     navigationHref: '/',
     observeNoJavaScript: observeGettingStartedWithoutJavaScript,
     observeHydrated: observeGettingStartedHydrated,
+  },
+  {
+    id: 'troubleshooting',
+    logicalRoute: '/troubleshooting',
+    directUrl: '/troubleshooting/',
+    physicalFile: 'troubleshooting/index.html',
+    title: 'Troubleshooting | Nuxt Content Mermaid',
+    description: 'Recover from the bounded failures most likely to block your first successful Mermaid render.',
+    heading: 'Troubleshooting',
+    navigationHref: '/',
+    observeNoJavaScript: observeTroubleshootingWithoutJavaScript,
+    observeHydrated: observeTroubleshootingHydrated,
+  },
+  {
+    id: 'migration-v3',
+    logicalRoute: '/migration/v3',
+    directUrl: '/migration/v3/',
+    physicalFile: 'migration/v3/index.html',
+    title: 'Migrating to v3 | Nuxt Content Mermaid',
+    description: 'Move a version 2 application to Nuxt Content Mermaid 3.0.0 from one searchable migration entry.',
+    heading: 'Migrating to v3',
+    navigationHref: '/',
+    observeNoJavaScript: observeMigrationWithoutJavaScript,
+    observeHydrated: observeMigrationHydrated,
   },
 ]

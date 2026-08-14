@@ -91,6 +91,17 @@ onMounted(() => {
     </main>
     <footer class="site-footer">
       <p>Built for package users. Experiments stay in the playground.</p>
+      <nav aria-label="Documentation">
+        <NuxtLink to="/getting-started">
+          Get started
+        </NuxtLink>
+        <NuxtLink to="/troubleshooting">
+          Troubleshooting
+        </NuxtLink>
+        <NuxtLink to="/migration/v3">
+          Migrate to v3
+        </NuxtLink>
+      </nav>
     </footer>
   </div>
 </template>

@@ -10,7 +10,7 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-11-24',
     prerender: {
       crawlLinks: false,
-      routes: ['/', '/getting-started'],
+      routes: ['/', '/getting-started', '/troubleshooting', '/migration/v3'],
     },
   },
   contentMermaid: {

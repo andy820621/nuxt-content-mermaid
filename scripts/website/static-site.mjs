@@ -221,7 +221,7 @@ async function assertCommonPage(page, routeCase, hydrationState) {
     `${routeCase.id} heading mismatch`,
   )
   expectObservation(
-    await page.locator(`nav a[href="${routeCase.navigationHref}"]`).count() === 1,
+    await page.locator(`nav[aria-label="Primary navigation"] a[href="${routeCase.navigationHref}"]`).count() === 1,
     `${routeCase.id} navigation mismatch`,
   )
   const root = page.locator(`[data-page-id="${routeCase.id}"]`)

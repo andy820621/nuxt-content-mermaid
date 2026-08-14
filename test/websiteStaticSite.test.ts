@@ -32,6 +32,18 @@ afterEach(async () => {
 })
 
 describe('shared production static-site lifecycle', () => {
+  it('composes recovery and migration cases into the shared route inventory', () => {
+    expect(WEBSITE_STATIC_CASES.map(routeCase => ({
+      id: routeCase.id,
+      logicalRoute: routeCase.logicalRoute,
+    }))).toEqual([
+      { id: 'home', logicalRoute: '/' },
+      { id: 'getting-started', logicalRoute: '/getting-started' },
+      { id: 'troubleshooting', logicalRoute: '/troubleshooting' },
+      { id: 'migration-v3', logicalRoute: '/migration/v3' },
+    ])
+  })
+
   it('groups equivalent physical outputs under their logical route', async () => {
     const publicDirectory = await createPublicDirectory()
 
@@ -156,7 +168,7 @@ describe('shared production static-site lifecycle', () => {
     const source = 'graph TD\n  Source --> SVG'
     await writeFile(join(publicDirectory, 'index.html'), `<!doctype html>
 <html><head><title>Home</title><meta name="description" content="Home description"></head>
-<body><nav><a href="/getting-started">Get started</a></nav>
+<body><nav aria-label="Primary navigation"><a href="/getting-started">Get started</a></nav>
 <main data-page-id="home" data-hydration-state="prerendered">
 <h1>Home route</h1><div data-contract-demo="primary"><div data-contract-diagram><svg data-toolbar-icon></svg><div class="mermaid"><pre>${source}</pre></div></div>
 <pre data-contract-source>${source}</pre><p data-artifact-version="3.0.0">3.0.0</p></div>
@@ -165,7 +177,7 @@ describe('shared production static-site lifecycle', () => {
 </body></html>`)
     await writeFile(join(publicDirectory, 'getting-started/index.html'), `<!doctype html>
 <html><head><title>Getting started</title><meta name="description" content="Ordinary route description"></head>
-<body><nav><a href="/">Home</a></nav>
+<body><nav aria-label="Primary navigation"><a href="/">Home</a></nav>
 <main data-page-id="getting-started" data-hydration-state="prerendered"><h1>Getting started route</h1></main>
 <script>document.querySelector('main').dataset.hydrationState='hydrated'</script>
 </body></html>`)
@@ -222,7 +234,7 @@ describe('shared production static-site lifecycle', () => {
     const publicDirectory = await createPublicDirectory()
     await writeFile(join(publicDirectory, 'index.html'), `<!doctype html>
 <html><head><title>Home</title><meta name="description" content="Home description"></head>
-<body><nav><a href="/getting-started">Get started</a></nav>
+<body><nav aria-label="Primary navigation"><a href="/getting-started">Get started</a></nav>
 <main data-page-id="home" data-hydration-state="prerendered"><h1>Home route</h1><p data-journey>First Successful Render</p></main>
 <script>document.querySelector('main').dataset.hydrationState='hydrated'</script>
 </body></html>`)
@@ -301,7 +313,7 @@ describe('shared production static-site lifecycle', () => {
       routes: [{ id: 'home' }],
     })
     expect(verifier).toHaveBeenCalledWith(expect.objectContaining({
-      allowedLogicalRoutes: ['/', '/getting-started'],
+      allowedLogicalRoutes: ['/', '/getting-started', '/troubleshooting', '/migration/v3'],
       cases: [expect.objectContaining({ id: 'home' })],
     }))
   })
