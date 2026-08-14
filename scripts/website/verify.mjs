@@ -44,6 +44,14 @@ export async function verifyWebsite({
   if (homepage.svgCount !== 1) {
     throw new Error(`website static-site verification failed: expected one hydrated Mermaid SVG, received ${homepage.svgCount ?? 0}`)
   }
+  for (const route of site.routes) {
+    for (const mode of ['noJavaScript', 'hydrated']) {
+      const count = route.observations?.[mode]?.criticalAccessibilityViolations
+      if (count !== 0) {
+        throw new Error(`website static-site verification failed: ${route.id} ${mode} critical accessibility evidence is ${count ?? 'missing'}`)
+      }
+    }
+  }
 
   return {
     mode: 'website-verification',

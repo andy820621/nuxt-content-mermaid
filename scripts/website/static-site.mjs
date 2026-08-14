@@ -4,6 +4,7 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { WEBSITE_STATIC_CASES } from './adoption.mjs'
 
 const IGNORED_PROVIDER_HTML = new Set(['200.html', '404.html'])
 const CONTENT_TYPES = {
@@ -17,29 +18,7 @@ const CONTENT_TYPES = {
 }
 const DEFAULT_REPOSITORY_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 
-export const WEBSITE_STATIC_CASES = [
-  {
-    id: 'home',
-    logicalRoute: '/',
-    directUrl: '/',
-    physicalFile: 'index.html',
-    title: 'Nuxt Content Mermaid',
-    description: 'Render Mermaid diagrams in Nuxt Content.',
-    heading: 'Nuxt Content Mermaid',
-    navigationHref: '/getting-started',
-    artifactVersion: '3.0.0',
-  },
-  {
-    id: 'getting-started',
-    logicalRoute: '/getting-started',
-    directUrl: '/getting-started/',
-    physicalFile: 'getting-started/index.html',
-    title: 'Getting Started | Nuxt Content Mermaid',
-    description: 'A minimal ordinary content route for Nuxt Content Mermaid.',
-    heading: 'Getting Started',
-    navigationHref: '/',
-  },
-]
+export { WEBSITE_STATIC_CASES }
 
 function isWithin(parent, candidate) {
   const child = relative(parent, candidate)
@@ -270,7 +249,8 @@ async function observeWithoutJavaScript({ browser, server, routeCase, boundary }
 
     let artifactVersion
     if (routeCase.contractSource) {
-      const source = page.locator('[data-contract-source]')
+      const primaryDemo = page.locator('[data-contract-demo="primary"]')
+      const source = primaryDemo.locator('[data-contract-source]')
       expectObservation(await source.count() === 1, `${routeCase.id} disclosure must be unique`)
       expectObservation(await source.isVisible(), `${routeCase.id} disclosure is not visible`)
       expectObservation((await source.textContent())?.trim() === routeCase.contractSource.trim(), `${routeCase.id} disclosure source mismatch`)
@@ -283,10 +263,13 @@ async function observeWithoutJavaScript({ browser, server, routeCase, boundary }
         return selection?.toString().trim()
       })
       expectObservation(selected === routeCase.contractSource.trim(), `${routeCase.id} disclosure is not programmatically selectable`)
-      artifactVersion = await page.locator('[data-artifact-version]').getAttribute('data-artifact-version')
+      artifactVersion = await primaryDemo.locator('[data-artifact-version]').getAttribute('data-artifact-version')
       expectObservation(artifactVersion === routeCase.artifactVersion, `${routeCase.id} artifact disclosure mismatch`)
     }
-    return { artifactVersion }
+    const observation = routeCase.observeNoJavaScript
+      ? await routeCase.observeNoJavaScript({ page, origin: server.origin })
+      : {}
+    return { artifactVersion, observation }
   }
   finally {
     await context.close()
@@ -311,12 +294,15 @@ async function observeWithJavaScript({ browser, server, routeCase, boundary }) {
 
     let svgCount
     if (routeCase.contractSource) {
-      const svg = page.locator('[data-contract-diagram] .mermaid > svg')
+      const svg = page.locator('[data-contract-demo="primary"] [data-contract-diagram] .mermaid > svg')
       await svg.waitFor()
       svgCount = await svg.count()
       expectObservation(svgCount === 1 && await svg.isVisible(), `${routeCase.id} must expose one visible Mermaid SVG`)
     }
-    return { svgCount }
+    const observation = routeCase.observeHydrated
+      ? await routeCase.observeHydrated({ page, origin: server.origin })
+      : {}
+    return { svgCount, observation }
   }
   finally {
     await context.close()
@@ -367,6 +353,10 @@ export async function runStaticSiteVerification({
         prerendered: true,
         hydrated: true,
         noJavaScript: true,
+        observations: {
+          noJavaScript: noJavaScript.observation,
+          hydrated: hydrated.observation,
+        },
         ...(noJavaScript.artifactVersion ? { artifactVersion: noJavaScript.artifactVersion } : {}),
         ...(hydrated.svgCount ? { svgCount: hydrated.svgCount } : {}),
       })

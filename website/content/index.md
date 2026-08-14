@@ -1,7 +1,7 @@
 ---
 title: Nuxt Content Mermaid
-description: Render Mermaid diagrams in Nuxt Content.
+description: Render interactive Mermaid diagrams from Markdown in Nuxt Content.
 pageId: home
 ---
 
-The smallest static proof that the stable package renders Mermaid diagrams.
+Turn Mermaid code blocks into interactive diagrams while keeping Markdown as the source of truth.

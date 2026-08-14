@@ -13,7 +13,7 @@ function artifactEvidence(version = '3.0.0') {
   }
 }
 
-function staticEvidence(version = '3.0.0', svgCount = 1) {
+function staticEvidence(version = '3.0.0', svgCount = 1, criticalAccessibilityViolations = 0) {
   return {
     phase: 'static-site',
     manifest: [],
@@ -28,6 +28,10 @@ function staticEvidence(version = '3.0.0', svgCount = 1) {
         noJavaScript: true,
         artifactVersion: version,
         svgCount,
+        observations: {
+          noJavaScript: { criticalAccessibilityViolations },
+          hydrated: { criticalAccessibilityViolations },
+        },
       },
       {
         id: 'getting-started',
@@ -37,6 +41,10 @@ function staticEvidence(version = '3.0.0', svgCount = 1) {
         prerendered: true,
         hydrated: true,
         noJavaScript: true,
+        observations: {
+          noJavaScript: { criticalAccessibilityViolations },
+          hydrated: { criticalAccessibilityViolations },
+        },
       },
     ],
     requestBoundary: {
@@ -96,6 +104,22 @@ describe('composed website verification', () => {
       repositoryRoot: '/repo',
       runCommand: vi.fn(async () => undefined),
       verifyArtifact: vi.fn(async () => artifact),
+      verifyStatic: vi.fn(async () => site),
+    })).rejects.toThrow(message)
+  })
+
+  it.each([
+    [staticEvidence('3.0.0', 1, 1), 'critical accessibility'],
+    [(() => {
+      const evidence = staticEvidence()
+      delete evidence.routes[0].observations.hydrated.criticalAccessibilityViolations
+      return evidence
+    })(), 'critical accessibility'],
+  ])('blocks incomplete or failing accessibility evidence %#', async (site, message) => {
+    await expect(verifyWebsite({
+      repositoryRoot: '/repo',
+      runCommand: vi.fn(async () => undefined),
+      verifyArtifact: vi.fn(async () => artifactEvidence()),
       verifyStatic: vi.fn(async () => site),
     })).rejects.toThrow(message)
   })

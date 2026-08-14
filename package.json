@@ -78,14 +78,15 @@
     "nuxt": "^4.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "catalog:test",
     "@nuxt/content": "catalog:integrations",
     "@nuxt/devtools": "catalog:dev",
     "@nuxt/eslint-config": "catalog:dev",
     "@nuxt/module-builder": "catalog:dev",
     "@nuxt/schema": "catalog:integrations",
     "@nuxt/test-utils": "catalog:test",
-    "@nuxtjs/mdc": "catalog:integrations",
     "@nuxtjs/color-mode": "catalog:dev",
+    "@nuxtjs/mdc": "catalog:integrations",
     "@types/node": "catalog:types",
     "changelogen": "catalog:dev",
     "eslint": "catalog:dev",

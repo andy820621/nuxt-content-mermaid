@@ -158,9 +158,10 @@ describe('shared production static-site lifecycle', () => {
 <html><head><title>Home</title><meta name="description" content="Home description"></head>
 <body><nav><a href="/getting-started">Get started</a></nav>
 <main data-page-id="home" data-hydration-state="prerendered">
-<h1>Home route</h1><div data-contract-diagram><svg data-toolbar-icon></svg><div class="mermaid"><pre>${source}</pre></div></div>
-<pre data-contract-source>${source}</pre><p data-artifact-version="3.0.0">3.0.0</p></main>
-<script>document.querySelector('main').dataset.hydrationState='hydrated';document.querySelector('[data-contract-diagram] .mermaid').innerHTML='<svg aria-label="diagram"></svg>'</script>
+<h1>Home route</h1><div data-contract-demo="primary"><div data-contract-diagram><svg data-toolbar-icon></svg><div class="mermaid"><pre>${source}</pre></div></div>
+<pre data-contract-source>${source}</pre><p data-artifact-version="3.0.0">3.0.0</p></div>
+<div data-contract-demo="lazy"><div class="mermaid"><pre>${source}</pre></div><pre data-contract-source>${source}</pre></div></main>
+<script>document.querySelector('main').dataset.hydrationState='hydrated';document.querySelector('[data-contract-demo="primary"] [data-contract-diagram] .mermaid').innerHTML='<svg aria-label="diagram"></svg>'</script>
 </body></html>`)
     await writeFile(join(publicDirectory, 'getting-started/index.html'), `<!doctype html>
 <html><head><title>Getting started</title><meta name="description" content="Ordinary route description"></head>
@@ -215,6 +216,51 @@ describe('shared production static-site lifecycle', () => {
       ],
       errors: [],
     })
+  })
+
+  it('runs route-owned observations inside the shared browser lifecycle', async () => {
+    const publicDirectory = await createPublicDirectory()
+    await writeFile(join(publicDirectory, 'index.html'), `<!doctype html>
+<html><head><title>Home</title><meta name="description" content="Home description"></head>
+<body><nav><a href="/getting-started">Get started</a></nav>
+<main data-page-id="home" data-hydration-state="prerendered"><h1>Home route</h1><p data-journey>First Successful Render</p></main>
+<script>document.querySelector('main').dataset.hydrationState='hydrated'</script>
+</body></html>`)
+
+    const observeNoJavaScript = vi.fn(async ({ page }) => ({
+      journey: await page.locator('[data-journey]').textContent(),
+    }))
+    const observeHydrated = vi.fn(async ({ page }) => ({
+      journey: await page.locator('[data-journey]').textContent(),
+    }))
+
+    await expect(runStaticSiteVerification({
+      publicDirectory,
+      allowedLogicalRoutes: ['/', '/getting-started'],
+      cases: [{
+        id: 'home',
+        logicalRoute: '/',
+        directUrl: '/',
+        physicalFile: 'index.html',
+        title: 'Home',
+        description: 'Home description',
+        heading: 'Home route',
+        navigationHref: '/getting-started',
+        observeNoJavaScript,
+        observeHydrated,
+      }],
+    })).resolves.toMatchObject({
+      routes: [{
+        id: 'home',
+        observations: {
+          noJavaScript: { journey: 'First Successful Render' },
+          hydrated: { journey: 'First Successful Render' },
+        },
+      }],
+    })
+
+    expect(observeNoJavaScript).toHaveBeenCalledOnce()
+    expect(observeHydrated).toHaveBeenCalledOnce()
   })
 
   it('runs a focused case through the shared static lifecycle only', async () => {

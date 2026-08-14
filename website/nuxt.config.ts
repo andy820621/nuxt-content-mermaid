@@ -3,6 +3,7 @@ export default defineNuxtConfig({
     '@nuxt/content',
     '@barzhsieh/nuxt-content-mermaid',
   ],
+  css: ['~/assets/css/main.css'],
   srcDir: '.',
   compatibilityDate: '2025-11-24',
   nitro: {
@@ -14,7 +15,14 @@ export default defineNuxtConfig({
   },
   contentMermaid: {
     loader: {
-      lazy: false,
+      lazy: true,
+    },
+    theme: {
+      light: 'default',
+      dark: 'dark',
+    },
+    toolbar: {
+      title: 'Mermaid source',
     },
   },
 })
