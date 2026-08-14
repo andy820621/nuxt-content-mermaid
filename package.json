@@ -64,7 +64,8 @@
     "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit",
     "verify:source": "pnpm lint && pnpm test && pnpm test:types",
     "verify:website": "node scripts/website/verify.mjs",
-    "verify:website-artifact": "node scripts/website/artifact.mjs"
+    "verify:website-artifact": "node scripts/website/artifact.mjs",
+    "verify:website-reference": "node scripts/website/reference-verifier.mjs"
   },
   "dependencies": {
     "@nuxt/kit": "catalog:integrations",

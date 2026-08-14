@@ -53,26 +53,97 @@ interface ReferenceRecordBase {
   fragment: string
   path: string
   title: string
+  purpose: string
+  ownership: string
+  occurrences: readonly ReferenceOccurrence[]
+  scope: string
+  boundary: string
+  deprecation: Readonly<{
+    status: 'active' | 'deprecated-accepted-no-op' | 'rejected' | 'outside-inventory'
+    summary: string
+  }>
+  explicitNegatives?: readonly string[]
 }
 
-export interface ConfigurationGroupRecord extends ReferenceRecordBase {
+export interface ReferenceOccurrence {
+  surface: string
+  path: string
+  scope: string
+  precedence: string
+}
+
+export interface ReferenceSummary<K extends string> {
+  kind: K
+  summary: string
+  value?: unknown
+  outcomes?: Readonly<Record<string, unknown>>
+}
+
+export interface ReferenceMinimumExample {
+  id: string
+  language: 'typescript' | 'markdown'
+  source: string
+}
+
+interface ConfigurationSemantics {
+  precedence: readonly string[]
+  default?: ReferenceSummary<'literal' | 'conditional' | 'inherited' | 'omitted'>
+  reset?: ReferenceSummary<'value' | 'omission' | 'none'>
+  minimumExample?: ReferenceMinimumExample
+  lifecycle?: string
+  errorSemantics?: string
+  supportedConstraint?: Readonly<{
+    summary: string
+    evidence: readonly ArtifactEvidenceIdentifier[]
+  }>
+  recommendedRange?: ReferenceSummary<'recommendation' | 'none'>
+  localValidation?: ReferenceSummary<'validation' | 'none'>
+}
+
+export interface ConfigurationGroupRecord extends ReferenceRecordBase, ConfigurationSemantics {
   kind: 'configuration-group'
   children: readonly string[]
 }
 
-export interface ConfigurationValueRecord extends ReferenceRecordBase {
+export interface ConfigurationValueRecord extends ReferenceRecordBase, ConfigurationSemantics {
   kind: 'configuration-value'
   valueType: string
+  default: ReferenceSummary<'literal' | 'conditional' | 'inherited' | 'omitted'>
+  reset: ReferenceSummary<'value' | 'omission' | 'none'>
+  minimumExample: ReferenceMinimumExample
+  lifecycle: string
+  errorSemantics: string
+  supportedConstraint: Readonly<{
+    summary: string
+    evidence: readonly ArtifactEvidenceIdentifier[]
+  }>
+  recommendedRange: ReferenceSummary<'recommendation' | 'none'>
+  localValidation: ReferenceSummary<'validation' | 'none'>
 }
 
 export interface AuthoringInputRecord extends ReferenceRecordBase {
   kind: 'authoring-input'
   syntax: string
+  transportTarget: string
+  sourcePrecedence: readonly string[]
+  downstreamOwnership: string
+  minimumExample: ReferenceMinimumExample
 }
 
 export interface DelegatedExceptionRecord extends ReferenceRecordBase {
   kind: 'delegated-exception'
   constraint: string
+  delegatedOwner: string
+  transportRestrictions: readonly string[]
+  packageFields: Readonly<{ set: readonly string[], read: readonly string[] }>
+  unknownKeyPolicy: string
+  allowances: Readonly<{
+    functionPaths: readonly string[]
+    regexpPaths: readonly string[]
+    opaqueIdentityPaths: readonly string[]
+  }>
+  exclusions: readonly string[]
+  packageBehavior: string
 }
 
 export type ReferenceRecord

@@ -590,6 +590,140 @@ function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim() !== ''
 }
 
+function isSupportedConstraint(value) {
+  return value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && isNonEmptyString(value.summary)
+    && Array.isArray(value.evidence)
+    && value.evidence.length > 0
+}
+
+function isNonEmptyStringArray(value) {
+  return Array.isArray(value) && value.length > 0 && value.every(isNonEmptyString)
+}
+
+function isSummary(value, allowedKinds) {
+  return value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && allowedKinds.includes(value.kind)
+    && isNonEmptyString(value.summary)
+}
+
+function isMinimumExample(value) {
+  return value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && isNonEmptyString(value.id)
+    && ['typescript', 'markdown'].includes(value.language)
+    && isNonEmptyString(value.source)
+}
+
+function areOccurrences(value) {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.every(occurrence => occurrence
+      && typeof occurrence === 'object'
+      && !Array.isArray(occurrence)
+      && ['surface', 'path', 'scope', 'precedence'].every(field => isNonEmptyString(occurrence[field])))
+}
+
+function isDeprecation(value) {
+  return value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && ['active', 'deprecated-accepted-no-op', 'rejected', 'outside-inventory'].includes(value.status)
+    && isNonEmptyString(value.summary)
+}
+
+function isStringArray(value) {
+  return Array.isArray(value) && value.every(item => typeof item === 'string')
+}
+
+function isDelegatedAllowances(value) {
+  return value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && ['functionPaths', 'regexpPaths', 'opaqueIdentityPaths'].every(field => isStringArray(value[field]))
+}
+
+function isPackageFields(value) {
+  return value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && isStringArray(value.set)
+    && isStringArray(value.read)
+}
+
+function cloneAndFreezeReferenceValue(value) {
+  if (Array.isArray(value)) return Object.freeze(value.map(cloneAndFreezeReferenceValue))
+  if (value && typeof value === 'object') {
+    return Object.freeze(Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [key, cloneAndFreezeReferenceValue(nested)]),
+    ))
+  }
+  return value
+}
+
+const COMMON_HUMAN_FIELDS = Object.freeze([
+  'purpose',
+  'ownership',
+  'occurrences',
+  'scope',
+  'boundary',
+  'deprecation',
+  'explicitNegatives',
+])
+
+const KIND_HUMAN_FIELDS = Object.freeze({
+  'configuration-group': Object.freeze([
+    'precedence',
+    'default',
+    'reset',
+    'minimumExample',
+    'lifecycle',
+    'errorSemantics',
+    'supportedConstraint',
+    'recommendedRange',
+    'localValidation',
+  ]),
+  'configuration-value': Object.freeze([
+    'precedence',
+    'default',
+    'reset',
+    'minimumExample',
+    'lifecycle',
+    'errorSemantics',
+    'supportedConstraint',
+    'recommendedRange',
+    'localValidation',
+  ]),
+  'authoring-input': Object.freeze([
+    'transportTarget',
+    'sourcePrecedence',
+    'downstreamOwnership',
+    'minimumExample',
+  ]),
+  'delegated-exception': Object.freeze([
+    'delegatedOwner',
+    'transportRestrictions',
+    'packageFields',
+    'unknownKeyPolicy',
+    'allowances',
+    'exclusions',
+    'packageBehavior',
+  ]),
+})
+
+function projectHumanFields(record, loadedRecord) {
+  for (const field of [...COMMON_HUMAN_FIELDS, ...KIND_HUMAN_FIELDS[record.kind]]) {
+    if (Object.hasOwn(record, field)) {
+      loadedRecord[field] = cloneAndFreezeReferenceValue(record[field])
+    }
+  }
+}
+
 async function evidenceMismatch(identifier, record, artifact, workspaceRoot) {
   if (typeof identifier !== 'string' || identifier.startsWith('workspace:')) {
     return { category: 'workspace-source-evidence', path: record.path, fragment: record.fragment }
@@ -653,6 +787,59 @@ export async function loadReferenceRecords(records, {
         mismatches.push({ category: 'missing-required-prose', path: record.path, fragment: record.fragment, field })
       }
     }
+    const requiredHumanFields = {
+      purpose: isNonEmptyString(record.purpose),
+      ownership: isNonEmptyString(record.ownership),
+      occurrences: areOccurrences(record.occurrences),
+      scope: isNonEmptyString(record.scope),
+      boundary: isNonEmptyString(record.boundary),
+      deprecation: isDeprecation(record.deprecation),
+      ...(record.kind === 'configuration-group'
+        ? { precedence: isNonEmptyStringArray(record.precedence) }
+        : {}),
+      ...(record.kind === 'configuration-value'
+        ? {
+            precedence: isNonEmptyStringArray(record.precedence),
+            default: isSummary(record.default, ['literal', 'conditional', 'inherited', 'omitted']),
+            reset: isSummary(record.reset, ['value', 'omission', 'none']),
+            minimumExample: isMinimumExample(record.minimumExample),
+            lifecycle: isNonEmptyString(record.lifecycle),
+            errorSemantics: isNonEmptyString(record.errorSemantics),
+            supportedConstraint: isSupportedConstraint(record.supportedConstraint),
+            recommendedRange: isSummary(record.recommendedRange, ['recommendation', 'none']),
+            localValidation: isSummary(record.localValidation, ['validation', 'none']),
+          }
+        : {}),
+      ...(record.kind === 'authoring-input'
+        ? {
+            transportTarget: isNonEmptyString(record.transportTarget),
+            sourcePrecedence: isNonEmptyStringArray(record.sourcePrecedence),
+            downstreamOwnership: isNonEmptyString(record.downstreamOwnership),
+            minimumExample: isMinimumExample(record.minimumExample),
+          }
+        : {}),
+      ...(record.kind === 'delegated-exception'
+        ? {
+            delegatedOwner: isNonEmptyString(record.delegatedOwner),
+            transportRestrictions: isNonEmptyStringArray(record.transportRestrictions),
+            packageFields: isPackageFields(record.packageFields),
+            unknownKeyPolicy: isNonEmptyString(record.unknownKeyPolicy),
+            allowances: isDelegatedAllowances(record.allowances),
+            exclusions: isNonEmptyStringArray(record.exclusions),
+            packageBehavior: isNonEmptyString(record.packageBehavior),
+          }
+        : {}),
+    }
+    for (const [field, valid] of Object.entries(requiredHumanFields)) {
+      if (!valid) {
+        mismatches.push({ category: 'missing-required-prose', path: record.path, fragment: record.fragment, field })
+      }
+    }
+    if (isSupportedConstraint(record.supportedConstraint)) {
+      for (const identifier of record.supportedConstraint.evidence) {
+        evidenceChecks.push(evidenceMismatch(identifier, record, artifact, workspaceRoot))
+      }
+    }
     if (requestedVersionMismatch || record.artifactVersion !== expectedArtifactVersion) {
       mismatches.push({ category: 'artifact-version-mismatch', path: record.path, fragment: record.fragment })
     }
@@ -685,8 +872,11 @@ export async function loadReferenceRecords(records, {
       artifactVersion: record.artifactVersion,
       evidence: Object.freeze(Array.isArray(record.evidence) ? [...record.evidence] : []),
     }
+    projectHumanFields(record, loadedRecord)
     if (record.kind === 'configuration-group') loadedRecord.children = Object.freeze(Array.isArray(record.children) ? [...record.children] : [])
-    if (record.kind === 'configuration-value') loadedRecord.valueType = record.valueType
+    if (record.kind === 'configuration-value') {
+      loadedRecord.valueType = record.valueType
+    }
     if (record.kind === 'authoring-input') loadedRecord.syntax = record.syntax
     if (record.kind === 'delegated-exception') loadedRecord.constraint = record.constraint
     return Object.freeze(loadedRecord)

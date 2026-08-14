@@ -22,6 +22,63 @@ import {
 } from '../scripts/website/reference-parity.mjs'
 
 const temporaryDirectories: string[] = []
+const commonHumanSemantics = {
+  purpose: 'Explains the package-owned role.',
+  ownership: 'nuxt-content-mermaid',
+  occurrences: [{
+    surface: 'Nuxt module options',
+    path: 'contentMermaid.debug',
+    scope: 'application',
+    precedence: 'runtime overrides module options',
+  }],
+  scope: 'application',
+  boundary: 'package-owned',
+  deprecation: { status: 'active', summary: 'Not deprecated.' },
+}
+const configurationValueSemantics = {
+  ...commonHumanSemantics,
+  precedence: ['runtimeConfig.public.contentMermaid', 'contentMermaid', 'package default'],
+  default: { kind: 'literal', value: false, summary: 'Defaults to false.' },
+  reset: { kind: 'omission', summary: 'Omit the value to restore the package default.' },
+  minimumExample: {
+    id: 'debug-value',
+    language: 'typescript',
+    source: 'const options: ModuleOptions = { debug: true }',
+  },
+  lifecycle: 'Resolved before runtime rendering.',
+  errorSemantics: 'Invalid values fail configuration validation.',
+  supportedConstraint: {
+    summary: 'The exact stable artifact accepts the documented value.',
+    evidence: ['artifact:dist/module.d.mts#ModuleOptions'],
+  },
+  recommendedRange: { kind: 'none', summary: 'No narrower recommendation.' },
+  localValidation: { kind: 'validation', summary: 'The package accepts booleans only.' },
+}
+const configurationGroupSemantics = {
+  ...commonHumanSemantics,
+  precedence: ['runtimeConfig.public.contentMermaid', 'contentMermaid', 'package default'],
+}
+const authoringInputSemantics = {
+  ...commonHumanSemantics,
+  transportTarget: '<Mermaid>',
+  sourcePrecedence: ['component prop', 'Markdown source'],
+  downstreamOwnership: 'Mermaid owns diagram syntax.',
+  minimumExample: {
+    id: 'authoring-frontmatter',
+    language: 'markdown',
+    source: '```mermaid\ngraph TD\n  A --> B\n```',
+  },
+}
+const delegatedExceptionSemantics = {
+  ...commonHumanSemantics,
+  delegatedOwner: 'Mermaid',
+  transportRestrictions: ['Strict pure-data transport.'],
+  packageFields: { set: [], read: ['theme'] },
+  unknownKeyPolicy: 'Preserve unknown pure-data keys.',
+  allowances: { functionPaths: [], regexpPaths: [], opaqueIdentityPaths: [] },
+  exclusions: ['functions', 'class instances', 'cycles', 'explicit undefined'],
+  packageBehavior: 'The package validates transport before delegation.',
+}
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map(path => rm(path, { recursive: true, force: true })))
@@ -354,10 +411,10 @@ describe('website Reference record loader', () => {
       title: 'Reference entry',
     }
     const records = await loadReferenceRecords([
-      { ...common, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: ['loader.init'] },
-      { ...common, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
-      { ...common, kind: 'authoring-input', path: 'authoring.frontmatter', fragment: 'frontmatter', syntax: 'frontmatter' },
-      { ...common, kind: 'delegated-exception', path: 'loader.init', fragment: 'loader-init', constraint: 'strict-pure-data' },
+      { ...common, ...configurationGroupSemantics, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: ['loader.init'] },
+      { ...common, ...configurationValueSemantics, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
+      { ...common, ...authoringInputSemantics, kind: 'authoring-input', path: 'authoring.frontmatter', fragment: 'frontmatter', syntax: 'frontmatter' },
+      { ...common, ...delegatedExceptionSemantics, kind: 'delegated-exception', path: 'loader.init', fragment: 'loader-init', constraint: 'strict-pure-data' },
     ], { artifactVersion: '3.0.0', artifact })
 
     expect(records.map(record => record.kind)).toEqual([
@@ -369,8 +426,10 @@ describe('website Reference record loader', () => {
   })
 
   it('fails closed with deterministic schema, version, evidence, path, and fragment mismatches', async () => {
+    const artifact = await referenceRecordArtifact()
     const records = [
       {
+        ...configurationValueSemantics,
         kind: 'configuration-value',
         path: 'debug',
         fragment: 'debug',
@@ -381,6 +440,7 @@ describe('website Reference record loader', () => {
         valueType: '',
       },
       {
+        ...configurationGroupSemantics,
         kind: 'configuration-group',
         path: 'debug',
         fragment: 'debug',
@@ -393,7 +453,7 @@ describe('website Reference record loader', () => {
     ]
 
     try {
-      await loadReferenceRecords(records, { artifactVersion: '3.0.0' })
+      await loadReferenceRecords(records, { artifactVersion: '3.0.0', artifact })
       expect.unreachable('invalid records must fail closed')
     }
     catch (error) {
@@ -415,6 +475,7 @@ describe('website Reference record loader', () => {
     const artifact = await referenceRecordArtifact()
     const evidence = ['artifact:dist/module.d.mts#ModuleOptions']
     const rawRecord = {
+      ...configurationValueSemantics,
       kind: 'configuration-value',
       path: 'debug',
       fragment: 'debug',
@@ -440,6 +501,7 @@ describe('website Reference record loader', () => {
       artifactVersion: '3.0.0',
       evidence: ['artifact:dist/module.d.mts#ModuleOptions'],
       valueType: 'boolean',
+      ...configurationValueSemantics,
     })
     expect(Object.isFrozen(loadedRecord?.evidence)).toBe(true)
   })
@@ -447,6 +509,7 @@ describe('website Reference record loader', () => {
   it('rejects a syntactically valid evidence identifier that was not discovered', async () => {
     const artifact = await referenceRecordArtifact()
     await expect(loadReferenceRecords([{
+      ...configurationValueSemantics,
       kind: 'configuration-value',
       path: 'debug',
       fragment: 'debug',
@@ -467,6 +530,7 @@ describe('website Reference record loader', () => {
       version: '3.0.1',
     })
     await expect(loadReferenceRecords([{
+      ...configurationValueSemantics,
       kind: 'configuration-value',
       path: 'debug',
       fragment: 'debug',
@@ -477,6 +541,26 @@ describe('website Reference record loader', () => {
       valueType: 'boolean',
     }], { artifact })).rejects.toMatchObject({
       mismatches: [{ category: 'artifact-version-mismatch' }],
+    })
+  })
+
+  it('rejects configuration values missing human-authored semantics', async () => {
+    const artifact = await referenceRecordArtifact()
+
+    await expect(loadReferenceRecords([{
+      kind: 'configuration-value',
+      path: 'debug',
+      fragment: 'debug',
+      title: 'Debug',
+      description: 'Controls package diagnostics.',
+      artifactVersion: '3.0.0',
+      evidence: ['artifact:dist/module.d.mts#ModuleOptions'],
+      valueType: 'boolean',
+    }], { artifact })).rejects.toMatchObject({
+      mismatches: expect.arrayContaining([
+        { category: 'missing-required-prose', path: 'debug', fragment: 'debug', field: 'purpose' },
+        { category: 'missing-required-prose', path: 'debug', fragment: 'debug', field: 'supportedConstraint' },
+      ]),
     })
   })
 })
@@ -628,8 +712,8 @@ describe('website Reference semantic probe and checker foundation', () => {
     }
     const artifact = await exactInstalledArtifact()
     const loaded = await loadReferenceRecords([
-      { ...common, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: [] },
-      { ...common, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
+      { ...common, ...configurationGroupSemantics, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: [] },
+      { ...common, ...configurationValueSemantics, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
     ], { artifactVersion: '3.0.0', artifact })
 
     expect(() => checkReferenceParity([...loaded] as unknown as typeof loaded, {})).toThrow(/loader output/)
@@ -688,8 +772,8 @@ describe('website Reference semantic probe and checker foundation', () => {
       title: 'Reference entry',
     }
     const loaded = await loadReferenceRecords([
-      { ...common, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: [] },
-      { ...common, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
+      { ...common, ...configurationGroupSemantics, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: [] },
+      { ...common, ...configurationValueSemantics, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
     ], { artifact })
 
     expect(await checkReferenceParity(loaded, {
@@ -725,6 +809,7 @@ describe('website Reference semantic probe and checker foundation', () => {
       },
     })
     const loaded = await loadReferenceRecords([{
+      ...configurationValueSemantics,
       kind: 'configuration-value',
       path: 'debug',
       fragment: 'debug',
