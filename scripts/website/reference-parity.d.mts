@@ -111,7 +111,10 @@ export interface TypeScriptProbeCase {
 }
 
 export const TYPESCRIPT_PROBE_CASES: readonly TypeScriptProbeCase[]
-export interface TypeScriptProbeResult extends TypeScriptProbeCase {
+export interface TypeScriptProbeResult {
+  id: TypeScriptProbeCase['id']
+  category: TypeScriptProbeCase['category']
+  expectation: TypeScriptProbeCase['expectation']
   observed: 'accept' | 'reject'
   passed: boolean
   diagnosticCodes: readonly number[]
@@ -198,4 +201,4 @@ export function checkReferenceParity(
       'match' | 'mismatch'
     >>
   },
-): readonly Readonly<ReferenceMismatch>[]
+): Promise<readonly Readonly<ReferenceMismatch>[]>

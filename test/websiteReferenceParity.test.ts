@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import { verifyWebsiteArtifactIdentity } from '../scripts/website/artifact.mjs'
+import type { TypeScriptProbeResult } from '../scripts/website/reference-parity.mjs'
 import {
   CONFIGURATION_ACCEPTANCE,
   CONFIGURATION_INVENTORY,
@@ -29,9 +30,11 @@ afterEach(async () => {
 async function artifactFixture({
   manifest,
   files,
+  version = '3.0.0',
 }: {
   manifest: Record<string, unknown>
   files: Record<string, string>
+  version?: string
 }) {
   const repositoryRoot = await mkdtemp(join(tmpdir(), 'reference-parity-'))
   temporaryDirectories.push(repositoryRoot)
@@ -39,7 +42,7 @@ async function artifactFixture({
   await mkdir(artifactRoot, { recursive: true })
   await writeFile(join(artifactRoot, 'package.json'), JSON.stringify({
     name: '@barzhsieh/nuxt-content-mermaid',
-    version: '3.0.0',
+    version,
     ...manifest,
   }))
   for (const [relativePath, source] of Object.entries(files)) {
@@ -56,9 +59,9 @@ async function artifactFixture({
       manifestPath: join(artifactRoot, 'package.json'),
       packageMetadata: {
         name: '@barzhsieh/nuxt-content-mermaid',
-        version: '3.0.0',
+        version,
       },
-      version: '3.0.0',
+      version,
     },
   }
 }
@@ -456,6 +459,26 @@ describe('website Reference record loader', () => {
       mismatches: [{ category: 'unreadable-verification-infrastructure' }],
     })
   })
+
+  it('rejects records whose version differs from the verified artifact', async () => {
+    const { artifact } = await artifactFixture({
+      manifest: { types: './dist/module.d.mts' },
+      files: { 'dist/module.d.mts': 'export interface ModuleOptions {}\n' },
+      version: '3.0.1',
+    })
+    await expect(loadReferenceRecords([{
+      kind: 'configuration-value',
+      path: 'debug',
+      fragment: 'debug',
+      title: 'Debug',
+      description: 'Debug logging.',
+      artifactVersion: '3.0.0',
+      evidence: ['artifact:dist/module.d.mts#ModuleOptions'],
+      valueType: 'boolean',
+    }], { artifact })).rejects.toMatchObject({
+      mismatches: [{ category: 'artifact-version-mismatch' }],
+    })
+  })
 })
 
 describe('website Reference configuration inventory', () => {
@@ -510,6 +533,11 @@ describe('website Reference configuration inventory', () => {
 })
 
 describe('website Reference semantic probe and checker foundation', () => {
+  it('types TypeScript probe results as verification output without snippet source', () => {
+    type ResultHasSource = 'source' extends keyof TypeScriptProbeResult ? true : false
+    expectTypeOf<ResultHasSource>().toEqualTypeOf<false>()
+  })
+
   it('preserves the exact Direct Mermaid Config capability paths', () => {
     expect(DIRECT_MERMAID_CONFIG_ALLOWANCES).toEqual({
       functionPaths: [
@@ -598,20 +626,20 @@ describe('website Reference semantic probe and checker foundation', () => {
       evidence: ['artifact:dist/module.d.mts#ModuleOptions'],
       title: 'Reference entry',
     }
-    const artifact = await referenceRecordArtifact()
+    const artifact = await exactInstalledArtifact()
     const loaded = await loadReferenceRecords([
       { ...common, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: [] },
       { ...common, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
     ], { artifactVersion: '3.0.0', artifact })
 
     expect(() => checkReferenceParity([...loaded] as unknown as typeof loaded, {})).toThrow(/loader output/)
-    expect(checkReferenceParity(loaded, {
+    expect(await checkReferenceParity(loaded, {
       artifactVersion: '3.0.0',
       paths: ['loader', 'debug'],
       fragments: ['loader', 'debug'],
       runtimePaths: [],
-    }).map(mismatch => mismatch.category)).toEqual(['unreadable-verification-infrastructure'])
-    expect(checkReferenceParity(loaded, {
+    })).toEqual([{ category: 'unreadable-verification-infrastructure' }])
+    expect((await checkReferenceParity(loaded, {
       artifactVersion: '3.0.1',
       paths: ['debug', 'debug', 'unknown'],
       fragments: ['debug', 'debug', 'unknown'],
@@ -626,7 +654,7 @@ describe('website Reference semantic probe and checker foundation', () => {
         constraintEvidence: 'match',
         snippets: 'mismatch',
       },
-    }).map(mismatch => mismatch.category)).toEqual([
+    })).map(mismatch => mismatch.category)).toEqual([
       'artifact-version-mismatch',
       'duplicate-fragment',
       'duplicate-path',
@@ -638,5 +666,90 @@ describe('website Reference semantic probe and checker foundation', () => {
       'snippet-failure',
       'type-mismatch',
     ])
+  })
+
+  it('fails closed when the verified artifact accepts an unrecorded configuration path', async () => {
+    const exactArtifact = await exactInstalledArtifact()
+    const validatorPath = 'dist/runtime/configuration/module.js'
+    const validatorSource = await readFile(join(exactArtifact.artifactRoot, validatorPath), 'utf8')
+    const moduleKeysPrefix = 'const MODULE_OPTION_KEYS = /* @__PURE__ */ new Set([\n'
+    expect(validatorSource).toContain(moduleKeysPrefix)
+    const { artifact } = await artifactFixture({
+      manifest: { types: './dist/module.d.mts' },
+      files: {
+        'dist/module.d.mts': 'export interface RuntimeOptions {}\nexport interface ModuleOptions extends RuntimeOptions {}\n',
+        [validatorPath]: validatorSource.replace(moduleKeysPrefix, `${moduleKeysPrefix}  "future",\n`),
+      },
+    })
+    const common = {
+      artifactVersion: '3.0.0',
+      description: 'Reference prose.',
+      evidence: ['artifact:dist/module.d.mts#ModuleOptions'],
+      title: 'Reference entry',
+    }
+    const loaded = await loadReferenceRecords([
+      { ...common, kind: 'configuration-group', path: 'loader', fragment: 'loader', children: [] },
+      { ...common, kind: 'configuration-value', path: 'debug', fragment: 'debug', valueType: 'boolean' },
+    ], { artifact })
+
+    expect(await checkReferenceParity(loaded, {
+      artifactVersion: '3.0.0',
+      paths: ['loader', 'debug'],
+      fragments: ['loader', 'debug'],
+      runtimePaths: [],
+      checks: Object.fromEntries(Object.keys({
+        types: true,
+        defaults: true,
+        conditionalDefaults: true,
+        delegatedDescendants: true,
+        exceptions: true,
+        deprecations: true,
+        constraintEvidence: true,
+        snippets: true,
+      }).map(key => [key, 'match'])),
+    })).toContainEqual({ category: 'extra-path', path: 'future' })
+  })
+
+  it('fails closed when the public artifact declaration exposes an unrecorded path', async () => {
+    const exactArtifact = await exactInstalledArtifact()
+    const validatorPath = 'dist/runtime/configuration/module.js'
+    const validatorSource = await readFile(join(exactArtifact.artifactRoot, validatorPath), 'utf8')
+    const { artifact } = await artifactFixture({
+      manifest: { types: './dist/module.d.mts' },
+      files: {
+        'dist/module.d.mts': [
+          'export interface RuntimeOptions { future?: boolean }',
+          'export interface ModuleOptions extends RuntimeOptions { enabled?: boolean }',
+        ].join('\n'),
+        [validatorPath]: validatorSource,
+      },
+    })
+    const loaded = await loadReferenceRecords([{
+      kind: 'configuration-value',
+      path: 'debug',
+      fragment: 'debug',
+      title: 'Debug',
+      description: 'Reference prose.',
+      artifactVersion: '3.0.0',
+      evidence: ['artifact:dist/module.d.mts#ModuleOptions'],
+      valueType: 'boolean',
+    }], { artifact })
+
+    expect(await checkReferenceParity(loaded, {
+      artifactVersion: '3.0.0',
+      paths: ['debug'],
+      fragments: ['debug'],
+      runtimePaths: [],
+      checks: {
+        types: 'match',
+        defaults: 'match',
+        conditionalDefaults: 'match',
+        delegatedDescendants: 'match',
+        exceptions: 'match',
+        deprecations: 'match',
+        constraintEvidence: 'match',
+        snippets: 'match',
+      },
+    })).toContainEqual({ category: 'extra-path', path: 'future' })
   })
 })

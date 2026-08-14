@@ -444,22 +444,7 @@ export async function probeDirectMermaidConfigAllowances(artifact, { workspaceRo
   })
 }
 
-export async function runSemanticTypeScriptProbes(artifact, declarations, {
-  probes = TYPESCRIPT_PROBE_CASES,
-} = {}) {
-  assertVerifiedArtifact(artifact)
-  const artifactRoot = await verificationRealpath(artifact.artifactRoot, 'verified artifact root')
-  const declarationEntry = await verificationRealpath(resolve(artifactRoot, declarations.entry), 'TypeScript declaration probe')
-  if (!isWithin(artifactRoot, declarationEntry)) {
-    infrastructureFailure('evidence-escape', 'TypeScript declaration probe escapes the verified artifact root')
-  }
-  const virtualSources = new Map(probes.map(probe => [
-    resolve(artifactRoot, '.reference-probes', `${probe.id}.ts`),
-    [
-      `import type { MermaidComponentProps, ModuleOptions, RuntimeMermaidConfig, RuntimeOptions } from ${JSON.stringify(declarationEntry)}`,
-      probe.source,
-    ].join('\n'),
-  ]))
+function createArtifactTypeScriptProgram(virtualSources) {
   const compilerOptions = {
     allowImportingTsExtensions: true,
     module: ts.ModuleKind.ESNext,
@@ -479,7 +464,26 @@ export async function runSemanticTypeScriptProbes(artifact, declarations, {
       ? ts.createSourceFile(file, virtualSources.get(file), languageVersion, true)
       : getSourceFile(file, languageVersion, onError, shouldCreateNewSourceFile)
   )
-  const program = ts.createProgram([...virtualSources.keys()], compilerOptions, host)
+  return ts.createProgram([...virtualSources.keys()], compilerOptions, host)
+}
+
+export async function runSemanticTypeScriptProbes(artifact, declarations, {
+  probes = TYPESCRIPT_PROBE_CASES,
+} = {}) {
+  assertVerifiedArtifact(artifact)
+  const artifactRoot = await verificationRealpath(artifact.artifactRoot, 'verified artifact root')
+  const declarationEntry = await verificationRealpath(resolve(artifactRoot, declarations.entry), 'TypeScript declaration probe')
+  if (!isWithin(artifactRoot, declarationEntry)) {
+    infrastructureFailure('evidence-escape', 'TypeScript declaration probe escapes the verified artifact root')
+  }
+  const virtualSources = new Map(probes.map(probe => [
+    resolve(artifactRoot, '.reference-probes', `${probe.id}.ts`),
+    [
+      `import type { MermaidComponentProps, ModuleOptions, RuntimeMermaidConfig, RuntimeOptions } from ${JSON.stringify(declarationEntry)}`,
+      probe.source,
+    ].join('\n'),
+  ]))
+  const program = createArtifactTypeScriptProgram(virtualSources)
   const diagnosticsByFile = Map.groupBy(
     ts.getPreEmitDiagnostics(program).filter(diagnostic => diagnostic.file && virtualSources.has(diagnostic.file.fileName)),
     diagnostic => diagnostic.file.fileName,
@@ -563,6 +567,10 @@ const REFERENCE_RECORD_KINDS = new Set([
   'delegated-exception',
 ])
 const LOADED_REFERENCE_MODELS = new WeakSet()
+const LOADED_REFERENCE_ARTIFACTS = new WeakMap()
+// Identity scoping prevents temp artifacts at different roots from sharing an
+// observation while avoiding duplicate TypeScript programs per loaded model.
+const ARTIFACT_CONFIGURATION_INVENTORIES = new WeakMap()
 
 export class ReferenceRecordValidationFailure extends Error {
   constructor(mismatches) {
@@ -615,7 +623,7 @@ async function evidenceMismatch(identifier, record, artifact, workspaceRoot) {
 }
 
 export async function loadReferenceRecords(records, {
-  artifactVersion = '3.0.0',
+  artifactVersion,
   artifact,
   workspaceRoot,
 } = {}) {
@@ -624,6 +632,10 @@ export async function loadReferenceRecords(records, {
   const evidenceChecks = []
   const paths = new Set()
   const fragments = new Set()
+  const expectedArtifactVersion = artifact?.version ?? artifactVersion ?? '3.0.0'
+  const requestedVersionMismatch = artifactVersion !== undefined
+    && artifact !== undefined
+    && artifactVersion !== artifact.version
   const loaded = records.map((record) => {
     if (!REFERENCE_RECORD_KINDS.has(record?.kind)) {
       throw new TypeError(`Unsupported Reference record kind: ${String(record?.kind)}`)
@@ -641,7 +653,7 @@ export async function loadReferenceRecords(records, {
         mismatches.push({ category: 'missing-required-prose', path: record.path, fragment: record.fragment, field })
       }
     }
-    if (artifactVersion !== undefined && record.artifactVersion !== artifactVersion) {
+    if (requestedVersionMismatch || record.artifactVersion !== expectedArtifactVersion) {
       mismatches.push({ category: 'artifact-version-mismatch', path: record.path, fragment: record.fragment })
     }
     if (!Array.isArray(record.evidence) || record.evidence.length === 0) {
@@ -683,6 +695,7 @@ export async function loadReferenceRecords(records, {
   if (mismatches.length > 0) throw new ReferenceRecordValidationFailure(mismatches.sort(compareMismatch))
   const model = Object.freeze(loaded)
   LOADED_REFERENCE_MODELS.add(model)
+  LOADED_REFERENCE_ARTIFACTS.set(model, artifact)
   return model
 }
 
@@ -701,6 +714,265 @@ function compareInventory(expectedValues, observedValues, labels, mismatches) {
   }
 }
 
+function literalString(node) {
+  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
+    ? node.text
+    : undefined
+}
+
+function literalStringArray(node) {
+  if (!node || !ts.isArrayLiteralExpression(node)) return undefined
+  const values = node.elements.map(literalString)
+  return values.every(value => value !== undefined) ? values : undefined
+}
+
+function literalStringSet(node) {
+  if (!node
+    || !ts.isNewExpression(node)
+    || !ts.isIdentifier(node.expression)
+    || node.expression.text !== 'Set'
+    || node.arguments?.length !== 1) {
+    return undefined
+  }
+  return literalStringArray(node.arguments[0])
+}
+
+function isRuntimeKeysWithoutEnabled(node) {
+  if (!ts.isNewExpression(node)
+    || !ts.isIdentifier(node.expression)
+    || node.expression.text !== 'Set'
+    || node.arguments?.length !== 1) {
+    return false
+  }
+  const filter = node.arguments[0]
+  if (!ts.isCallExpression(filter)
+    || !ts.isPropertyAccessExpression(filter.expression)
+    || filter.expression.name.text !== 'filter'
+    || filter.arguments.length !== 1) {
+    return false
+  }
+  const source = filter.expression.expression
+  const callback = filter.arguments[0]
+  if (!ts.isArrayLiteralExpression(source)
+    || source.elements.length !== 1
+    || !ts.isSpreadElement(source.elements[0])
+    || !ts.isIdentifier(source.elements[0].expression)
+    || source.elements[0].expression.text !== 'MODULE_OPTION_KEYS'
+    || !ts.isArrowFunction(callback)
+    || callback.parameters.length !== 1
+    || !ts.isIdentifier(callback.parameters[0].name)
+    || !ts.isBinaryExpression(callback.body)
+    || callback.body.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken) {
+    return false
+  }
+  const parameter = callback.parameters[0].name.text
+  return (ts.isIdentifier(callback.body.left)
+    && callback.body.left.text === parameter
+    && literalString(callback.body.right) === 'enabled')
+  || (literalString(callback.body.left) === 'enabled'
+    && ts.isIdentifier(callback.body.right)
+    && callback.body.right.text === parameter)
+}
+
+// The artifact validator owns every accepted package path in root and nested
+// Set allowlists. Requiring its exact closed shape makes layout changes fail
+// as unreadable infrastructure instead of silently producing a partial list.
+function parseArtifactConfigurationInventory(source, file) {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  let moduleOptionKeys
+  let runtimeKeysDerived = false
+  let validateRuntimeOptions
+  for (const statement of sourceFile.statements) {
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue
+        if (declaration.name.text === 'MODULE_OPTION_KEYS') {
+          moduleOptionKeys = literalStringSet(declaration.initializer)
+        }
+        if (declaration.name.text === 'RUNTIME_OPTION_KEYS') {
+          runtimeKeysDerived = isRuntimeKeysWithoutEnabled(declaration.initializer)
+        }
+      }
+    }
+    if (ts.isFunctionDeclaration(statement)
+      && statement.name?.text === 'validateRuntimeOptions'
+      && statement.body) {
+      validateRuntimeOptions = statement
+    }
+  }
+  if (!moduleOptionKeys?.includes('enabled') || !runtimeKeysDerived || !validateRuntimeOptions) {
+    infrastructureFailure('unreadable-verification-infrastructure', 'artifact configuration allowlists could not be derived')
+  }
+
+  const paths = new Set(moduleOptionKeys)
+  let runtimeRootValidated = false
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      if (node.expression.text === 'assertKnownKeys') {
+        if (ts.isIdentifier(node.arguments[1]) && node.arguments[1].text === 'RUNTIME_OPTION_KEYS') {
+          runtimeRootValidated = true
+        }
+        else {
+          const keys = literalStringSet(node.arguments[1])
+          const parent = literalStringArray(node.arguments[3])
+          if (!keys || !parent) {
+            infrastructureFailure('unreadable-verification-infrastructure', 'artifact nested configuration allowlist is unreadable')
+          }
+          for (const key of keys) paths.add([...parent, key].join('.'))
+        }
+      }
+      if (node.expression.text === 'assertObjectProperty') {
+        const key = literalString(node.arguments[1])
+        const parent = literalStringArray(node.arguments[3])
+        if (key === undefined || !parent) {
+          infrastructureFailure('unreadable-verification-infrastructure', 'artifact object configuration path is unreadable')
+        }
+        const objectPath = [...parent, key]
+        paths.add(objectPath.join('.'))
+        if (node.arguments[4]) {
+          const keys = literalStringSet(node.arguments[4])
+          if (!keys) {
+            infrastructureFailure('unreadable-verification-infrastructure', 'artifact object configuration allowlist is unreadable')
+          }
+          for (const child of keys) paths.add([...objectPath, child].join('.'))
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(validateRuntimeOptions.body)
+  if (!runtimeRootValidated
+    || [...paths].some(path => !moduleOptionKeys.includes(path.split('.')[0]))) {
+    infrastructureFailure('unreadable-verification-infrastructure', 'artifact configuration allowlists are internally inconsistent')
+  }
+  const contentMermaid = Object.freeze([...paths].sort())
+  return Object.freeze({
+    contentMermaid,
+    runtimeConfigPublicContentMermaid: Object.freeze(contentMermaid.filter(path => path !== 'enabled')),
+  })
+}
+
+async function probeArtifactRuntimeConfigurationInventory(artifact) {
+  assertVerifiedArtifact(artifact)
+  const relativePath = 'dist/runtime/configuration/module.js'
+  await Promise.all([
+    discoverArtifactEvidence(artifact, { relativePath, symbolOrProbeId: 'MODULE_OPTION_KEYS' }),
+    discoverArtifactEvidence(artifact, { relativePath, symbolOrProbeId: 'validateRuntimeOptions' }),
+  ])
+  const artifactRoot = await verificationRealpath(artifact.artifactRoot, 'verified artifact root')
+  const file = await verificationRealpath(resolve(artifactRoot, relativePath), 'artifact configuration validator')
+  if (!isWithin(artifactRoot, file)) {
+    infrastructureFailure('evidence-escape', 'artifact configuration validator escapes the verified artifact root')
+  }
+  let source
+  try {
+    source = await readFile(file, 'utf8')
+  }
+  catch (error) {
+    infrastructureFailure('unreadable-verification-infrastructure', 'artifact configuration validator is unreadable', error)
+  }
+  return parseArtifactConfigurationInventory(source, file)
+}
+
+function collectClosedConfigurationPaths(checker, type, prefix, paths, visited, location) {
+  const candidates = type.isUnion() ? type.types : [type]
+  for (const candidate of candidates) {
+    const current = checker.getNonNullableType(candidate)
+    if (!(current.flags & ts.TypeFlags.Object)
+      || checker.isArrayType(current)
+      || checker.isTupleType(current)
+      || checker.getIndexTypeOfType(current, ts.IndexKind.String)
+      || checker.getSignaturesOfType(current, ts.SignatureKind.Call).length > 0) {
+      continue
+    }
+    let prefixes = visited.get(current)
+    if (!prefixes) {
+      prefixes = new Set()
+      visited.set(current, prefixes)
+    }
+    const prefixKey = prefix.join('.')
+    if (prefixes.has(prefixKey)) continue
+    prefixes.add(prefixKey)
+    for (const property of checker.getPropertiesOfType(current)) {
+      const path = [...prefix, property.name]
+      paths.add(path.join('.'))
+      const declaration = property.valueDeclaration ?? property.declarations?.[0] ?? location
+      collectClosedConfigurationPaths(
+        checker,
+        checker.getTypeOfSymbolAtLocation(property, declaration),
+        path,
+        paths,
+        visited,
+        declaration,
+      )
+    }
+  }
+}
+
+async function probeArtifactDeclarationConfigurationInventory(artifact) {
+  assertVerifiedArtifact(artifact)
+  const artifactRoot = await verificationRealpath(artifact.artifactRoot, 'verified artifact root')
+  const declarations = await discoverPublicDeclarations(artifact)
+  const declarationEntry = await verificationRealpath(
+    resolve(artifactRoot, declarations.entry),
+    'artifact public configuration declarations',
+  )
+  const virtualFile = resolve(artifactRoot, '.reference-probes', 'configuration-inventory.ts')
+  const virtualSources = new Map([[
+    virtualFile,
+    [
+      `import type { ModuleOptions, RuntimeOptions } from ${JSON.stringify(declarationEntry)}`,
+      'type ReferenceModuleOptions = ModuleOptions',
+      'type ReferenceRuntimeOptions = RuntimeOptions',
+    ].join('\n'),
+  ]])
+  const program = createArtifactTypeScriptProgram(virtualSources)
+  const diagnostics = ts.getPreEmitDiagnostics(program).filter(diagnostic => diagnostic.category === ts.DiagnosticCategory.Error)
+  const sourceFile = program.getSourceFile(virtualFile)
+  if (diagnostics.length > 0 || !sourceFile) {
+    infrastructureFailure('unreadable-verification-infrastructure', 'artifact public configuration declarations could not be inspected')
+  }
+  const checker = program.getTypeChecker()
+  const aliases = new Map(sourceFile.statements
+    .filter(ts.isTypeAliasDeclaration)
+    .map(alias => [alias.name.text, alias]))
+  function pathsFor(aliasName) {
+    const alias = aliases.get(aliasName)
+    if (!alias) {
+      infrastructureFailure('unreadable-verification-infrastructure', `artifact configuration alias is missing: ${aliasName}`)
+    }
+    const paths = new Set()
+    // String-indexed objects are delegated open payloads, so their descendants
+    // intentionally stop at the package-owned boundary (for example loader.init).
+    collectClosedConfigurationPaths(
+      checker,
+      checker.getTypeFromTypeNode(alias.type),
+      [],
+      paths,
+      new WeakMap(),
+      alias,
+    )
+    return Object.freeze([...paths].sort())
+  }
+  return Object.freeze({
+    contentMermaid: pathsFor('ReferenceModuleOptions'),
+    runtimeConfigPublicContentMermaid: pathsFor('ReferenceRuntimeOptions'),
+  })
+}
+
+function observeArtifactConfigurationInventories(artifact) {
+  let observation = ARTIFACT_CONFIGURATION_INVENTORIES.get(artifact)
+  if (!observation) {
+    observation = Promise.all([
+      probeArtifactRuntimeConfigurationInventory(artifact),
+      probeArtifactDeclarationConfigurationInventory(artifact),
+    ])
+    ARTIFACT_CONFIGURATION_INVENTORIES.set(artifact, observation)
+    observation.catch(() => ARTIFACT_CONFIGURATION_INVENTORIES.delete(artifact))
+  }
+  return observation
+}
+
 const PARITY_CHECK_CATEGORIES = Object.freeze({
   types: 'type-mismatch',
   defaults: 'default-mismatch',
@@ -716,10 +988,50 @@ export function checkReferenceParity(records, observation = {}) {
   if (!LOADED_REFERENCE_MODELS.has(records)) {
     throw new TypeError('Reference parity checker requires loader output')
   }
+  return checkLoadedReferenceParity(records, observation)
+}
+
+async function checkLoadedReferenceParity(records, observation) {
   const mismatches = []
   const artifactVersion = records[0]?.artifactVersion
   if (observation.artifactVersion !== undefined && observation.artifactVersion !== artifactVersion) {
     mismatches.push({ category: 'artifact-version-mismatch' })
+  }
+  const verifiedArtifact = LOADED_REFERENCE_ARTIFACTS.get(records)
+  let artifactInventoryUnreadable = false
+  if (!verifiedArtifact) {
+    artifactInventoryUnreadable = true
+  }
+  else {
+    try {
+      const artifactInventories = await observeArtifactConfigurationInventories(verifiedArtifact)
+      for (const artifactInventory of artifactInventories) {
+        compareInventory(CONFIGURATION_ACCEPTANCE.contentMermaid, artifactInventory.contentMermaid, {
+          duplicate: 'duplicate-path',
+          missing: 'missing-path',
+          extra: 'extra-path',
+          key: 'path',
+        }, mismatches)
+        compareInventory(
+          CONFIGURATION_ACCEPTANCE.runtimeConfigPublicContentMermaid,
+          artifactInventory.runtimeConfigPublicContentMermaid,
+          {
+            duplicate: 'duplicate-path',
+            missing: 'missing-path',
+            extra: 'extra-path',
+            key: 'path',
+          },
+          mismatches,
+        )
+      }
+    }
+    catch (error) {
+      mismatches.push({
+        category: REFERENCE_MISMATCH_CATEGORIES.includes(error?.category)
+          ? error.category
+          : 'unreadable-verification-infrastructure',
+      })
+    }
   }
   compareInventory(records.map(record => record.path), observation.paths ?? [], {
     duplicate: 'duplicate-path',
@@ -742,6 +1054,12 @@ export function checkReferenceParity(records, observation = {}) {
     if (status === 'mismatch') mismatches.push({ category })
     else if (status !== 'match') checksUnreadable = true
   }
-  if (checksUnreadable) mismatches.push({ category: 'unreadable-verification-infrastructure' })
-  return Object.freeze(mismatches.sort(compareMismatch).map(Object.freeze))
+  if (checksUnreadable || artifactInventoryUnreadable) {
+    mismatches.push({ category: 'unreadable-verification-infrastructure' })
+  }
+  const uniqueMismatches = new Map(mismatches.map(mismatch => [
+    `${mismatch.category}\0${mismatch.path ?? ''}\0${mismatch.fragment ?? ''}\0${mismatch.field ?? ''}`,
+    mismatch,
+  ]))
+  return Object.freeze([...uniqueMismatches.values()].sort(compareMismatch).map(Object.freeze))
 }
