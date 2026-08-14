@@ -372,6 +372,11 @@ h3 {
   background: var(--surface-subtle);
 }
 
+/* Keep the registry-backed 3.0.0 Contract Demo centered until the renderer fix ships. */
+.contract-demo .mermaid > svg {
+  display: block;
+}
+
 .contract-demo .mermaid-btn:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: -1px;

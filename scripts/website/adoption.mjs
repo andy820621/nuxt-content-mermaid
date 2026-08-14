@@ -80,9 +80,34 @@ async function focusByKeyboard(page, target) {
   throw new Error('website adoption verification failed: keyboard focus did not reach the expected control')
 }
 
+async function expectContractDiagramCentered(demo) {
+  const geometry = await demo.locator('.mermaid-wrapper').evaluate((wrapper) => {
+    const svg = wrapper.querySelector('.mermaid > svg')
+    const graphic = svg?.querySelector('g.root') ?? svg?.querySelector('g')
+    if (!svg || !graphic) return null
+
+    const center = (element) => {
+      const rect = element.getBoundingClientRect()
+      return rect.left + rect.width / 2
+    }
+
+    return {
+      graphicCenterDelta: center(graphic) - center(wrapper),
+      svgCenterDelta: center(svg) - center(wrapper),
+      svgDisplay: getComputedStyle(svg).display,
+      svgViewBox: svg.getAttribute('viewBox'),
+      svgWidth: svg.getAttribute('width'),
+    }
+  })
+
+  expectEvidence(Boolean(geometry), 'Contract Demo must expose measurable SVG geometry')
+  expectEvidence(Math.abs(geometry.graphicCenterDelta) <= 1, 'Contract Demo graphics must be horizontally centered')
+  expectEvidence(Math.abs(geometry.svgCenterDelta) <= 1, 'Contract Demo SVG viewport must be horizontally centered')
+  return geometry
+}
+
 export async function observeHomeWithoutJavaScript({ page }) {
   await expectAccessibleStructure(page)
-  const criticalAccessibilityViolations = await expectNoCriticalAccessibilityViolations(page)
   await expectHomepageCoreContent(page)
 
   const primaryCta = page.locator('[data-primary-cta]')
@@ -99,20 +124,17 @@ export async function observeHomeWithoutJavaScript({ page }) {
     compatibility: true,
     exactArtifact: PACKAGE_VERSION,
     contractSourceFallbacks: 2,
-    criticalAccessibilityViolations,
   }
 }
 
 export async function observeGettingStartedWithoutJavaScript({ page }) {
   await expectAccessibleStructure(page)
-  const criticalAccessibilityViolations = await expectNoCriticalAccessibilityViolations(page)
   await expectGettingStartedCoreContent(page)
 
   return {
     selfContainedSteps: 5,
     successCheckpoint: true,
     inlineRecoverySymptoms: 3,
-    criticalAccessibilityViolations,
   }
 }
 
@@ -124,6 +146,7 @@ export async function observeHomeHydrated({ page }) {
   const primaryDemo = page.locator('[data-contract-demo="primary"]')
   const primarySvg = primaryDemo.locator('.mermaid > svg')
   await primarySvg.waitFor()
+  const centeredDiagram = await expectContractDiagramCentered(primaryDemo)
   const lightSvg = await primarySvg.evaluate(element => element.outerHTML)
 
   const themeButton = page.getByRole('button', { name: 'Switch to dark theme' })
@@ -156,7 +179,8 @@ export async function observeHomeHydrated({ page }) {
   await lazySvg.waitFor()
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  const reducedMotion = await themeButton.evaluate((element) => {
+  const activeThemeButton = page.getByRole('button', { name: 'Switch to light theme' })
+  const reducedMotion = await activeThemeButton.evaluate((element) => {
     const style = getComputedStyle(element)
     return {
       animationName: style.animationName,
@@ -196,6 +220,7 @@ export async function observeHomeHydrated({ page }) {
     narrowViewport: true,
     clientNavigation: true,
     criticalAccessibilityViolations,
+    centeredDiagram,
   }
 }
 

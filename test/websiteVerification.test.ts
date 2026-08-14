@@ -13,7 +13,10 @@ function artifactEvidence(version = '3.0.0') {
   }
 }
 
-function staticEvidence(version = '3.0.0', svgCount = 1, criticalAccessibilityViolations = 0) {
+function staticEvidence(version = '3.0.0', svgCount = 1, criticalAccessibilityViolations: number | null = 0) {
+  const hydratedAccessibility = criticalAccessibilityViolations === null
+    ? {}
+    : { criticalAccessibilityViolations }
   return {
     phase: 'static-site',
     manifest: [],
@@ -29,8 +32,8 @@ function staticEvidence(version = '3.0.0', svgCount = 1, criticalAccessibilityVi
         artifactVersion: version,
         svgCount,
         observations: {
-          noJavaScript: { criticalAccessibilityViolations },
-          hydrated: { criticalAccessibilityViolations },
+          noJavaScript: {},
+          hydrated: hydratedAccessibility,
         },
       },
       {
@@ -42,8 +45,8 @@ function staticEvidence(version = '3.0.0', svgCount = 1, criticalAccessibilityVi
         hydrated: true,
         noJavaScript: true,
         observations: {
-          noJavaScript: { criticalAccessibilityViolations },
-          hydrated: { criticalAccessibilityViolations },
+          noJavaScript: {},
+          hydrated: hydratedAccessibility,
         },
       },
     ],
@@ -110,11 +113,7 @@ describe('composed website verification', () => {
 
   it.each([
     [staticEvidence('3.0.0', 1, 1), 'critical accessibility'],
-    [(() => {
-      const evidence = staticEvidence()
-      delete evidence.routes[0].observations.hydrated.criticalAccessibilityViolations
-      return evidence
-    })(), 'critical accessibility'],
+    [staticEvidence('3.0.0', 1, null), 'critical accessibility'],
   ])('blocks incomplete or failing accessibility evidence %#', async (site, message) => {
     await expect(verifyWebsite({
       repositoryRoot: '/repo',
@@ -122,5 +121,16 @@ describe('composed website verification', () => {
       verifyArtifact: vi.fn(async () => artifactEvidence()),
       verifyStatic: vi.fn(async () => site),
     })).rejects.toThrow(message)
+  })
+
+  it('requires axe evidence from hydrated routes without claiming JavaScript-disabled coverage', async () => {
+    const site = staticEvidence()
+
+    await expect(verifyWebsite({
+      repositoryRoot: '/repo',
+      runCommand: vi.fn(async () => undefined),
+      verifyArtifact: vi.fn(async () => artifactEvidence()),
+      verifyStatic: vi.fn(async () => site),
+    })).resolves.toMatchObject({ mode: 'website-verification' })
   })
 })
