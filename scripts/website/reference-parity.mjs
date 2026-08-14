@@ -851,7 +851,8 @@ export async function loadReferenceRecords(records, {
         evidenceChecks.push(evidenceMismatch(identifier, record, artifact, workspaceRoot))
       }
     }
-    if (record.kind === 'configuration-group' && !Array.isArray(record.children)) {
+    if (record.kind === 'configuration-group'
+      && (!Array.isArray(record.children) || !record.children.every(isNonEmptyString))) {
       mismatches.push({ category: 'type-mismatch', path: record.path, fragment: record.fragment, field: 'children' })
     }
     if (record.kind === 'configuration-value' && !isNonEmptyString(record.valueType)) {

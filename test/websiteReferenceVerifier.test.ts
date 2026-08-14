@@ -6,12 +6,14 @@ import { verifyWebsiteReference } from '../scripts/website/reference-verifier.mj
 
 type RawReferenceRecord = Record<string, unknown> & {
   artifactVersion?: string
+  children?: unknown[]
   default?: Record<string, unknown>
   deprecation?: Record<string, unknown>
   evidence?: string[]
   minimumExample?: Record<string, unknown>
   occurrences?: Array<Record<string, unknown>>
   path?: string
+  supportedConstraint?: Record<string, unknown> & { evidence?: string[] }
   unknownKeyPolicy?: string
   valueType?: string
 }
@@ -64,7 +66,7 @@ describe('focused website Reference verifier', () => {
       recordCount: 43,
       mismatches: [],
     })
-  })
+  }, 15_000)
 
   it('classifies unreadable verification infrastructure deterministically', async () => {
     const { verifyWebsiteReference } = await import('../scripts/website/reference-verifier.mjs')
@@ -104,6 +106,14 @@ describe('focused website Reference verifier', () => {
     ['type', (records: RawReferenceRecord[]) => { records[1]!.valueType = 'string' }, ['type-mismatch']],
     ['default', (records: RawReferenceRecord[]) => { records[1]!.default!.value = true }, ['default-mismatch']],
     ['evidence', (records: RawReferenceRecord[]) => { records[1]!.evidence = ['artifact:dist/module.d.mts#MissingReferenceSymbol'] }, ['unsupported-constraint-evidence']],
+    ['unrelated record evidence', (records: RawReferenceRecord[]) => {
+      records.find(record => record.path === 'debug')!.evidence![0]
+        = 'artifact:dist/module.d.mts#ModuleOptions'
+    }, ['unsupported-constraint-evidence']],
+    ['unrelated Supported Constraint evidence', (records: RawReferenceRecord[]) => {
+      records.find(record => record.path === 'debug')!.supportedConstraint!.evidence
+        = ['artifact:dist/module.d.mts#ModuleOptions']
+    }, ['unsupported-constraint-evidence']],
     ['snippet', (records: RawReferenceRecord[]) => { records[1]!.minimumExample!.source = 'const options: ModuleOptions = { debug: 1 }' }, ['snippet-failure']],
     ['version', (records: RawReferenceRecord[]) => { records[1]!.artifactVersion = '3.0.1' }, ['artifact-version-mismatch']],
     ['deprecation', (records: RawReferenceRecord[]) => { records[7]!.deprecation!.status = 'active' }, ['deprecation-mismatch']],
@@ -127,10 +137,27 @@ describe('focused website Reference verifier', () => {
       const occurrence = record.occurrences!.find(candidate => candidate.surface === 'Mermaid YAML frontmatter')!
       occurrence.precedence = 'Application default wins.'
     }, ['delegated-descendant']],
+    ['group children', (records: RawReferenceRecord[]) => {
+      records.find(record => record.path === 'loader')!.children = ['future']
+    }, ['delegated-descendant']],
+    ['group child element', (records: RawReferenceRecord[]) => {
+      records.find(record => record.path === 'loader')!.children = [42]
+    }, ['type-mismatch']],
+    ['configuration occurrence semantics', (records: RawReferenceRecord[]) => {
+      records.find(record => record.path === 'debug')!.occurrences![0]!.scope = 'diagram'
+    }, ['delegated-descendant']],
+    ['authoring occurrence semantics', (records: RawReferenceRecord[]) => {
+      records.find(record => record.path === 'authoring.markdown.fence')!
+        .occurrences![0]!.precedence = 'Page data overrides fence data.'
+    }, ['delegated-descendant']],
+    ['delegated occurrence semantics', (records: RawReferenceRecord[]) => {
+      records.find(record => record.path === 'delegated.component-page-config')!
+        .occurrences![0]!.scope = 'application'
+    }, ['delegated-descendant']],
   ])('classifies a tampered %s deterministically', async (_label, mutate, expectedCategories) => {
     const result = await verifyTamperedCorpus(mutate)
     expect(result.mismatches.map(mismatch => mismatch.category)).toEqual(expect.arrayContaining(expectedCategories))
-  })
+  }, 15_000)
 
   it('never generates or mutates the human-authored corpus', async () => {
     const before = await readFile(WEBSITE_REFERENCE_CORPUS_PATH, 'utf8')
@@ -143,5 +170,5 @@ describe('focused website Reference verifier', () => {
 
     expect(result.mismatches).toEqual([])
     await expect(readFile(WEBSITE_REFERENCE_CORPUS_PATH, 'utf8')).resolves.toBe(before)
-  })
+  }, 15_000)
 })

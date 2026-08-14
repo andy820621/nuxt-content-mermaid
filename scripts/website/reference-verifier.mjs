@@ -54,6 +54,79 @@ const EXPECTED_FRAGMENTS = Object.freeze([
   'delegated-markdown-frontmatter-other',
 ])
 
+const EVIDENCE = Object.freeze({
+  moduleOptions: 'artifact:dist/module.d.mts#ModuleOptions',
+  runtimeOptions: 'artifact:dist/module.d.mts#RuntimeOptions',
+  componentProps: 'artifact:dist/module.d.mts#MermaidComponentProps',
+  resolveModule: 'artifact:dist/runtime/configuration/module.js#resolveModuleConfiguration',
+  validateRuntime: 'artifact:dist/runtime/configuration/module.js#validateRuntimeOptions',
+  resolveExpand: 'artifact:dist/runtime/configuration/module.js#resolveExpandOptions',
+  resolveToolbar: 'artifact:dist/runtime/configuration/module.js#resolveToolbarOptions',
+  strictData: 'artifact:dist/runtime/configuration/core.js#assertStrictData',
+  debugDefaults: 'artifact:dist/runtime/configuration/runtime-options.js#resolveDebugDefaults',
+  defaultMermaid: 'artifact:dist/runtime/constants.js#DEFAULT_MERMAID_CONFIG',
+  defaultLightTheme: 'artifact:dist/runtime/constants.js#DEFAULT_LIGHT_THEME',
+  defaultDarkTheme: 'artifact:dist/runtime/constants.js#DEFAULT_DARK_THEME',
+  defaultExpand: 'artifact:dist/runtime/constants.js#DEFAULT_EXPAND_OPTIONS',
+  defaultToolbar: 'artifact:dist/runtime/constants.js#DEFAULT_TOOLBAR_OPTIONS',
+  markdownToolbar: 'artifact:dist/module.mjs#resolveMarkdownToolbar',
+  transformMarkdown: 'artifact:dist/module.mjs#transformMarkdownDiagrams',
+  fenceAttributes: 'artifact:dist/module.mjs#resolveFenceInlineAttributes',
+  componentSource: 'artifact:dist/runtime/component-configuration.js#resolveMermaidComponentSource',
+  diagramConfig: 'artifact:dist/module.mjs#resolveDiagramMermaidConfig',
+  markdownFrontmatter: 'artifact:dist/module.mjs#resolveMarkdownFrontmatter',
+  directConfig: 'artifact:dist/runtime/direct-mermaid-config.js#assertDirectMermaidConfig',
+  functionPaths: 'artifact:dist/runtime/constants.js#MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS',
+  regexpPaths: 'artifact:dist/runtime/constants.js#MERMAID_11_16_1_REGEXP_PATHS',
+  opaquePaths: 'artifact:dist/runtime/constants.js#DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS',
+})
+
+const EXPECTED_EVIDENCE = Object.freeze({
+  'enabled': { record: [EVIDENCE.moduleOptions, EVIDENCE.resolveModule], supported: [EVIDENCE.resolveModule] },
+  'debug': { record: [EVIDENCE.runtimeOptions, EVIDENCE.debugDefaults], supported: [EVIDENCE.debugDefaults] },
+  'loader': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [] },
+  'loader.init': { record: [EVIDENCE.defaultMermaid, EVIDENCE.debugDefaults, EVIDENCE.strictData], supported: [] },
+  'loader.lazy': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [] },
+  'loader.lazy.threshold': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [EVIDENCE.strictData, EVIDENCE.validateRuntime] },
+  'theme': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [] },
+  'theme.useColorModeTheme': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'theme.light': { record: [EVIDENCE.runtimeOptions, EVIDENCE.defaultLightTheme], supported: [EVIDENCE.validateRuntime] },
+  'theme.dark': { record: [EVIDENCE.runtimeOptions, EVIDENCE.defaultDarkTheme], supported: [EVIDENCE.validateRuntime] },
+  'components': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [] },
+  'components.renderer': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'components.spinner': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'components.error': { record: [EVIDENCE.runtimeOptions, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'expand': { record: [EVIDENCE.defaultExpand, EVIDENCE.resolveExpand], supported: [] },
+  'expand.enabled': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'expand.margin': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.strictData, EVIDENCE.validateRuntime] },
+  'expand.invokeOpenOn': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [] },
+  'expand.invokeOpenOn.diagramClick': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'expand.invokeCloseOn': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [] },
+  'expand.invokeCloseOn.esc': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'expand.invokeCloseOn.wheel': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'expand.invokeCloseOn.swipe': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'expand.invokeCloseOn.overlayClick': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'expand.invokeCloseOn.closeButtonClick': { record: [EVIDENCE.defaultExpand, EVIDENCE.validateRuntime], supported: [EVIDENCE.validateRuntime] },
+  'toolbar': { record: [EVIDENCE.defaultToolbar, EVIDENCE.resolveToolbar, EVIDENCE.markdownToolbar], supported: [] },
+  'toolbar.title': { record: [EVIDENCE.runtimeOptions, EVIDENCE.defaultToolbar, EVIDENCE.markdownToolbar], supported: [EVIDENCE.validateRuntime, EVIDENCE.markdownToolbar] },
+  'toolbar.fontSize': { record: [EVIDENCE.runtimeOptions, EVIDENCE.defaultToolbar, EVIDENCE.markdownToolbar], supported: [EVIDENCE.strictData, EVIDENCE.validateRuntime] },
+  'toolbar.fullscreenToolbarScale': { record: [EVIDENCE.runtimeOptions, EVIDENCE.defaultToolbar, EVIDENCE.markdownToolbar], supported: [EVIDENCE.strictData, EVIDENCE.validateRuntime] },
+  'toolbar.buttons': { record: [EVIDENCE.defaultToolbar, EVIDENCE.validateRuntime, EVIDENCE.markdownToolbar], supported: [] },
+  'toolbar.buttons.copy': { record: [EVIDENCE.defaultToolbar, EVIDENCE.validateRuntime, EVIDENCE.markdownToolbar], supported: [EVIDENCE.validateRuntime] },
+  'toolbar.buttons.fullscreen': { record: [EVIDENCE.defaultToolbar, EVIDENCE.validateRuntime, EVIDENCE.markdownToolbar], supported: [EVIDENCE.validateRuntime] },
+  'toolbar.buttons.expand': { record: [EVIDENCE.defaultToolbar, EVIDENCE.validateRuntime, EVIDENCE.markdownToolbar], supported: [EVIDENCE.validateRuntime] },
+  'authoring.component.code': { record: [EVIDENCE.componentProps], supported: [] },
+  'authoring.markdown.fence': { record: [EVIDENCE.transformMarkdown], supported: [] },
+  'authoring.markdown.fence.title': { record: [EVIDENCE.fenceAttributes, EVIDENCE.transformMarkdown], supported: [] },
+  'authoring.markdown.fence.display-mode': { record: [EVIDENCE.fenceAttributes, EVIDENCE.transformMarkdown], supported: [] },
+  'delegated.loader-init': { record: [EVIDENCE.strictData, EVIDENCE.debugDefaults], supported: [] },
+  'delegated.component-page-config': { record: [EVIDENCE.componentSource, EVIDENCE.strictData], supported: [] },
+  'delegated.markdown-page-config': { record: [EVIDENCE.transformMarkdown, EVIDENCE.componentSource], supported: [] },
+  'delegated.markdown-diagram-config': { record: [EVIDENCE.diagramConfig, EVIDENCE.markdownFrontmatter], supported: [] },
+  'delegated.component-direct-config': { record: [EVIDENCE.directConfig, EVIDENCE.functionPaths, EVIDENCE.regexpPaths, EVIDENCE.opaquePaths], supported: [] },
+  'delegated.markdown-frontmatter-other': { record: [EVIDENCE.markdownFrontmatter, EVIDENCE.transformMarkdown], supported: [] },
+})
+
 const EXPECTED_VALUE_TYPES = Object.freeze({
   'enabled': 'boolean',
   'debug': 'boolean',
@@ -135,6 +208,123 @@ const EXPECTED_DEFAULTS = Object.freeze({
   'toolbar.buttons.copy': { kind: 'literal', value: true },
   'toolbar.buttons.fullscreen': { kind: 'literal', value: true },
   'toolbar.buttons.expand': { kind: 'literal', value: true },
+})
+
+const EXPECTED_CHILDREN = Object.freeze({
+  'loader': ['loader.init', 'loader.lazy'],
+  'loader.init': [],
+  'loader.lazy': ['loader.lazy.threshold'],
+  'theme': ['theme.useColorModeTheme', 'theme.light', 'theme.dark'],
+  'components': ['components.renderer', 'components.spinner', 'components.error'],
+  'expand': ['expand.enabled', 'expand.margin', 'expand.invokeOpenOn', 'expand.invokeCloseOn'],
+  'expand.invokeOpenOn': ['expand.invokeOpenOn.diagramClick'],
+  'expand.invokeCloseOn': [
+    'expand.invokeCloseOn.esc',
+    'expand.invokeCloseOn.wheel',
+    'expand.invokeCloseOn.swipe',
+    'expand.invokeCloseOn.overlayClick',
+    'expand.invokeCloseOn.closeButtonClick',
+  ],
+  'toolbar': ['toolbar.title', 'toolbar.fontSize', 'toolbar.fullscreenToolbarScale', 'toolbar.buttons'],
+  'toolbar.buttons': ['toolbar.buttons.copy', 'toolbar.buttons.fullscreen', 'toolbar.buttons.expand'],
+})
+
+const CONFIGURATION_PRECEDENCE_OVERRIDES = Object.freeze({
+  'loader': {
+    module: 'Runtime override wins by property presence.',
+    runtime: 'Overrides module options by property presence.',
+  },
+  'loader.init': {
+    module: 'Runtime values override module values and defaults.',
+    runtime: 'Highest application-level layer.',
+  },
+  'expand': {
+    module: 'Runtime override wins by property presence.',
+    runtime: 'Overrides module options by property presence.',
+  },
+  'theme.useColorModeTheme': {
+    module: 'No layer changes behavior.',
+    runtime: 'No layer changes behavior.',
+  },
+})
+
+const EXPECTED_NON_CONFIGURATION_OCCURRENCES = Object.freeze({
+  'authoring.component.code': [{
+    surface: 'Mermaid component',
+    path: '<Mermaid>.code',
+    scope: 'diagram',
+    precedence: 'The explicit prop supplies component source.',
+  }],
+  'authoring.markdown.fence': [{
+    surface: 'Nuxt Content Markdown',
+    path: 'Mermaid fence body',
+    scope: 'diagram',
+    precedence: 'Fence inline metadata overrides Mermaid YAML frontmatter.',
+  }],
+  'authoring.markdown.fence.title': [{
+    surface: 'Mermaid fence',
+    path: 'Mermaid fence title',
+    scope: 'diagram',
+    precedence: 'Overrides a same-named Mermaid YAML frontmatter key.',
+  }],
+  'authoring.markdown.fence.display-mode': [{
+    surface: 'Mermaid fence',
+    path: 'Mermaid fence displayMode',
+    scope: 'diagram',
+    precedence: 'Overrides a same-named Mermaid YAML frontmatter key.',
+  }],
+  'delegated.loader-init': [
+    {
+      surface: 'Nuxt module options',
+      path: 'contentMermaid.loader.init.*',
+      scope: 'application',
+      precedence: 'Runtime descendants override module descendants.',
+    },
+    {
+      surface: 'Public runtime config',
+      path: 'runtimeConfig.public.contentMermaid.loader.init.*',
+      scope: 'runtime',
+      precedence: 'Overrides module descendants.',
+    },
+  ],
+  'delegated.component-page-config': [{
+    surface: 'Mermaid component',
+    path: '<Mermaid>.pageConfig.*',
+    scope: 'diagram',
+    precedence: 'Overrides runtime configuration and cannot coexist with <Mermaid>.config.',
+  }],
+  'delegated.markdown-page-config': [{
+    surface: 'Markdown page frontmatter',
+    path: 'config.*',
+    scope: 'page',
+    precedence: 'Per-diagram Mermaid YAML and fence data override page data.',
+  }],
+  'delegated.markdown-diagram-config': [
+    {
+      surface: 'Mermaid fence',
+      path: 'Mermaid fence config.*',
+      scope: 'diagram',
+      precedence: 'Overrides YAML config descendants.',
+    },
+    {
+      surface: 'Mermaid YAML frontmatter',
+      path: 'Mermaid YAML frontmatter config.*',
+      scope: 'diagram',
+      precedence: 'Fence config overrides it.',
+    },
+  ],
+  'delegated.component-direct-config': [{
+    surface: 'Mermaid component',
+    path: '<Mermaid>.config.*',
+    scope: 'diagram',
+    precedence: 'Overrides runtime configuration and cannot coexist with pageConfig.',
+  }],
+  'delegated.markdown-frontmatter-other': [{
+    surface: 'Mermaid YAML frontmatter',
+    path: 'Mermaid YAML frontmatter other keys',
+    scope: 'diagram',
+    precedence: 'Fence inline title, displayMode, config, and toolbar override same-named YAML data.',
+  }],
 })
 
 const EMPTY_ALLOWANCES = Object.freeze({
@@ -257,6 +447,16 @@ function typeCheckMatches(records) {
     && values.every(record => EXPECTED_VALUE_TYPES[record.path] === record.valueType)
 }
 
+function evidenceCheckMatches(records) {
+  return records.length === Object.keys(EXPECTED_EVIDENCE).length
+    && records.every((record) => {
+      const expected = EXPECTED_EVIDENCE[record.path]
+      return expected !== undefined
+        && isDeepStrictEqual(record.evidence, expected.record)
+        && isDeepStrictEqual(record.supportedConstraint?.evidence ?? [], expected.supported)
+    })
+}
+
 function projectDefault(value) {
   if (value === undefined) return null
   if (value.kind === 'conditional') {
@@ -279,6 +479,12 @@ function defaultCheckMatches(records, moduleResolution) {
     return record?.default?.kind === 'literal'
       && isDeepStrictEqual(record.default.value, valueAtPath(resolved, path))
   })
+}
+
+function childrenCheckMatches(records) {
+  const groups = records.filter(record => record.kind === 'configuration-group')
+  return groups.length === Object.keys(EXPECTED_CHILDREN).length
+    && groups.every(record => isDeepStrictEqual(record.children, EXPECTED_CHILDREN[record.path]))
 }
 
 function conditionalCheckMatches(records, debugFalse, debugTrue) {
@@ -327,62 +533,85 @@ function deprecationCheckMatches(records) {
   )
 }
 
-function configurationOccurrenceCheckMatches(records) {
-  const configuration = records.filter(record => record.kind.startsWith('configuration-'))
-  return configuration.every((record) => {
-    const expected = [`contentMermaid.${record.path}`]
-    if (record.path !== 'enabled') {
-      expected.push(`runtimeConfig.public.contentMermaid.${record.path}`)
-    }
-    if (record.path === 'toolbar' || record.path.startsWith('toolbar.')) {
-      expected.push(
-        `<Mermaid>.${record.path}`,
-        `Mermaid fence ${record.path}`,
-        `Mermaid YAML frontmatter ${record.path}`,
-      )
-    }
-    if (!isDeepStrictEqual(record.occurrences.map(occurrence => occurrence.path), expected)) return false
-    if (record.path !== 'toolbar' && !record.path.startsWith('toolbar.')) return true
-    return isDeepStrictEqual(record.occurrences, [
+function expectedConfigurationOccurrences(path) {
+  if (path === 'enabled') {
+    return [{
+      surface: 'Nuxt module options',
+      path: 'contentMermaid.enabled',
+      scope: 'build',
+      precedence: 'Explicit module value overrides the package default.',
+    }]
+  }
+  if (path === 'toolbar' || path.startsWith('toolbar.')) {
+    return [
       {
         surface: 'Nuxt module options',
-        path: `contentMermaid.${record.path}`,
+        path: `contentMermaid.${path}`,
         scope: 'application',
         precedence: 'Runtime override wins.',
       },
       {
         surface: 'Public runtime config',
-        path: `runtimeConfig.public.contentMermaid.${record.path}`,
+        path: `runtimeConfig.public.contentMermaid.${path}`,
         scope: 'runtime',
         precedence: 'Per-diagram authoring wins.',
       },
       {
         surface: 'Mermaid component',
-        path: `<Mermaid>.${record.path}`,
+        path: `<Mermaid>.${path}`,
         scope: 'diagram',
         precedence: 'Overrides application toolbar.',
       },
       {
         surface: 'Mermaid fence',
-        path: `Mermaid fence ${record.path}`,
+        path: `Mermaid fence ${path}`,
         scope: 'diagram',
-        precedence: record.path === 'toolbar'
+        precedence: path === 'toolbar'
           ? 'Overrides YAML frontmatter and application toolbar.'
           : 'Overrides YAML frontmatter.',
       },
       {
         surface: 'Mermaid YAML frontmatter',
-        path: `Mermaid YAML frontmatter ${record.path}`,
+        path: `Mermaid YAML frontmatter ${path}`,
         scope: 'diagram',
         precedence: 'Fence inline toolbar overrides it.',
       },
-    ])
-  })
+    ]
+  }
+  const precedence = CONFIGURATION_PRECEDENCE_OVERRIDES[path] ?? {
+    module: 'Runtime override wins.',
+    runtime: 'Overrides module options.',
+  }
+  return [
+    {
+      surface: 'Nuxt module options',
+      path: `contentMermaid.${path}`,
+      scope: 'application',
+      precedence: precedence.module,
+    },
+    {
+      surface: 'Public runtime config',
+      path: `runtimeConfig.public.contentMermaid.${path}`,
+      scope: 'runtime',
+      precedence: precedence.runtime,
+    },
+  ]
+}
+
+function occurrenceCheckMatches(records) {
+  return records.length === EXPECTED_PATHS.length
+    && records.every((record) => {
+      const expected = record.kind.startsWith('configuration-')
+        ? expectedConfigurationOccurrences(record.path)
+        : EXPECTED_NON_CONFIGURATION_OCCURRENCES[record.path]
+      return expected !== undefined && isDeepStrictEqual(record.occurrences, expected)
+    })
 }
 
 function boundaryCheckMatches(records) {
   return !records.some(record => record.path.startsWith('loader.init.'))
-    && configurationOccurrenceCheckMatches(records)
+    && childrenCheckMatches(records)
+    && occurrenceCheckMatches(records)
     && isDeepStrictEqual(records.flatMap(record => record.explicitNegatives ?? []), EXPLICIT_NEGATIVES)
 }
 
@@ -515,7 +744,7 @@ async function verifyWebsiteReferenceOrThrow({
       delegatedDescendants: boundaryCheckMatches(records) ? 'match' : 'mismatch',
       exceptions: exceptionCheckMatches(records, allowances) ? 'match' : 'mismatch',
       deprecations: deprecationCheckMatches(records) ? 'match' : 'mismatch',
-      constraintEvidence: 'match',
+      constraintEvidence: evidenceCheckMatches(records) ? 'match' : 'mismatch',
       snippets: snippetsMatch ? 'match' : 'mismatch',
     },
   })
