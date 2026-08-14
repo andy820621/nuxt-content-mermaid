@@ -87,6 +87,12 @@ export function validateWebsiteArtifactIdentity(identity) {
     version: expectedVersion,
     integrity: lockfile.integrity,
     tarball: registry.dist.tarball,
+    artifactRoot: packageRoot,
+    packageMetadata: {
+      name: installed.manifestName,
+      version: installed.manifestVersion,
+      ...installed.packageMetadata,
+    },
     manifestPath,
     moduleEntryPath,
   }
@@ -116,6 +122,13 @@ async function findInstalledManifest(moduleEntryPath, packageName) {
         return {
           manifestName: manifest.name,
           manifestVersion: manifest.version,
+          packageMetadata: {
+            name: manifest.name,
+            version: manifest.version,
+            exports: manifest.exports,
+            types: manifest.types,
+            typesVersions: manifest.typesVersions,
+          },
           manifestPath: await realpath(manifestPath),
           moduleEntryPath: await realpath(moduleEntryPath),
         }

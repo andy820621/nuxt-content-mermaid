@@ -8,6 +8,11 @@ function artifactEvidence(version = '3.0.0') {
     version,
     integrity: 'sha512-dGVzdA==',
     tarball: 'https://registry.npmjs.org/package.tgz',
+    artifactRoot: '/repo/node_modules/.pnpm/package',
+    packageMetadata: {
+      name: '@barzhsieh/nuxt-content-mermaid',
+      version,
+    },
     manifestPath: '/repo/node_modules/.pnpm/package/package.json',
     moduleEntryPath: '/repo/node_modules/.pnpm/package/dist/module.mjs',
   }

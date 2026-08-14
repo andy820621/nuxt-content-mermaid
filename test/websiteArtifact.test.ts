@@ -30,6 +30,13 @@ function exactIdentity(overrides: Record<string, unknown> = {}) {
     installed: {
       manifestName: packageName,
       manifestVersion: version,
+      packageMetadata: {
+        name: packageName,
+        version,
+        exports: undefined,
+        types: undefined,
+        typesVersions: undefined,
+      },
       manifestPath: `${packageRoot}/package.json`,
       moduleEntryPath: `${packageRoot}/dist/module.mjs`,
     },
@@ -47,6 +54,11 @@ describe('website artifact integration identity', () => {
       version,
       integrity,
       tarball,
+      artifactRoot: '/repo/node_modules/.pnpm/@barzhsieh+nuxt-content-mermaid@3.0.0/node_modules/@barzhsieh/nuxt-content-mermaid',
+      packageMetadata: {
+        name: packageName,
+        version,
+      },
     })
   })
 
