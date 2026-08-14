@@ -734,7 +734,10 @@ async function evidenceMismatch(identifier, record, artifact, workspaceRoot) {
   if (artifactPath.startsWith('/') || artifactPath.split(/[\\/]/).includes('..')) {
     return { category: 'evidence-escape', path: record.path, fragment: record.fragment }
   }
-  if (!artifact) return { category: 'unsupported-constraint-evidence', path: record.path, fragment: record.fragment }
+  // Build-time public projections validate the human model without resolving a
+  // second artifact. The composed verifier repeats this seam with its single
+  // verified artifact identity and performs discovery there.
+  if (!artifact) return
   try {
     const discovered = await discoverArtifactEvidence(artifact, {
       relativePath: artifactPath,

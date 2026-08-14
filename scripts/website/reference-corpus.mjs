@@ -8,6 +8,7 @@ export const WEBSITE_REFERENCE_CORPUS_PATH = fileURLToPath(
 
 export async function loadWebsiteReferenceCorpus({
   artifact,
+  artifactVersion,
   repositoryRoot,
   readText = path => readFile(path, 'utf8'),
 } = {}) {
@@ -15,6 +16,7 @@ export async function loadWebsiteReferenceCorpus({
   const records = JSON.parse(source)
   return loadReferenceRecords(records, {
     artifact,
+    artifactVersion,
     workspaceRoot: repositoryRoot,
   })
 }

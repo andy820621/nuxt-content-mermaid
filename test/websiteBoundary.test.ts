@@ -49,6 +49,8 @@ describe('documentation website application boundary', () => {
       gettingStartedPage,
       troubleshootingPage,
       migrationPage,
+      referencePage,
+      pageShell,
       nuxtConfig,
     ] = await Promise.all([
       readFile('website/content.config.ts', 'utf8'),
@@ -56,21 +58,32 @@ describe('documentation website application boundary', () => {
       readFile('website/pages/getting-started.vue', 'utf8'),
       readFile('website/pages/troubleshooting.vue', 'utf8'),
       readFile('website/pages/migration/v3.vue', 'utf8'),
+      readFile('website/pages/reference.vue', 'utf8'),
+      readFile('website/components/PageShell.vue', 'utf8'),
       readFile('website/nuxt.config.ts', 'utf8'),
     ])
 
     expect(contentConfig).toContain('pages: defineCollection({')
     expect(contentConfig).toContain('source: \'**/*.md\'')
-    expect(contentConfig).toMatch(/pageId: z\.enum\(\[[^\]]*'troubleshooting'[^\]]*'migration-v3'[^\]]*\]\)/)
+    expect(contentConfig).toMatch(/pageId: z\.enum\(\[[^\]]*'troubleshooting'[^\]]*'migration-v3'[^\]]*'reference'[^\]]*\]\)/)
     expect(contentConfig).not.toMatch(/(?:\.\.\/)+(?:content\.config|playground)|from ['"].*playground/)
 
     expect(homePage).toMatch(/queryCollection\('pages'\)\.path\('\/'\)\.first\(\)/)
     expect(gettingStartedPage).toMatch(/queryCollection\('pages'\)\.path\('\/getting-started'\)\.first\(\)/)
     expect(troubleshootingPage).toMatch(/queryCollection\('pages'\)\.path\('\/troubleshooting'\)\.first\(\)/)
     expect(migrationPage).toMatch(/queryCollection\('pages'\)\.path\('\/migration\/v3'\)\.first\(\)/)
-    expect(nuxtConfig).toMatch(/routes:\s*\[[^\]]*'\/troubleshooting'[^\]]*'\/migration\/v3'[^\]]*\]/)
+    expect(referencePage).toMatch(/queryCollection\('pages'\)\.path\('\/reference'\)\.first\(\)/)
+    expect(nuxtConfig).toContain('loadWebsiteReferencePublicModel')
+    expect(nuxtConfig).toMatch(/appConfig:\s*\{[^}]*websiteReference/)
+    expect(referencePage).toContain('useAppConfig()')
+    expect(referencePage).not.toContain('loadWebsiteReferencePublicModel')
+    expect(referencePage).not.toContain('import.meta.server')
+    expect(referencePage).not.toMatch(/records\.v1\.json|\$fetch|\bfetch\s*\(/)
+    expect(pageShell).toContain('to="/reference"')
+    expect(pageShell).toContain('Reference')
+    expect(nuxtConfig).toMatch(/routes:\s*\[[^\]]*'\/troubleshooting'[^\]]*'\/migration\/v3'[^\]]*'\/reference'[^\]]*\]/)
 
-    for (const routeSource of [homePage, gettingStartedPage, troubleshootingPage, migrationPage]) {
+    for (const routeSource of [homePage, gettingStartedPage, troubleshootingPage, migrationPage, referencePage]) {
       expect(routeSource).not.toMatch(/queryCollection\('(?!pages')[^']+'\)|from ['"].*(?:content\.config|playground)/)
     }
   })

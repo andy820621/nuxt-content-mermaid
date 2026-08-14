@@ -53,6 +53,13 @@ onMounted(() => {
           >
             Get started
           </NuxtLink>
+          <NuxtLink
+            to="/reference"
+            class="nav-link"
+            :aria-current="props.page.pageId === 'reference' ? 'page' : undefined"
+          >
+            Reference
+          </NuxtLink>
           <button
             class="theme-toggle"
             type="button"

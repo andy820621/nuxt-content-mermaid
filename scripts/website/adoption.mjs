@@ -2,6 +2,12 @@ import AxeBuilder from '@axe-core/playwright'
 
 const PACKAGE_VERSION = '3.0.0'
 const PACKAGE_IDENTITY = `@barzhsieh/nuxt-content-mermaid@${PACKAGE_VERSION}`
+const REFERENCE_RECORD_COUNT = 43
+const REFERENCE_FRAGMENT_CASES = [
+  'debug',
+  'delegated-component-direct-config',
+  'theme-use-color-mode-theme',
+]
 
 function expectEvidence(condition, message) {
   if (!condition) throw new Error(`website adoption verification failed: ${message}`)
@@ -168,6 +174,83 @@ async function expectMigrationCoreContent(page) {
     expectEvidence(pageText?.includes(term), `Migration entry must contain ${term}`)
   }
   expectEvidence(pageText?.includes('Run the application\'s production build'), 'Migration checklist must end in a usable build check')
+}
+
+async function expectReferenceCoreContent(page) {
+  await expectVisibleText(page, '[data-reference-identity]', PACKAGE_IDENTITY, 'Reference artifact identity')
+  await expectVisibleText(page, '[data-reference-record-count]', `${REFERENCE_RECORD_COUNT} validated records`, 'Reference record count')
+
+  const sectionIds = [
+    'configuration-groups',
+    'configuration-value-options',
+    'authoring-inputs',
+    'delegated-open-payloads',
+    'deprecated-options',
+  ]
+  await expectFragmentTargets(page, sectionIds)
+
+  const records = page.locator('[data-reference-record]')
+  expectEvidence(await records.count() === REFERENCE_RECORD_COUNT, 'Reference must render all 43 validated records')
+  const fragments = await records.evaluateAll(elements => elements.map(element => ({
+    id: element.id,
+    fragment: element.getAttribute('data-reference-fragment'),
+    anchorCount: element.querySelectorAll(`a[href="#${CSS.escape(element.id)}"]`).length,
+  })))
+  expectEvidence(new Set(fragments.map(record => record.id)).size === REFERENCE_RECORD_COUNT, 'Reference record ids must be unique')
+  expectEvidence(
+    fragments.every(record => record.id && record.fragment === record.id && record.anchorCount === 1),
+    'every Reference record must expose one stable linkable anchor',
+  )
+  expectEvidence(
+    await page.locator('#deprecated-options [data-reference-record="theme.useColorModeTheme"]').count() === 1,
+    'deprecated no-op must appear once in the dedicated Deprecated section',
+  )
+  expectEvidence(
+    await page.locator('#configuration-value-options [data-reference-record="theme.useColorModeTheme"]').count() === 0,
+    'deprecated no-op must not duplicate in active values',
+  )
+
+  const pageText = await page.locator('[data-page-id="reference"]').textContent()
+  for (const literal of [
+    'startOnLoad: false',
+    'theme: \'default\'',
+    'fontFamily: \'Arial, sans-serif, 微軟正黑體\'',
+    'securityLevel: \'strict\'',
+    'debug:false → { logLevel: 5, suppressErrorRendering: true }',
+    'debug:true → { logLevel: 1, suppressErrorRendering: false }',
+    'runtimeConfig.public.contentMermaid.enabled is absent and rejected.',
+    'mermaidContent is rejected and is not deprecated.',
+    'Mermaid %%{init}%% syntax is Mermaid-owned and outside the package inventory.',
+  ]) {
+    expectEvidence(pageText?.includes(literal), `Reference must render exact behavior: ${literal}`)
+  }
+  expectEvidence(await page.locator('pre > code[data-code-language]').count() > 0, 'Reference examples must use semantic code markup')
+  expectEvidence(
+    await page.locator('[data-reference-record] > details.reference-occurrences').count() === REFERENCE_RECORD_COUNT,
+    'every Reference record must expose its accepted surfaces',
+  )
+
+  const html = await page.content()
+  expectEvidence(
+    !/artifact:|artifactRoot|manifestPath|\.pnpm|\/Users\/|dist\/runtime\/.+?#|reference-probe:/i.test(html),
+    'Reference public HTML must not expose private evidence identifiers or paths',
+  )
+  return fragments.map(record => record.id)
+}
+
+async function expectReferenceFragmentLoads(page, origin, hydrated) {
+  for (const fragment of REFERENCE_FRAGMENT_CASES) {
+    await page.goto(`${origin}/reference/#${fragment}`, { waitUntil: 'load' })
+    const response = await page.reload({ waitUntil: 'load' })
+    expectEvidence(response?.status() === 200, `Reference fragment #${fragment} direct load must return 200`)
+    if (hydrated) {
+      await page.locator('[data-page-id="reference"][data-hydration-state="hydrated"]').waitFor()
+    }
+    expectEvidence(new URL(page.url()).pathname === '/reference/', `Reference fragment #${fragment} must keep the Reference route`)
+    expectEvidence(new URL(page.url()).hash === `#${fragment}`, `Reference fragment #${fragment} must preserve its hash`)
+    expectEvidence(await page.locator(`#${fragment}`).count() === 1, `Reference fragment #${fragment} must resolve uniquely`)
+    expectEvidence(await page.locator('[data-reference-record]').count() === REFERENCE_RECORD_COUNT, `Reference fragment #${fragment} must retain full content`)
+  }
 }
 
 async function focusByKeyboard(page, target) {
@@ -401,6 +484,37 @@ export async function observeMigrationHydrated({ page }) {
   }
 }
 
+export async function observeReferenceWithoutJavaScript({ page, origin }) {
+  await expectAccessibleStructure(page)
+  await expectSearchMetadata(page, '/reference')
+  const fragments = await expectReferenceCoreContent(page)
+  await expectReferenceFragmentLoads(page, origin, false)
+  return {
+    identity: PACKAGE_IDENTITY,
+    recordCount: REFERENCE_RECORD_COUNT,
+    uniqueFragments: fragments.length,
+    initialHtmlComplete: true,
+    representativeFragments: REFERENCE_FRAGMENT_CASES.length,
+    indexable: true,
+  }
+}
+
+export async function observeReferenceHydrated({ page, origin }) {
+  await expectAccessibleStructure(page)
+  const criticalAccessibilityViolations = await expectNoCriticalAccessibilityViolations(page)
+  await expectSearchMetadata(page, '/reference')
+  const fragments = await expectReferenceCoreContent(page)
+  await expectReferenceFragmentLoads(page, origin, true)
+  return {
+    identity: PACKAGE_IDENTITY,
+    recordCount: REFERENCE_RECORD_COUNT,
+    uniqueFragments: fragments.length,
+    sameReferencePage: true,
+    representativeFragments: REFERENCE_FRAGMENT_CASES.length,
+    criticalAccessibilityViolations,
+  }
+}
+
 export const WEBSITE_STATIC_CASES = [
   {
     id: 'home',
@@ -450,5 +564,17 @@ export const WEBSITE_STATIC_CASES = [
     navigationHref: '/',
     observeNoJavaScript: observeMigrationWithoutJavaScript,
     observeHydrated: observeMigrationHydrated,
+  },
+  {
+    id: 'reference',
+    logicalRoute: '/reference',
+    directUrl: '/reference/',
+    physicalFile: 'reference/index.html',
+    title: 'Reference | Nuxt Content Mermaid',
+    description: 'Explore every validated Nuxt Content Mermaid configuration, authoring input, and delegated payload boundary.',
+    heading: 'Reference',
+    navigationHref: '/reference',
+    observeNoJavaScript: observeReferenceWithoutJavaScript,
+    observeHydrated: observeReferenceHydrated,
   },
 ]

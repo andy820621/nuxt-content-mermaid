@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { ReferenceMismatch } from '../scripts/website/reference-parity.mjs'
 import { verifyWebsite } from '../scripts/website/verify.mjs'
 
 function artifactEvidence(version = '3.0.0') {
@@ -54,6 +55,30 @@ function staticEvidence(version = '3.0.0', svgCount = 1, criticalAccessibilityVi
           hydrated: hydratedAccessibility,
         },
       },
+      {
+        id: 'reference',
+        logicalRoute: '/reference',
+        directUrl: '/reference/',
+        physicalFile: 'reference/index.html',
+        prerendered: true,
+        hydrated: true,
+        noJavaScript: true,
+        observations: {
+          noJavaScript: {
+            identity: `@barzhsieh/nuxt-content-mermaid@${version}`,
+            recordCount: 43,
+            uniqueFragments: 43,
+            initialHtmlComplete: true,
+          },
+          hydrated: {
+            ...hydratedAccessibility,
+            identity: `@barzhsieh/nuxt-content-mermaid@${version}`,
+            recordCount: 43,
+            uniqueFragments: 43,
+            sameReferencePage: true,
+          },
+        },
+      },
     ],
     requestBoundary: {
       requestCount: 2,
@@ -73,6 +98,22 @@ function staticEvidence(version = '3.0.0', svgCount = 1, criticalAccessibilityVi
   }
 }
 
+function referenceEvidence(version = '3.0.0', recordCount = 43, mismatches: readonly ReferenceMismatch[] = []) {
+  return {
+    artifact: artifactEvidence(version),
+    recordCount,
+    mismatches,
+  }
+}
+
+function referenceObservations(site: ReturnType<typeof staticEvidence>) {
+  const route = site.routes.find(route => route.id === 'reference')
+  if (!route) throw new Error('Reference fixture is missing')
+  const { noJavaScript, hydrated } = route.observations
+  if (!('recordCount' in noJavaScript) || !('identity' in hydrated)) throw new Error('Reference fixture observations are missing')
+  return { noJavaScript, hydrated }
+}
+
 describe('composed website verification', () => {
   it('runs build phases before correlating artifact and static evidence', async () => {
     const order: string[] = []
@@ -83,6 +124,10 @@ describe('composed website verification', () => {
       order.push('artifact')
       return artifactEvidence()
     })
+    const verifyReference = vi.fn(async ({ resolveArtifact }) => {
+      order.push('reference')
+      return referenceEvidence((await resolveArtifact()).version)
+    })
     const verifyStatic = vi.fn(async () => {
       order.push('static')
       return staticEvidence()
@@ -92,6 +137,7 @@ describe('composed website verification', () => {
       repositoryRoot: '/repo',
       runCommand,
       verifyArtifact,
+      verifyReference,
       verifyStatic,
     })).resolves.toMatchObject({
       mode: 'website-verification',
@@ -99,9 +145,14 @@ describe('composed website verification', () => {
         artifactVersion: '3.0.0',
         homepageDisclosure: '3.0.0',
         hydratedSvgCount: 1,
+        referenceRecordCount: 43,
       },
     })
-    expect(order).toEqual(['typecheck', 'generate', 'artifact', 'static'])
+    expect(order).toEqual(['typecheck', 'generate', 'artifact', 'reference', 'static'])
+    expect(runCommand).toHaveBeenCalledTimes(2)
+    expect(verifyArtifact).toHaveBeenCalledOnce()
+    expect(verifyReference).toHaveBeenCalledOnce()
+    expect(verifyStatic).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -112,6 +163,7 @@ describe('composed website verification', () => {
       repositoryRoot: '/repo',
       runCommand: vi.fn(async () => undefined),
       verifyArtifact: vi.fn(async () => artifact),
+      verifyReference: vi.fn(async () => referenceEvidence()),
       verifyStatic: vi.fn(async () => site),
     })).rejects.toThrow(message)
   })
@@ -124,6 +176,7 @@ describe('composed website verification', () => {
       repositoryRoot: '/repo',
       runCommand: vi.fn(async () => undefined),
       verifyArtifact: vi.fn(async () => artifactEvidence()),
+      verifyReference: vi.fn(async () => referenceEvidence()),
       verifyStatic: vi.fn(async () => site),
     })).rejects.toThrow(message)
   })
@@ -135,7 +188,47 @@ describe('composed website verification', () => {
       repositoryRoot: '/repo',
       runCommand: vi.fn(async () => undefined),
       verifyArtifact: vi.fn(async () => artifactEvidence()),
+      verifyReference: vi.fn(async () => referenceEvidence()),
       verifyStatic: vi.fn(async () => site),
     })).resolves.toMatchObject({ mode: 'website-verification' })
+  })
+
+  it.each([
+    [referenceEvidence('3.0.1'), 'artifact version'],
+    [referenceEvidence('3.0.0', 42), 'record count'],
+    [referenceEvidence('3.0.0', 43, [{ category: 'default-mismatch' }]), 'mismatches'],
+  ])('blocks incomplete or inconsistent Reference parity evidence %#', async (reference, message) => {
+    await expect(verifyWebsite({
+      repositoryRoot: '/repo',
+      runCommand: vi.fn(async () => undefined),
+      verifyArtifact: vi.fn(async () => artifactEvidence()),
+      verifyReference: vi.fn(async () => reference),
+      verifyStatic: vi.fn(async () => staticEvidence()),
+    })).rejects.toThrow(message)
+  })
+
+  it.each([
+    ['no-JavaScript count', (site: ReturnType<typeof staticEvidence>) => {
+      referenceObservations(site).noJavaScript.recordCount = 42
+    }],
+    ['hydrated identity', (site: ReturnType<typeof staticEvidence>) => {
+      referenceObservations(site).hydrated.identity = '@barzhsieh/nuxt-content-mermaid@3.0.1'
+    }],
+    ['unique fragments', (site: ReturnType<typeof staticEvidence>) => {
+      referenceObservations(site).hydrated.uniqueFragments = 42
+    }],
+    ['route evidence', (site: ReturnType<typeof staticEvidence>) => {
+      site.routes.pop()
+    }],
+  ])('blocks missing or mismatched Reference %s', async (_label, mutate) => {
+    const site = staticEvidence()
+    mutate(site)
+    await expect(verifyWebsite({
+      repositoryRoot: '/repo',
+      runCommand: vi.fn(async () => undefined),
+      verifyArtifact: vi.fn(async () => artifactEvidence()),
+      verifyReference: vi.fn(async () => referenceEvidence()),
+      verifyStatic: vi.fn(async () => site),
+    })).rejects.toThrow('Reference route evidence')
   })
 })

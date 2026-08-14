@@ -8,7 +8,7 @@ export default defineContentConfig({
       schema: z.object({
         title: z.string(),
         description: z.string(),
-        pageId: z.enum(['home', 'getting-started', 'troubleshooting', 'migration-v3']),
+        pageId: z.enum(['home', 'getting-started', 'troubleshooting', 'migration-v3', 'reference']),
       }),
     }),
   },

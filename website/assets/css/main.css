@@ -490,6 +490,156 @@ h3 {
   padding: 5rem 0 7rem;
 }
 
+.reference-page {
+  width: min(940px, 100%);
+}
+
+.reference-page > [data-reference-record-count] {
+  margin: 1.5rem 0;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.reference-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 2rem 0 4rem;
+}
+
+.reference-toc a {
+  padding: 0.55rem 0.75rem;
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.reference-section {
+  scroll-margin-top: 2rem;
+  margin-top: 5rem;
+}
+
+.reference-section > h2 {
+  margin-bottom: 1.5rem;
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.reference-record {
+  scroll-margin-top: 2rem;
+  margin: 0 0 1.25rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.reference-record:target {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.reference-record-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.reference-record-heading h3 {
+  margin-bottom: 0.75rem;
+  font-size: 1.45rem;
+}
+
+.reference-path {
+  margin: 0 0 0.45rem;
+  color: var(--brand-strong);
+  font-size: 0.8rem;
+}
+
+.reference-anchor {
+  padding: 0.25rem;
+  color: var(--brand-strong);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.reference-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+
+.reference-facts > div {
+  padding: 0.8rem;
+  background: var(--surface-subtle);
+  border-radius: 0.65rem;
+}
+
+.reference-facts dt,
+.reference-details dt {
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.reference-facts dd,
+.reference-details dd {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.reference-facts dd code + code::before {
+  content: ", ";
+}
+
+.reference-detail,
+.reference-occurrences {
+  margin-top: 1.25rem;
+}
+
+.reference-negatives {
+  padding: 0.9rem 0.9rem 0.9rem 2rem;
+  color: var(--text-muted);
+  background: var(--surface-subtle);
+  border-radius: 0.65rem;
+}
+
+.reference-detail h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.reference-detail pre {
+  overflow-x: auto;
+  padding: 1rem;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  white-space: pre;
+}
+
+.reference-details {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.35fr) minmax(0, 1fr);
+  gap: 0.65rem 1rem;
+  margin-top: 1.25rem;
+}
+
+.reference-details dd {
+  margin-top: 0;
+}
+
+.reference-occurrences summary {
+  color: var(--brand-strong);
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .document-hero {
   padding-bottom: 2.5rem;
   border-bottom: 1px solid var(--line);

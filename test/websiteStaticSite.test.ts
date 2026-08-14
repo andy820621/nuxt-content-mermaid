@@ -41,6 +41,7 @@ describe('shared production static-site lifecycle', () => {
       { id: 'getting-started', logicalRoute: '/getting-started' },
       { id: 'troubleshooting', logicalRoute: '/troubleshooting' },
       { id: 'migration-v3', logicalRoute: '/migration/v3' },
+      { id: 'reference', logicalRoute: '/reference' },
     ])
   })
 
@@ -305,16 +306,16 @@ describe('shared production static-site lifecycle', () => {
       errors: [],
     }))
     await expect(runWebsiteStaticCli({
-      argv: ['--case', 'home'],
+      argv: ['--case', 'reference'],
       cases: WEBSITE_STATIC_CASES,
       verifier,
     })).resolves.toMatchObject({
       phase: 'static-site',
-      routes: [{ id: 'home' }],
+      routes: [{ id: 'reference' }],
     })
     expect(verifier).toHaveBeenCalledWith(expect.objectContaining({
-      allowedLogicalRoutes: ['/', '/getting-started', '/troubleshooting', '/migration/v3'],
-      cases: [expect.objectContaining({ id: 'home' })],
+      allowedLogicalRoutes: ['/', '/getting-started', '/troubleshooting', '/migration/v3', '/reference'],
+      cases: [expect.objectContaining({ id: 'reference' })],
     }))
   })
 })
