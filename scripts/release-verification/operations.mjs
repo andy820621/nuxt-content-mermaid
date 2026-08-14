@@ -230,6 +230,15 @@ function parsePackResult(output) {
   throw new Error('pnpm pack did not return valid JSON artifact metadata')
 }
 
+function assertPublishablePacklist(packlist) {
+  const npmMetadata = new Set(['LICENSE', 'README.md', 'README.zh-TW.md', 'package.json'])
+  for (const path of packlist) {
+    if (!path.startsWith('dist/') && !npmMetadata.has(path)) {
+      throw new Error(`Publishable Package Artifact contains an unexpected path: ${path}`)
+    }
+  }
+}
+
 async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner }) {
   if ((await readdir(artifactDirectory)).length > 0) {
     throw new Error('Artifact directory contains pre-existing state')
@@ -264,6 +273,8 @@ async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner
     ))) {
     throw new TypeError('pnpm pack artifact metadata is missing a valid packlist')
   }
+  const packlist = packResult.files.map(file => file.path)
+  assertPublishablePacklist(packlist)
 
   const archivePath = resolve(artifactDirectory, tarballs[0])
   if (!isWithin(resolve(artifactDirectory), archivePath)) {
@@ -275,7 +286,7 @@ async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner
     filename: tarballs[0],
     sha256: createHash('sha256').update(archiveBytes).digest('hex'),
     integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
-    packlist: packResult.files.map(file => file.path),
+    packlist,
     packageName: packResult.name,
     packageVersion: packResult.version,
   }

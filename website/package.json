@@ -1,0 +1,19 @@
+{
+  "name": "nuxt-content-mermaid-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "nuxt prepare && vue-tsc --noEmit -p tsconfig.json",
+    "generate": "nuxt generate"
+  },
+  "dependencies": {
+    "@barzhsieh/nuxt-content-mermaid": "3.0.0",
+    "@nuxt/content": "catalog:integrations",
+    "better-sqlite3": "12.5.0",
+    "nuxt": "catalog:dev"
+  },
+  "devDependencies": {
+    "typescript": "catalog:dev",
+    "vue-tsc": "catalog:dev"
+  }
+}

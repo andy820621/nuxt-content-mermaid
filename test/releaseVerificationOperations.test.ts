@@ -697,6 +697,9 @@ describe('package artifact creation', () => {
           version: '2.2.3',
           filename: join(artifactDirectory, filename),
           files: [
+            { path: 'LICENSE' },
+            { path: 'README.md' },
+            { path: 'README.zh-TW.md' },
             { path: 'dist/module.mjs' },
             { path: 'dist/types.d.mts' },
             { path: 'package.json' },
@@ -718,6 +721,9 @@ describe('package artifact creation', () => {
       sha256: createHash('sha256').update(archiveBytes).digest('hex'),
       integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
       packlist: [
+        'LICENSE',
+        'README.md',
+        'README.zh-TW.md',
         'dist/module.mjs',
         'dist/types.d.mts',
         'package.json',
@@ -755,6 +761,41 @@ describe('package artifact creation', () => {
       repositoryRoot,
       artifactDirectory,
     })).rejects.toThrow('pnpm pack must produce exactly one tarball; found 2')
+  })
+
+  it.each([
+    'website/components/ContractDemo.vue',
+    'assets/contract-demo/basic.mmd',
+    'website/.output/public/index.html',
+    'debug/request-log.json',
+  ])('rejects non-package surface in the publishable artifact: %s', async (unexpectedPath) => {
+    const repositoryRoot = await createTemporaryDirectory('package-repository')
+    const artifactDirectory = await createTemporaryDirectory('package-artifact')
+    const filename = 'barzhsieh-nuxt-content-mermaid-3.0.0.tgz'
+    const commandRunner = vi.fn(async () => {
+      await writeFile(join(artifactDirectory, filename), 'artifact')
+      return {
+        stdout: JSON.stringify({
+          name: '@barzhsieh/nuxt-content-mermaid',
+          version: '3.0.0',
+          filename,
+          files: [
+            { path: 'dist/module.mjs' },
+            { path: 'package.json' },
+            { path: unexpectedPath },
+          ],
+        }),
+      }
+    })
+    const operations = createReleaseVerificationOperations({
+      templateDirectory: '/unused',
+      commandRunner,
+    })
+
+    await expect(operations.createArtifact({
+      repositoryRoot,
+      artifactDirectory,
+    })).rejects.toThrow(`Publishable Package Artifact contains an unexpected path: ${unexpectedPath}`)
   })
 })
 
