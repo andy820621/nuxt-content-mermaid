@@ -5,7 +5,8 @@
 本規格是文件網站唯一的產品與架構契約。
 
 - 2026-08-15：完成第一階段簡化，網站收斂為一個 Nuxt Content collection、通用文件 route/layout 與六篇手寫 Markdown。
-- 2026-08-15：核准第二階段 landing 優化；本次規格已完成，程式尚未實作。
+- 2026-08-15：完成第二階段 landing 優化，以薄 Vue shell 排版首頁，並讓 Mermaid demo 保持內容驅動。
+- 2026-08-15：核准第三階段品牌資源整合；本次規格已完成，程式尚未實作。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
@@ -44,6 +45,7 @@ Landing 與 docs layout 解決的是不同問題，因此不應讓 docs layout �
 - 保留目前容易理解的文件 collection、catch-all route、sidebar 與 TOC。
 - 讓一人維護者主要透過 Markdown 維護公開文件。
 - 保留全站 light/dark theme toggle 與 GitHub repository 入口。
+- 以正式 wordmark、favicon 與靜態社群圖片建立一致的網站識別。
 - 不因首頁視覺優化重建 records、demo contract、生成器或驗證系統。
 - 讓網站繼續完全退出套件品質與交付流程。
 
@@ -54,7 +56,7 @@ Landing 與 docs layout 解決的是不同問題，因此不應讓 docs layout �
 - Nuxt UI Pro 或其他文件站框架。
 - Nuxt Studio。
 - 搜尋 API 或全文搜尋索引。
-- Plausible、analytics 或 OG Image 生成。
+- Plausible、analytics 或動態 OG Image 生成；網站只使用一張既有靜態社群圖片。
 - 多段式行銷首頁、testimonial、blog feed 或 release feed。
 - Nuxt ESLint 的 Packages／Guide／Legacy 多層分類。
 - Landing collection、data collection、自訂 landing schema 或 landing frontmatter model。
@@ -115,6 +117,66 @@ Header 在 landing 與所有文件頁都顯示。Landing 不強制 dark mode；t
 Theme 使用套件既有的 `useMermaidTheme()` 作為網站與 diagram 的共同狀態，並由全站 root 的 theme attribute 套用 CSS variables。不得為網站另外建立 theme store、theme record 或加入只為 toggle 服務的 UI framework。Theme preference 的跨 reload 持久化不是本次契約。
 
 小螢幕下 header 的品牌、Documentation、Troubleshooting、theme toggle 與 GitHub link 都必須保持可達。文字導覽可以用純 CSS 移到第二列或縮短間距，但本次不引入搜尋、drawer framework 或複雜 navigation state。
+
+## 品牌資源
+
+### 資源角色
+
+`src/assets/` 是網站品牌資源的單一來源。網站不得把相同檔案複製到 `website/public/`，也不得建立品牌 manifest、asset generator 或同步 script。
+
+正式資源分工如下：
+
+| 資源 | 用途 |
+| --- | --- |
+| `nuxt-content-mermaid-icon.svg` | Header 的獨立圖示。 |
+| `nuxt-content-mermaid-wordmark.svg` | Dark mode Header 使用的白色／綠色 wordmark。 |
+| `nuxt-content-mermaid-wordmark-dark.svg` | Light mode Header 使用的黑色／綠色 wordmark；由原版只修改根層 `color` 為 `#000000`。 |
+| `nuxt-content-mermaid-logo.svg` | 完整 icon + wordmark 品牌原稿；本階段不直接渲染。 |
+| `nuxt-content-mermaid.png` | Open Graph 與 Twitter 共用的靜態社群圖片。 |
+| `nuxt-content-mermaid.webp`、`nuxt-content-mermaid_wide.png` | 既有替代輸出；本階段不作為 metadata 圖片。 |
+| `favicon/*` | Browser favicon、PNG icons、Apple touch icon 與未啟用的 manifest 原稿。 |
+
+既有未追蹤的 `facicon/` 目錄在納入 Git 前更名為語意正確的 `favicon/`。`site.webmanifest` 與 Android icons 可以保留為品牌來源，但網站不連結 manifest；本階段不建立 PWA、service worker 或安裝體驗。
+
+### Header wordmark
+
+Header 首頁連結由以下視覺組成：
+
+1. `nuxt-content-mermaid-icon.svg`。
+2. 依目前網站 theme 選擇的 wordmark：dark mode 使用原版，light mode 使用 `wordmark-dark.svg`。
+
+Vue 可以從既有 `activeTheme` 計算當前 wordmark URL，但不得建立第二個 theme state。Icon 是裝飾圖，wordmark 提供 `Nuxt Content Mermaid` 的替代文字；整組仍是一個可存取的首頁連結。小螢幕可縮小 wordmark 並讓文字導覽換列，但不得退回純文字品牌或隱藏首頁入口。
+
+### Public asset mapping
+
+`website/nuxt.config.ts` 透過 Nitro `publicAssets` 將 repository 的 `src/assets/` 唯讀映射到網站固定的 `/assets/` 路徑。這是網站 build-time 的靜態資源輸入，不是 package artifact 或 release contract。
+
+此方式的約束是：
+
+- 不複製檔案到 `website/public/`。
+- 不使用帶 hash 的 Vite asset URL 作為社群 metadata。
+- 不新增 runtime environment variable、asset manifest 或部署檢查。
+- Root lint、test、typecheck、build、artifact 與 release 繼續完全忽略網站。
+
+### Favicon 與社群 metadata
+
+全站 head 使用 `/assets/favicon/` 下的既有 favicon 與 Apple touch icon。Manifest 不加入 head。
+
+網站正式 origin 固定為：
+
+```text
+https://nuxt-content-mermaid.barz.app
+```
+
+全站共用以下靜態 metadata：
+
+- `og:site_name = Nuxt Content Mermaid`。
+- `og:type = website`。
+- `og:image = https://nuxt-content-mermaid.barz.app/assets/nuxt-content-mermaid.png`。
+- `twitter:card = summary_large_image`。
+- `twitter:image` 使用同一張絕對網址圖片。
+
+Landing 與文件 route 各自以目前 page 的 `title`、`description` 補齊 Open Graph title／description；全站 shell 以當前 route path 和固定 origin 產生 `og:url`。這只是靜態 head metadata，不新增 Nuxt SEO module、OG renderer、canonical generator 或發布驗證。
 
 ## Landing page
 
@@ -284,7 +346,7 @@ website/
 
 網站仍不需要 `components/`、`utils/`、`reference/`、`server/` 或網站專用 scripts/tests。
 
-## 本次檔案變更範圍
+## 第二階段檔案變更範圍（已完成）
 
 | 檔案 | 動作 | 設計責任 |
 | --- | --- | --- |
@@ -303,6 +365,30 @@ website/
 - Root scripts、CI、artifact 與 release files：網站仍完全退出這些流程。
 
 本次不新增或恢復任何其他檔案。
+
+## 第三階段檔案變更範圍
+
+| 檔案 | 動作 | 設計責任 |
+| --- | --- | --- |
+| `src/assets/nuxt-content-mermaid-icon.svg` | 納入 Git | Header icon 品牌原稿。 |
+| `src/assets/nuxt-content-mermaid-logo.svg` | 納入 Git | 保留完整品牌原稿，本階段不直接渲染。 |
+| `src/assets/nuxt-content-mermaid-wordmark.svg` | 納入 Git | Dark mode Header wordmark。 |
+| `src/assets/nuxt-content-mermaid-wordmark-dark.svg` | 新增 | Light mode 的黑色文字 wordmark。 |
+| `src/assets/facicon/` → `src/assets/favicon/` | 更名並納入 Git | Browser icon 資源；manifest 不啟用。 |
+| `website/nuxt.config.ts` | 修改 | 以 Nitro `publicAssets` 將 `src/assets/` 映射到 `/assets/`。 |
+| `website/app.vue` | 修改 | 顯示 theme-aware icon／wordmark，設定 favicon 與全站社群 metadata。 |
+| `website/assets/css/main.css` | 修改 | Header 品牌圖片與 responsive 尺寸；移除舊 CSS 品牌圖形。 |
+| `website/pages/index.vue` | 修改 | 以首頁 page title／description 補齊 Open Graph metadata。 |
+| `website/pages/[...slug].vue` | 修改 | 以文件 page title／description 補齊 Open Graph metadata。 |
+
+第三階段不修改：
+
+- `website/content/**`、`website/content.config.ts` 與 `website/layouts/docs.vue`。
+- Landing hero、CTA、功能 cards 與真實 Mermaid `ContentRenderer` demo。
+- `website/package.json`、workspace 設定與 lockfile。
+- Root scripts、CI、artifact 與 release files。
+
+第三階段不新增 dependency、Vue component、content model、schema、generator、manifest pipeline、test 或永久網站驗證。
 
 ## 品質與交付邊界
 
