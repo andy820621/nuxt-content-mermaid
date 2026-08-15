@@ -19,18 +19,6 @@ const tocLinks = computed(() => props.page.body.toc?.links ?? [])
 
 <template>
   <div class="docs-shell">
-    <a
-      class="skip-link"
-      href="#main-content"
-    >Skip to content</a>
-
-    <header class="docs-header">
-      <NuxtLink
-        class="docs-brand"
-        to="/"
-      >Nuxt Content Mermaid</NuxtLink>
-    </header>
-
     <div class="docs-grid">
       <aside class="docs-sidebar">
         <nav aria-label="Documentation">
