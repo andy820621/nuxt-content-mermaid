@@ -56,16 +56,12 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:package-artifact": "node scripts/release-verification/package-artifact.mjs --package-source pack --profile v3-known-latest",
-    "test:website-static": "node scripts/website/static-site.mjs",
     "test:compatibility-profile": "node scripts/release-verification/package-artifact.mjs --package-source pack",
     "test:package-contract": "pnpm prepack && vue-tsc -p test/release-verification/consumer-template/type-contracts/tsconfig.json --noEmit",
     "test:release-workflow": "vitest run test/prepareReleasePr.test.ts test/releaseWorkflow.test.ts test/publishWorkflow.test.ts",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit",
-    "verify:source": "pnpm lint && pnpm test && pnpm test:types",
-    "verify:website": "node scripts/website/verify.mjs",
-    "verify:website-artifact": "node scripts/website/artifact.mjs",
-    "verify:website-reference": "node scripts/website/reference-verifier.mjs"
+    "verify:source": "pnpm lint && pnpm test && pnpm test:types"
   },
   "dependencies": {
     "@nuxt/kit": "catalog:integrations",

@@ -38,9 +38,6 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install
 
-      - name: Verify documentation website
-        run: pnpm verify:website
-
       - name: Verify source
         run: pnpm verify:source
 

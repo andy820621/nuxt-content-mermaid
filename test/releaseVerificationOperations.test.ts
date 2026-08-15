@@ -764,9 +764,9 @@ describe('package artifact creation', () => {
   })
 
   it.each([
-    'website/components/ContractDemo.vue',
-    'assets/contract-demo/basic.mmd',
-    'website/.output/public/index.html',
+    'playground/app.vue',
+    'docs/internal-notes.md',
+    '.output/public/index.html',
     'debug/request-log.json',
   ])('rejects non-package surface in the publishable artifact: %s', async (unexpectedPath) => {
     const repositoryRoot = await createTemporaryDirectory('package-repository')
