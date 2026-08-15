@@ -35,7 +35,6 @@ html[data-theme='dark'] {
 }
 
 html {
-  min-width: 20rem;
   scroll-behavior: smooth;
 }
 
