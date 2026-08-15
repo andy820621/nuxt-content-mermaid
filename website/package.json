@@ -3,17 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "nuxt prepare && vue-tsc --noEmit -p tsconfig.json",
+    "dev": "nuxt dev",
     "generate": "nuxt generate"
   },
   "dependencies": {
-    "@barzhsieh/nuxt-content-mermaid": "3.0.0",
+    "@barzhsieh/nuxt-content-mermaid": "workspace:*",
     "@nuxt/content": "catalog:integrations",
     "better-sqlite3": "12.5.0",
     "nuxt": "catalog:dev"
-  },
-  "devDependencies": {
-    "typescript": "catalog:dev",
-    "vue-tsc": "catalog:dev"
   }
 }

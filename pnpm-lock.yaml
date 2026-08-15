@@ -197,8 +197,8 @@ importers:
   website:
     dependencies:
       '@barzhsieh/nuxt-content-mermaid':
-        specifier: 3.0.0
-        version: 3.0.0(38279990b2354b97fd293a7cdd1d07fe)
+        specifier: workspace:*
+        version: link:..
       '@nuxt/content':
         specifier: catalog:integrations
         version: 3.15.2(@oxc-project/types@0.143.0)(better-sqlite3@12.5.0)(esbuild@0.28.2)(magic-string@1.1.0)(magicast@0.5.4)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.1(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))
@@ -208,13 +208,6 @@ importers:
       nuxt:
         specifier: catalog:dev
         version: 4.5.2(@babel/plugin-syntax-jsx@7.27.1(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.0))(@oxc-project/types@0.143.0)(@types/node@25.3.0)(@vue/compiler-sfc@3.5.41)(better-sqlite3@12.5.0)(cac@6.7.14)(db0@0.3.4(better-sqlite3@12.5.0))(esbuild@0.28.2)(eslint@10.8.1(jiti@2.7.0))(ioredis@5.11.1)(lightningcss@1.33.0)(magicast@0.5.4)(optionator@0.9.4)(rolldown@1.2.3)(rollup-plugin-visualizer@7.0.1(rolldown@1.2.3)(rollup@4.62.4))(rollup@4.62.4)(terser@5.44.1)(typescript@5.9.3)(vite@8.2.1(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))(vue-tsc@3.3.9(typescript@5.9.3))(yaml@2.9.0)
-    devDependencies:
-      typescript:
-        specifier: catalog:dev
-        version: 5.9.3
-      vue-tsc:
-        specifier: catalog:dev
-        version: 3.3.9(typescript@5.9.3)
 
 packages:
 
@@ -372,13 +365,6 @@ packages:
   '@babel/types@8.0.4':
     resolution: {integrity: sha512-eY+Yn3dCqTGmyiq2QRU66lA5FL8lqqqvecHt0fF3uHONIa7ToYsaCiWV8lOKqAs0Rb2SjixiKFROngnulPtt2g==}
     engines: {node: ^22.18.0 || >=24.11.0}
-
-  '@barzhsieh/nuxt-content-mermaid@3.0.0':
-    resolution: {integrity: sha512-kEruFkDptMGvmqS+XAB7lQS8CEaC5BAZOjJc/TINDXOFAeUlAkDDGBmAkLEI9L4XbI8jmMUlspjRel5At90v0Q==}
-    engines: {node: '>=22.19.0'}
-    peerDependencies:
-      '@nuxt/content': '>=3.5.0 <4.0.0'
-      nuxt: ^4.1.0
 
   '@bomb.sh/tab@0.0.19':
     resolution: {integrity: sha512-dTRfo9Q9B+lbLG3JCu8a/AGQSfD2XXcFcnakQzVjSOX+VvR/s9zpsH8TlqV3iHqazniRn1Ypwd1hcRlXcu/4BA==}
@@ -6355,22 +6341,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 8.0.0
       '@babel/helper-validator-identifier': 8.0.4
-
-  '@barzhsieh/nuxt-content-mermaid@3.0.0(38279990b2354b97fd293a7cdd1d07fe)':
-    dependencies:
-      '@nuxt/content': 3.15.2(@oxc-project/types@0.143.0)(better-sqlite3@12.5.0)(esbuild@0.28.2)(magic-string@1.1.0)(magicast@0.5.4)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.1(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))
-      '@nuxt/kit': 4.5.2(magic-string@1.1.0)(magicast@0.5.4)(oxc-parser@0.139.0)(rolldown@1.2.3)(unplugin@3.3.0(esbuild@0.28.2)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.1(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0)))
-      defu: 6.1.7
-      destr: 2.0.5
-      mermaid: 11.16.1
-      nuxt: 4.5.2(@babel/plugin-syntax-jsx@7.27.1(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.0))(@oxc-project/types@0.143.0)(@types/node@25.3.0)(@vue/compiler-sfc@3.5.41)(better-sqlite3@12.5.0)(cac@6.7.14)(db0@0.3.4(better-sqlite3@12.5.0))(esbuild@0.28.2)(eslint@10.8.1(jiti@2.7.0))(ioredis@5.11.1)(lightningcss@1.33.0)(magicast@0.5.4)(optionator@0.9.4)(rolldown@1.2.3)(rollup-plugin-visualizer@7.0.1(rolldown@1.2.3)(rollup@4.62.4))(rollup@4.62.4)(terser@5.44.1)(typescript@5.9.3)(vite@8.2.1(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))(vue-tsc@3.3.9(typescript@5.9.3))(yaml@2.9.0)
-      yaml: 2.9.0
-    transitivePeerDependencies:
-      - magic-string
-      - magicast
-      - oxc-parser
-      - rolldown
-      - unplugin
 
   '@bomb.sh/tab@0.0.19(cac@6.7.14)(citty@0.2.2)':
     optionalDependencies:
