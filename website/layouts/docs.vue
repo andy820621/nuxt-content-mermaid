@@ -25,6 +25,7 @@ const tocLinks = computed(() => props.page.body.toc?.links ?? [])
           <NuxtLink
             v-for="item in sidebarItems"
             :key="item.path"
+            class="docs-navigation-link"
             :to="item.path"
             :aria-current="item.path === page.path ? 'page' : undefined"
           >
