@@ -9,6 +9,7 @@
 - 2026-08-15：完成第三階段品牌資源整合，以正式 wordmark、favicon 與靜態社群 metadata 建立網站識別。
 - 2026-08-15：完成第四階段 wordmark 簡化，以單一 SVG 配合 CSS `currentColor` 支援 light/dark theme。
 - 2026-08-15：完成第五階段 responsive navigation 優化，以單一手機文件選單與高辨識 active state 改善導覽。
+- 2026-08-15：核准第六階段 code readability 優化，以正確的 Shiki dark tokens、高對比暗色 palette 與一致的 inline／fenced code 排版改善閱讀體驗；等待實作。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
@@ -49,6 +50,7 @@ Landing 與 docs layout 解決的是不同問題，因此不應讓 docs layout �
 - 讓一人維護者主要透過 Markdown 維護公開文件。
 - 保留全站 light/dark theme toggle 與 GitHub repository 入口。
 - 讓手機導覽收斂為單一 hamburger 入口，並讓目前頁面在所有 theme 下清楚可辨。
+- 讓 fenced 與 inline code 在 light／dark theme、desktop／mobile 下保持清楚、可辨且容易閱讀。
 - 以正式 wordmark、favicon 與靜態社群圖片建立一致的網站識別。
 - 不因首頁視覺優化重建 records、demo contract、生成器或驗證系統。
 - 讓網站繼續完全退出套件品質與交付流程。
@@ -336,6 +338,75 @@ Cards 是 landing presentation，不進入 frontmatter、collection schema 或�
 - 內容可以把症狀 heading 寫成使用者自然搜尋的問題，但仍是普通 Markdown。
 - 不新增 FAQ collection、accordion、disclosure component 或問題資料模型。
 
+## 程式碼閱讀體驗
+
+### 問題與原則
+
+Nuxt Content 3.15.2 已經為 fenced code 產生 `github-light` 與 `github-dark` Shiki tokens，但它產生的 dark selector 以 `.dark` class 為契約；本網站以 `html[data-theme='dark']` 表示目前 theme，因此 dark mode 仍顯示 light tokens。最差的 fenced-code token 與 `var(--surface)` 只有約 `1.15:1` 對比，不能依賴微調背景解決。
+
+本階段採用 Nuxt 官方文件的核心機制：在 build time 同時產生 light／dark Shiki tokens，並在目前 theme selector 下切換 token 的 `color`、`background-color`、`font-style`、`font-weight` 與 `text-decoration`。不直接複製 Nuxt 的 Material palette，因為它是為 Nuxt 的藍灰 surface 設計；本站保留 `github-light`，dark theme 改用 `github-dark-high-contrast`，使範例程式碼在既有綠色 surface 上保持高對比。
+
+這是內容 presentation，不建立 code component、Prose component、MDC component、client-side highlighter 或另一套 theme state。Shiki 仍由 Nuxt Content 在內容 build 時處理，沒有額外 browser JavaScript。
+
+### Shiki theme 與 selector
+
+`website/nuxt.config.ts` 只透過既有 MDC highlight options 明確指定：
+
+```ts
+mdc: {
+  highlight: {
+    theme: {
+      default: 'github-light',
+      dark: 'github-dark-high-contrast',
+    },
+  },
+},
+```
+
+不得新增 Shiki dependency；Nuxt Content／MDC 既有 highlighter 負責載入 themes。Light theme 保留目前 palette，避免無關的亮色視覺變動。
+
+`website/assets/css/main.css` 以本站既有 theme contract 套用 dark variables：
+
+```css
+html[data-theme='dark'] .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+```
+
+這個 selector 不把 root theme 改成 `.dark`，也不修改 `useMermaidTheme()`；網站與 Mermaid 繼續共享目前的 `data-theme` 狀態。
+
+### Fenced code
+
+所有 `.docs-content pre` 保留目前的 `var(--surface)`、`var(--border)`、圓角與 `overflow: auto` fallback，並採用：
+
+- `0.875rem` 字級與約 `1.7` line-height，接近 Nuxt 官方的 `14px / 24px` 閱讀密度。
+- `white-space: pre-wrap` 與 `overflow-wrap: break-word`，讓長 package commands 與 URLs 優先在容器內換行。
+- 標準的 thin scrollbar color 作為仍需 overflow 時的低干擾 fallback，不建立自訂 scrollbar component 或大量 vendor-specific styling。
+
+換行只改變畫面 presentation，不改動 Markdown source、Shiki token、複製內容或程式碼 whitespace semantics。
+
+### Inline code
+
+`.docs-content :not(pre) > code` 使用與 fenced code 相同的 monospaced font，並加上：
+
+- `var(--surface)` 輕量底色。
+- 小幅 horizontal／vertical padding。
+- 小圓角。
+- 相對於周圍文字略小的字級。
+
+Inline code 不使用 syntax highlighting、不改成 link、不增加 copy button，也不建立專屬 Vue component。表格、清單與段落中的 inline code 使用同一規則。
+
+### 不受影響的內容
+
+- Mermaid diagram 的正常 browser renderer、toolbar、theme 與互動行為不變。
+- Mermaid source fallback 不改成 Shiki code block，也不新增 source disclosure。
+- Landing Mermaid demo、文件內容、navigation、routes、TOC、SEO 與品牌資源不變。
+- Code blocks 不增加 title bar、language label、copy button、line numbers、highlighted lines 或 tabs。
+
 ## 最終內容樹
 
 ```text
@@ -428,12 +499,22 @@ website/
 
 | 檔案 | 動作 | 設計責任 |
 | --- | --- | --- |
-| `website/app.vue` | 修改 | 共用 `docs-navigation` payload、手機 hamburger、全畫面文件選單、關閉與焦點行為。 |
+| `website/app.vue` | 修改 | 使用獨立的 `mobile-docs-navigation` query、手機 hamburger、全畫面文件選單、關閉與焦點行為。 |
 | `website/layouts/docs.vue` | 修改 | 保留 desktop sticky sidebar，手機完全隱藏 sidebar。 |
 | `website/assets/css/main.css` | 修改 | 單列手機 Header、全畫面選單、背景鎖定，以及 light/dark 都清楚的 active／hover／focus styles。 |
 | `docs/specs/documentation-website.md` | 修改 | 固定第五階段 responsive navigation 契約與驗收條件。 |
 
 第五階段不修改 Content、routes、collection、favicon、社群 metadata、dependencies、root scripts、CI、artifact 或 release，也不新增 component、composable、store、utility、UI framework、永久測試或網站 verifier。
+
+## 第六階段檔案變更範圍（設計已核准）
+
+| 檔案 | 動作 | 設計責任 |
+| --- | --- | --- |
+| `website/nuxt.config.ts` | 修改 | 明確指定 `github-light` 與 `github-dark-high-contrast` Shiki themes。 |
+| `website/assets/css/main.css` | 修改 | 讓 `data-theme='dark'` 套用 dark tokens，並改善 fenced／inline code 的字級、換行、surface 與 overflow presentation。 |
+| `docs/specs/documentation-website.md` | 修改 | 固定第六階段 code readability 契約與驗收條件。 |
+
+第六階段不修改 Markdown、Vue components、routes、layout、navigation、Mermaid runtime、品牌資源、dependencies、workspace、root scripts、CI、artifact 或 release；也不新增 Prose／MDC component、client-side highlighter、copy control、永久測試或網站 verifier。
 
 ## 品質與交付邊界
 
@@ -489,6 +570,12 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 18. Mobile menu 開啟時主內容不可互動或捲動，Header actions 仍可操作；Escape 關閉後焦點返回 hamburger。
 19. Desktop sidebar 與 mobile menu 的 active link 都具有 accent 指示線、accent 文字、soft background 與 `aria-current="page"`，在 light／dark theme 下清楚可辨。
 20. 一次性畫面檢查涵蓋 desktop/mobile × light/dark、hamburger open/close、active state、keyboard focus 與無水平溢位，但不新增永久 browser test。
+21. Dark theme 的 fenced code 實際使用 `github-dark-high-contrast` 產生的 `--shiki-dark` tokens，不再顯示 light tokens。
+22. Light theme 繼續使用 `github-light`，既有文件與 landing 外觀沒有無關的 palette 改變。
+23. 所有文件頁的 fenced code 使用一致的 `0.875rem` 字級、易讀 line-height、長行換行與 overflow fallback；一般 desktop／mobile viewport 不因長 install command 產生頁面水平溢位。
+24. 段落、清單與表格中的 inline code 具有可辨識的 surface、padding 與圓角，且在 light／dark theme 下保持清楚。
+25. Mermaid renderer、fallback semantics、內容、routes、navigation、TOC 與 theme state 不因 code presentation 優化而改變。
+26. 一次性 `pnpm --dir website generate` 與 desktop/mobile × light/dark 畫面檢查涵蓋 Getting Started、Writing Diagrams、Configuration、Troubleshooting 與 Migration to v3，但不新增永久驗證。
 
 ## 官方與研究依據
 
@@ -501,5 +588,8 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 - [Nuxt ESLint landing page](https://eslint.nuxt.com/)
 - [Nuxt ESLint module documentation](https://eslint.nuxt.com/packages/module)
 - [Nuxt ESLint FAQ](https://eslint.nuxt.com/guide/faq)
+- [Nuxt core docs repository：網站由 nuxt.com 提供](https://github.com/nuxt/nuxt/blob/main/docs/README.md)
+- [Nuxt.com MDC parser：light／dark Shiki themes](https://github.com/nuxt/nuxt.com/blob/main/helpers/mdc-parser.mjs)
+- [Nuxt.com CSS：dark Shiki token selector](https://github.com/nuxt/nuxt.com/blob/main/app/assets/css/main.css)
 - `docs/research/documentation-site-architecture-comparison.md`
 - `docs/research/nuxt-eslint-site-experience.md`
