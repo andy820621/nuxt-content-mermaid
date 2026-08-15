@@ -2,6 +2,32 @@ import { loadWebsiteReferenceCorpus } from './reference-corpus.mjs'
 
 const PACKAGE_IDENTITY = '@barzhsieh/nuxt-content-mermaid@3.0.0'
 const ARTIFACT_VERSION = '3.0.0'
+const EVIDENCE_CATEGORY_BY_SYMBOL = Object.freeze({
+  ModuleOptions: 'Public type declaration',
+  RuntimeOptions: 'Public type declaration',
+  MermaidComponentProps: 'Public type declaration',
+  DEFAULT_MERMAID_CONFIG: 'Packaged default',
+  DEFAULT_LIGHT_THEME: 'Packaged default',
+  DEFAULT_DARK_THEME: 'Packaged default',
+  DEFAULT_EXPAND_OPTIONS: 'Packaged default',
+  DEFAULT_TOOLBAR_OPTIONS: 'Packaged default',
+  resolveModuleConfiguration: 'Artifact behavior probe',
+  resolveExpandOptions: 'Artifact behavior probe',
+  resolveToolbarOptions: 'Artifact behavior probe',
+  resolveDebugDefaults: 'Artifact behavior probe',
+  resolveMarkdownToolbar: 'Artifact behavior probe',
+  transformMarkdownDiagrams: 'Artifact behavior probe',
+  resolveFenceInlineAttributes: 'Artifact behavior probe',
+  resolveMermaidComponentSource: 'Artifact behavior probe',
+  resolveDiagramMermaidConfig: 'Artifact behavior probe',
+  resolveMarkdownFrontmatter: 'Artifact behavior probe',
+  validateRuntimeOptions: 'Artifact validation probe',
+  assertStrictData: 'Artifact validation probe',
+  assertDirectMermaidConfig: 'Artifact validation probe',
+  MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS: 'Artifact capability allowlist',
+  MERMAID_11_16_1_REGEXP_PATHS: 'Artifact capability allowlist',
+  DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS: 'Artifact capability allowlist',
+})
 const SUMMARY_OBJECT_FIELDS = Object.freeze({
   'loader.init': Object.freeze({
     value: Object.freeze(['startOnLoad', 'theme', 'fontFamily', 'securityLevel']),
@@ -81,8 +107,21 @@ function projectMinimumExample(example) {
   })
 }
 
+function projectEvidenceCategories(evidence) {
+  const categories = evidence.map((identifier) => {
+    const symbol = identifier.match(/^artifact:[^#]+#([^#]+)$/)?.[1]
+    const category = EVIDENCE_CATEGORY_BY_SYMBOL[symbol]
+    if (!category) throw new TypeError(`Reference public evidence category is missing for ${symbol ?? 'invalid evidence'}`)
+    return category
+  })
+  return Object.freeze([...new Set(categories)])
+}
+
 function projectSupportedConstraint(constraint) {
-  return Object.freeze({ summary: constraint.summary })
+  return Object.freeze({
+    summary: constraint.summary,
+    evidenceCategories: projectEvidenceCategories(constraint.evidence),
+  })
 }
 
 function projectPackageFields(packageFields) {
@@ -109,6 +148,7 @@ function projectBase(record) {
     description: record.description,
     purpose: record.purpose,
     ownership: record.ownership,
+    evidenceCategories: projectEvidenceCategories(record.evidence),
     occurrences: projectOccurrences(record.occurrences),
     scope: record.scope,
     boundary: record.boundary,
@@ -142,6 +182,7 @@ function projectGroupSemantics(record) {
     ...(record.reset ? { reset: projectSummary(record, record.reset) } : {}),
     ...(record.minimumExample ? { minimumExample: projectMinimumExample(record.minimumExample) } : {}),
     ...(record.lifecycle ? { lifecycle: record.lifecycle } : {}),
+    ...(record.errorSemantics ? { errorSemantics: record.errorSemantics } : {}),
   }
 }
 

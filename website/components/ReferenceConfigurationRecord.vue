@@ -79,6 +79,12 @@ function outcomeEntries(summary: Summary | undefined) {
         <dt>Boundary</dt>
         <dd>{{ props.record.boundary }}</dd>
       </div>
+      <div>
+        <dt>Evidence</dt>
+        <dd data-reference-evidence-categories>
+          {{ props.record.evidenceCategories.join(', ') }}
+        </dd>
+      </div>
       <div v-if="props.record.kind === 'configuration-group'">
         <dt>Canonical Children</dt>
         <dd>
@@ -157,7 +163,12 @@ function outcomeEntries(summary: Summary | undefined) {
       </template>
       <template v-if="props.record.supportedConstraint">
         <dt>Supported Constraint</dt>
-        <dd>{{ props.record.supportedConstraint.summary }}</dd>
+        <dd data-reference-supported-constraint>
+          {{ props.record.supportedConstraint.summary }}
+          <small data-supported-constraint-evidence>
+            Evidence: {{ props.record.supportedConstraint.evidenceCategories.join(', ') }}
+          </small>
+        </dd>
       </template>
       <template v-if="props.record.recommendedRange">
         <dt>Recommended Range</dt>

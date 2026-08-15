@@ -9,6 +9,7 @@ import {
   CONFIGURATION_INVENTORY,
   checkReferenceParity,
   discoverArtifactEvidence,
+  discoverArtifactRuntimeAuthority,
   discoverArtifactRuntimeExport,
   discoverPublicDeclarations,
   discoverRuntimeEvidence,
@@ -216,39 +217,78 @@ describe('website Reference parity artifact declarations', () => {
   })
 
   it('discovers runtime parity seams from the verified artifact layout', async () => {
-    const { artifact, repositoryRoot } = await artifactFixture({
+    const { artifact } = await artifactFixture({
       manifest: { types: './index.d.ts' },
       files: {
         'index.d.ts': 'export interface ModuleOptions {}\n',
-        'dist/runtime/constants.js': [
+        'bundle/defaults.mjs': [
           'export const DEFAULT_RUNTIME_OPTIONS = {}',
           'export const MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS = []',
           'export const MERMAID_11_16_1_REGEXP_PATHS = []',
           'export const DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS = []',
         ].join('\n'),
-        'dist/runtime/configuration/runtime-options.js': 'function resolveDebugDefaults() {}\n',
-        'dist/runtime/configuration/module.js': 'function validateRuntimeOptions() {}\nfunction resolveModuleConfiguration() {}\n',
-        'dist/runtime/configuration/core.js': 'function assertStrictData() {}\n',
-        'dist/runtime/direct-mermaid-config.js': 'function assertDirectMermaidConfig() {}\n',
+        'bundle/debug.mjs': 'function resolveDebugDefaults() {}\n',
+        'bundle/configuration.mjs': 'function validateRuntimeOptions() {}\nfunction resolveModuleConfiguration() {}\n',
+        'bundle/data.mjs': 'function assertStrictData() {}\n',
+        'bundle/direct.mjs': 'function assertDirectMermaidConfig() {}\n',
       },
     })
 
-    await expect(discoverRuntimeEvidence(artifact, { workspaceRoot: repositoryRoot })).resolves.toEqual({
-      literalDefaults: ['artifact:dist/runtime/constants.js#DEFAULT_RUNTIME_OPTIONS'],
-      conditionalDefaults: ['artifact:dist/runtime/configuration/runtime-options.js#resolveDebugDefaults'],
+    await expect(discoverRuntimeEvidence(artifact)).resolves.toEqual({
+      literalDefaults: ['artifact:bundle/defaults.mjs#DEFAULT_RUNTIME_OPTIONS'],
+      conditionalDefaults: ['artifact:bundle/debug.mjs#resolveDebugDefaults'],
       validatorsAndPrecedence: [
-        'artifact:dist/runtime/configuration/module.js#resolveModuleConfiguration',
-        'artifact:dist/runtime/configuration/module.js#validateRuntimeOptions',
+        'artifact:bundle/configuration.mjs#resolveModuleConfiguration',
+        'artifact:bundle/configuration.mjs#validateRuntimeOptions',
       ],
       openPayloads: [
-        'artifact:dist/runtime/configuration/core.js#assertStrictData',
-        'artifact:dist/runtime/direct-mermaid-config.js#assertDirectMermaidConfig',
+        'artifact:bundle/data.mjs#assertStrictData',
+        'artifact:bundle/direct.mjs#assertDirectMermaidConfig',
       ],
       directMermaidConfigAllowances: [
-        'artifact:dist/runtime/constants.js#DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS',
-        'artifact:dist/runtime/constants.js#MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS',
-        'artifact:dist/runtime/constants.js#MERMAID_11_16_1_REGEXP_PATHS',
+        'artifact:bundle/defaults.mjs#DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS',
+        'artifact:bundle/defaults.mjs#MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS',
+        'artifact:bundle/defaults.mjs#MERMAID_11_16_1_REGEXP_PATHS',
       ],
+    })
+    await expect(probeDirectMermaidConfigAllowances(artifact))
+      .resolves.toEqual({ functionPaths: [], regexpPaths: [], opaqueIdentityPaths: [] })
+  })
+
+  it('discovers runtime authority from the verified package entry when optional file globs are absent', async () => {
+    const { artifact } = await artifactFixture({
+      manifest: {
+        main: './bundle/module.mjs',
+        files: ['missing/**/*.mjs'],
+      },
+      files: {
+        'bundle/module.mjs': 'export const ENTRY_GRAPH_RUNTIME_PROBE = true\n',
+      },
+    })
+
+    await expect(discoverArtifactRuntimeAuthority(artifact, {
+      symbolOrProbeId: 'ENTRY_GRAPH_RUNTIME_PROBE',
+    })).resolves.toMatchObject({
+      evidence: 'artifact:bundle/module.mjs#ENTRY_GRAPH_RUNTIME_PROBE',
+      relativePath: 'bundle/module.mjs',
+    })
+  })
+
+  it('skips absent optional manifest file roots while scanning present roots', async () => {
+    const { artifact } = await artifactFixture({
+      manifest: {
+        files: ['bundle/**/*.mjs', 'missing/**/*.js'],
+      },
+      files: {
+        'bundle/runtime.mjs': 'export const OPTIONAL_GLOB_RUNTIME_PROBE = true\n',
+      },
+    })
+
+    await expect(discoverArtifactRuntimeAuthority(artifact, {
+      symbolOrProbeId: 'OPTIONAL_GLOB_RUNTIME_PROBE',
+    })).resolves.toMatchObject({
+      evidence: 'artifact:bundle/runtime.mjs#OPTIONAL_GLOB_RUNTIME_PROBE',
+      relativePath: 'bundle/runtime.mjs',
     })
   })
 
@@ -697,6 +737,7 @@ describe('website Reference semantic probe and checker foundation', () => {
       'missing-fragment',
       'missing-path',
       'missing-required-prose',
+      'precedence-mismatch',
       'runtime-only-enabled',
       'snippet-failure',
       'type-mismatch',
@@ -732,6 +773,7 @@ describe('website Reference semantic probe and checker foundation', () => {
         types: 'mismatch',
         defaults: 'match',
         conditionalDefaults: 'match',
+        precedence: 'match',
         delegatedDescendants: 'match',
         exceptions: 'match',
         deprecations: 'match',
@@ -785,6 +827,7 @@ describe('website Reference semantic probe and checker foundation', () => {
         types: true,
         defaults: true,
         conditionalDefaults: true,
+        precedence: true,
         delegatedDescendants: true,
         exceptions: true,
         deprecations: true,
@@ -829,6 +872,7 @@ describe('website Reference semantic probe and checker foundation', () => {
         types: 'match',
         defaults: 'match',
         conditionalDefaults: 'match',
+        precedence: 'match',
         delegatedDescendants: 'match',
         exceptions: 'match',
         deprecations: 'match',

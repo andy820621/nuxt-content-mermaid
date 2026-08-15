@@ -33,6 +33,9 @@ const props = defineProps<{ record: PublicDelegatedException }>()
       <dt>Scope</dt><dd>{{ props.record.scope }}</dd>
       <dt>Ownership</dt><dd>{{ props.record.ownership }}</dd>
       <dt>Boundary</dt><dd>{{ props.record.boundary }}</dd>
+      <dt>Evidence</dt><dd data-reference-evidence-categories>
+        {{ props.record.evidenceCategories.join(', ') }}
+      </dd>
       <dt>Unknown-key Policy</dt><dd>{{ props.record.unknownKeyPolicy }}</dd>
       <dt>Package-owned Behavior</dt><dd>{{ props.record.packageBehavior }}</dd>
       <dt>Lifecycle Status</dt><dd>{{ props.record.deprecation.summary }}</dd>

@@ -1,7 +1,10 @@
 import { isDeepStrictEqual } from 'node:util'
-import { writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { defineNuxtModule, loadNuxt } from '@nuxt/kit'
+import { parse as parseYaml } from 'yaml'
 import { createReleaseVerificationOperations } from '../release-verification/operations.mjs'
 import { ReleaseVerificationInfrastructureError } from '../release-verification/failure-classification.mjs'
 import { selectVersionProfile } from '../release-verification/profiles.mjs'
@@ -11,8 +14,11 @@ import {
   checkReferenceParity,
   CONFIGURATION_ACCEPTANCE,
   CONFIGURATION_INVENTORY,
+  discoverArtifactEvidence,
+  discoverArtifactRuntimeAuthority,
   discoverArtifactRuntimeExport,
   discoverPublicDeclarations,
+  ReferenceVerificationInfrastructureFailure,
   probeDirectMermaidConfigAllowances,
   runSemanticTypeScriptProbes,
 } from './reference-parity.mjs'
@@ -54,31 +60,39 @@ const EXPECTED_FRAGMENTS = Object.freeze([
   'delegated-markdown-frontmatter-other',
 ])
 
+function declarationEvidence(symbol) {
+  return Object.freeze({ kind: 'declaration', symbol })
+}
+
+function runtimeEvidence(symbol) {
+  return Object.freeze({ kind: 'runtime', symbol })
+}
+
 const EVIDENCE = Object.freeze({
-  moduleOptions: 'artifact:dist/module.d.mts#ModuleOptions',
-  runtimeOptions: 'artifact:dist/module.d.mts#RuntimeOptions',
-  componentProps: 'artifact:dist/module.d.mts#MermaidComponentProps',
-  resolveModule: 'artifact:dist/runtime/configuration/module.js#resolveModuleConfiguration',
-  validateRuntime: 'artifact:dist/runtime/configuration/module.js#validateRuntimeOptions',
-  resolveExpand: 'artifact:dist/runtime/configuration/module.js#resolveExpandOptions',
-  resolveToolbar: 'artifact:dist/runtime/configuration/module.js#resolveToolbarOptions',
-  strictData: 'artifact:dist/runtime/configuration/core.js#assertStrictData',
-  debugDefaults: 'artifact:dist/runtime/configuration/runtime-options.js#resolveDebugDefaults',
-  defaultMermaid: 'artifact:dist/runtime/constants.js#DEFAULT_MERMAID_CONFIG',
-  defaultLightTheme: 'artifact:dist/runtime/constants.js#DEFAULT_LIGHT_THEME',
-  defaultDarkTheme: 'artifact:dist/runtime/constants.js#DEFAULT_DARK_THEME',
-  defaultExpand: 'artifact:dist/runtime/constants.js#DEFAULT_EXPAND_OPTIONS',
-  defaultToolbar: 'artifact:dist/runtime/constants.js#DEFAULT_TOOLBAR_OPTIONS',
-  markdownToolbar: 'artifact:dist/module.mjs#resolveMarkdownToolbar',
-  transformMarkdown: 'artifact:dist/module.mjs#transformMarkdownDiagrams',
-  fenceAttributes: 'artifact:dist/module.mjs#resolveFenceInlineAttributes',
-  componentSource: 'artifact:dist/runtime/component-configuration.js#resolveMermaidComponentSource',
-  diagramConfig: 'artifact:dist/module.mjs#resolveDiagramMermaidConfig',
-  markdownFrontmatter: 'artifact:dist/module.mjs#resolveMarkdownFrontmatter',
-  directConfig: 'artifact:dist/runtime/direct-mermaid-config.js#assertDirectMermaidConfig',
-  functionPaths: 'artifact:dist/runtime/constants.js#MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS',
-  regexpPaths: 'artifact:dist/runtime/constants.js#MERMAID_11_16_1_REGEXP_PATHS',
-  opaquePaths: 'artifact:dist/runtime/constants.js#DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS',
+  moduleOptions: declarationEvidence('ModuleOptions'),
+  runtimeOptions: declarationEvidence('RuntimeOptions'),
+  componentProps: declarationEvidence('MermaidComponentProps'),
+  resolveModule: runtimeEvidence('resolveModuleConfiguration'),
+  validateRuntime: runtimeEvidence('validateRuntimeOptions'),
+  resolveExpand: runtimeEvidence('resolveExpandOptions'),
+  resolveToolbar: runtimeEvidence('resolveToolbarOptions'),
+  strictData: runtimeEvidence('assertStrictData'),
+  debugDefaults: runtimeEvidence('resolveDebugDefaults'),
+  defaultMermaid: runtimeEvidence('DEFAULT_MERMAID_CONFIG'),
+  defaultLightTheme: runtimeEvidence('DEFAULT_LIGHT_THEME'),
+  defaultDarkTheme: runtimeEvidence('DEFAULT_DARK_THEME'),
+  defaultExpand: runtimeEvidence('DEFAULT_EXPAND_OPTIONS'),
+  defaultToolbar: runtimeEvidence('DEFAULT_TOOLBAR_OPTIONS'),
+  markdownToolbar: runtimeEvidence('resolveMarkdownToolbar'),
+  transformMarkdown: runtimeEvidence('transformMarkdownDiagrams'),
+  fenceAttributes: runtimeEvidence('resolveFenceInlineAttributes'),
+  componentSource: runtimeEvidence('resolveMermaidComponentSource'),
+  diagramConfig: runtimeEvidence('resolveDiagramMermaidConfig'),
+  markdownFrontmatter: runtimeEvidence('resolveMarkdownFrontmatter'),
+  directConfig: runtimeEvidence('assertDirectMermaidConfig'),
+  functionPaths: runtimeEvidence('MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS'),
+  regexpPaths: runtimeEvidence('MERMAID_11_16_1_REGEXP_PATHS'),
+  opaquePaths: runtimeEvidence('DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS'),
 })
 
 const EXPECTED_EVIDENCE = Object.freeze({
@@ -437,8 +451,395 @@ const EXPLICIT_NEGATIVES = Object.freeze([
   'Mermaid %%{init}%% syntax is Mermaid-owned and outside the package inventory.',
 ])
 
+const BOOLEAN_CONSTRAINT_PATHS = Object.freeze([
+  'enabled',
+  'debug',
+  'theme.useColorModeTheme',
+  'expand.enabled',
+  'expand.invokeOpenOn.diagramClick',
+  'expand.invokeCloseOn.esc',
+  'expand.invokeCloseOn.wheel',
+  'expand.invokeCloseOn.swipe',
+  'expand.invokeCloseOn.overlayClick',
+  'expand.invokeCloseOn.closeButtonClick',
+  'toolbar.buttons.copy',
+  'toolbar.buttons.fullscreen',
+  'toolbar.buttons.expand',
+])
+const STRING_CONSTRAINT_PATHS = Object.freeze([
+  'theme.light',
+  'theme.dark',
+  'components.renderer',
+  'components.spinner',
+  'components.error',
+  'toolbar.title',
+])
+const NUMBER_CONSTRAINT_PATHS = Object.freeze([
+  'loader.lazy.threshold',
+  'expand.margin',
+  'toolbar.fullscreenToolbarScale',
+])
+
+function constraintCases(accepted, rejected) {
+  return Object.freeze({ accepted: Object.freeze(accepted), rejected: Object.freeze(rejected) })
+}
+
+const SUPPORTED_CONSTRAINT_PROBES = Object.freeze(Object.fromEntries([
+  ...BOOLEAN_CONSTRAINT_PATHS.map(path => [path, constraintCases([false, true], ['true', 1, null])]),
+  ...STRING_CONSTRAINT_PATHS.map(path => [path, constraintCases(['', 'reference-value'], [true, 1, null])]),
+  ...NUMBER_CONSTRAINT_PATHS.map(path => [path, constraintCases([-1, 0, 0.5], ['1', Number.NaN, Number.POSITIVE_INFINITY, -0])]),
+  ['toolbar.fontSize', constraintCases(['1rem', 16], [true, null, Number.POSITIVE_INFINITY, -0])],
+]))
+
+const PRECEDENCE_PROBE_VALUES = Object.freeze({
+  'debug': [false, true],
+  'loader.init.theme': ['default', 'dark'],
+  'loader.lazy.threshold': [0.1, 0.9],
+  'theme.useColorModeTheme': [false, true],
+  'theme.light': ['default', 'neutral'],
+  'theme.dark': ['dark', 'forest'],
+  'components.renderer': ['ModuleRenderer', 'RuntimeRenderer'],
+  'components.spinner': ['ModuleSpinner', 'RuntimeSpinner'],
+  'components.error': ['ModuleError', 'RuntimeError'],
+  'expand.enabled': [false, true],
+  'expand.margin': [4, 12],
+  'expand.invokeOpenOn.diagramClick': [false, true],
+  'expand.invokeCloseOn.esc': [false, true],
+  'expand.invokeCloseOn.wheel': [false, true],
+  'expand.invokeCloseOn.swipe': [false, true],
+  'expand.invokeCloseOn.overlayClick': [false, true],
+  'expand.invokeCloseOn.closeButtonClick': [false, true],
+  'toolbar.title': ['Module title', 'Runtime title'],
+  'toolbar.fontSize': ['12px', '16px'],
+  'toolbar.fullscreenToolbarScale': [1, 1.5],
+  'toolbar.buttons.copy': [false, true],
+  'toolbar.buttons.fullscreen': [false, true],
+  'toolbar.buttons.expand': [false, true],
+})
+
 function valueAtPath(value, path) {
   return path.split('.').reduce((current, segment) => current?.[segment], value)
+}
+
+function layerFromEntries(entries) {
+  const root = {}
+  for (const [path, value] of entries) {
+    const segments = path.split('.')
+    let current = root
+    for (const segment of segments.slice(0, -1)) {
+      current[segment] ??= {}
+      current = current[segment]
+    }
+    current[segments.at(-1)] = value
+  }
+  return root
+}
+
+function layerWithValue(path, value) {
+  return layerFromEntries([[path, value]])
+}
+
+function resolvesConfigurationPath(resolveModuleConfiguration, {
+  path,
+  value,
+  surface,
+}) {
+  try {
+    const resolution = resolveModuleConfiguration({
+      nuxtResolvedOptions: surface === 'module' ? layerWithValue(path, value) : {},
+      runtimeOverrides: surface === 'runtime' ? layerWithValue(path, value) : {},
+    })
+    return isDeepStrictEqual(
+      path === 'enabled' ? resolution.enabled : valueAtPath(resolution.runtimeOptions, path),
+      value,
+    )
+  }
+  catch {
+    return false
+  }
+}
+
+function rejectsConfigurationPath(resolveModuleConfiguration, {
+  path,
+  value,
+  surface,
+}) {
+  try {
+    resolveModuleConfiguration({
+      nuxtResolvedOptions: surface === 'module' ? layerWithValue(path, value) : {},
+      runtimeOverrides: surface === 'runtime' ? layerWithValue(path, value) : {},
+    })
+    return false
+  }
+  catch {
+    return true
+  }
+}
+
+function supportedConstraintBehaviorMatches(records, resolveModuleConfiguration) {
+  const recordsWithConstraints = records.filter(record => record.supportedConstraint !== undefined)
+  if (!isDeepStrictEqual(
+    recordsWithConstraints.map(record => record.path).sort(),
+    Object.keys(SUPPORTED_CONSTRAINT_PROBES).sort(),
+  )) return false
+
+  return recordsWithConstraints.every((record) => {
+    const probe = SUPPORTED_CONSTRAINT_PROBES[record.path]
+    const surfaces = record.path === 'enabled' ? ['module'] : ['module', 'runtime']
+    return probe !== undefined
+      && surfaces.every(surface => probe.accepted.every(value => resolvesConfigurationPath(
+        resolveModuleConfiguration,
+        { path: record.path, value, surface },
+      )))
+      && surfaces.every(surface => probe.rejected.every(value => rejectsConfigurationPath(
+        resolveModuleConfiguration,
+        { path: record.path, value, surface },
+      )))
+      && (record.path !== 'enabled' || rejectsConfigurationPath(resolveModuleConfiguration, {
+        path: record.path,
+        value: true,
+        surface: 'runtime',
+      }))
+  })
+}
+
+function modulePrecedenceBehaviorMatches(resolveModuleConfiguration) {
+  const entries = Object.entries(PRECEDENCE_PROBE_VALUES)
+  const lower = layerFromEntries(entries.map(([path, values]) => [path, values[0]]))
+  const higher = layerFromEntries(entries.map(([path, values]) => [path, values[1]]))
+  const sparseHigherEntries = entries.filter((_entry, index) => index % 2 === 0)
+  const sparseHigher = layerFromEntries(sparseHigherEntries.map(([path, values]) => [path, values[1]]))
+  const sparseHigherPaths = new Set(sparseHigherEntries.map(([path]) => path))
+  try {
+    const fullResolution = resolveModuleConfiguration({
+      nuxtResolvedOptions: { enabled: false, ...lower },
+      runtimeOverrides: higher,
+    })
+    const sparseResolution = resolveModuleConfiguration({
+      nuxtResolvedOptions: { enabled: false, ...lower },
+      runtimeOverrides: sparseHigher,
+    })
+    return fullResolution.enabled === false
+      && sparseResolution.enabled === false
+      && entries.every(([path, values]) => (
+        isDeepStrictEqual(valueAtPath(fullResolution.runtimeOptions, path), values[1])
+        && isDeepStrictEqual(
+          valueAtPath(sparseResolution.runtimeOptions, path),
+          sparseHigherPaths.has(path) ? values[1] : values[0],
+        )
+      ))
+  }
+  catch {
+    return false
+  }
+}
+
+function runtimeSnapshotBehaviorMatches(resolveRuntimeOptionsSnapshot) {
+  try {
+    const snapshot = resolveRuntimeOptionsSnapshot({
+      debug: true,
+      loader: {
+        init: { extension: { enabled: true }, logLevel: 4 },
+        lazy: { threshold: 0.33 },
+      },
+      theme: { light: 'neutral' },
+      expand: { margin: 13, invokeCloseOn: { esc: false } },
+      toolbar: { title: 'Runtime title', buttons: { copy: false } },
+    })
+    return isDeepStrictEqual(snapshot.loader?.init?.extension, { enabled: true })
+      && snapshot.loader?.init?.logLevel === 4
+      && snapshot.loader?.init?.suppressErrorRendering === false
+      && snapshot.loader?.init?.startOnLoad === false
+      && snapshot.loader?.lazy?.threshold === 0.33
+      && snapshot.theme?.light === 'neutral'
+      && snapshot.theme?.dark === 'dark'
+      && snapshot.expand?.margin === 13
+      && snapshot.expand?.invokeCloseOn?.esc === false
+      && snapshot.expand?.invokeCloseOn?.wheel === true
+      && snapshot.toolbar?.title === 'Runtime title'
+      && snapshot.toolbar?.buttons?.copy === false
+      && snapshot.toolbar?.buttons?.fullscreen === true
+  }
+  catch {
+    return false
+  }
+}
+
+function componentSourceBehaviorMatches(resolveMermaidComponentSource) {
+  try {
+    const pageConfig = { theme: 'forest', extension: { enabled: true } }
+    const directConfig = { theme: 'dark' }
+    const runtimeOnly = resolveMermaidComponentSource({})
+    const page = resolveMermaidComponentSource({ pageConfig })
+    const direct = resolveMermaidComponentSource({ config: directConfig })
+    const conflict = resolveMermaidComponentSource({ pageConfig, config: directConfig })
+    let invalidRejected = false
+    try {
+      resolveMermaidComponentSource({ pageConfig: { theme: false } })
+    }
+    catch {
+      invalidRejected = true
+    }
+    return runtimeOnly?.kind === 'runtime-only'
+      && page?.kind === 'page'
+      && page.config !== pageConfig
+      && isDeepStrictEqual(page.config, pageConfig)
+      && direct?.kind === 'direct'
+      && direct.config === directConfig
+      && conflict?.kind === 'conflict'
+      && conflict.error?.code === 'CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR'
+      && invalidRejected
+  }
+  catch {
+    return false
+  }
+}
+
+function mermaidConfigBehaviorMatches(materializeMermaidConfigForInvocation, resolveMermaidTheme) {
+  try {
+    const materialized = materializeMermaidConfigForInvocation({
+      runtimeConfig: {
+        theme: 'neutral',
+        flowchart: { htmlLabels: true, curve: 'basis' },
+        runtimeExtension: { enabled: true },
+      },
+      source: {
+        kind: 'page',
+        config: {
+          flowchart: { htmlLabels: false },
+          pageExtension: { enabled: true },
+        },
+      },
+      theme: 'forest',
+    })
+    const directMaterialized = materializeMermaidConfigForInvocation({
+      runtimeConfig: { flowchart: { htmlLabels: true, curve: 'basis' } },
+      source: { kind: 'direct', config: { flowchart: { htmlLabels: false } } },
+    })
+    return materialized.startOnLoad === false
+      && materialized.theme === 'forest'
+      && materialized.flowchart?.htmlLabels === false
+      && materialized.flowchart?.curve === 'basis'
+      && isDeepStrictEqual(materialized.runtimeExtension, { enabled: true })
+      && isDeepStrictEqual(materialized.pageExtension, { enabled: true })
+      && directMaterialized.flowchart?.htmlLabels === false
+      && directMaterialized.flowchart?.curve === 'basis'
+      && resolveMermaidTheme({
+        frontmatterTheme: 'forest',
+        manualThemeMode: 'dark',
+        colorModeValue: 'light',
+        baseTheme: 'base',
+        lightTheme: 'neutral',
+        darkTheme: 'dark',
+      }) === 'forest'
+      && resolveMermaidTheme({
+        manualThemeMode: 'dark',
+        colorModeValue: 'light',
+        baseTheme: 'base',
+        lightTheme: 'neutral',
+        darkTheme: 'forest',
+      }) === 'forest'
+      && resolveMermaidTheme({
+        colorModeValue: 'light',
+        baseTheme: 'base',
+        lightTheme: 'neutral',
+        darkTheme: 'dark',
+      }) === 'neutral'
+      && resolveMermaidTheme({ baseTheme: 'base', lightTheme: 'neutral' }) === 'base'
+  }
+  catch {
+    return false
+  }
+}
+
+function precedenceBehaviorMatches({
+  materializeMermaidConfigForInvocation,
+  resolveMermaidComponentSource,
+  resolveMermaidTheme,
+  resolveModuleConfiguration,
+  resolveRuntimeOptionsSnapshot,
+}) {
+  return modulePrecedenceBehaviorMatches(resolveModuleConfiguration)
+    && runtimeSnapshotBehaviorMatches(resolveRuntimeOptionsSnapshot)
+    && componentSourceBehaviorMatches(resolveMermaidComponentSource)
+    && mermaidConfigBehaviorMatches(materializeMermaidConfigForInvocation, resolveMermaidTheme)
+}
+
+async function markdownBehaviorMatches(artifact, repositoryRoot) {
+  const authority = await discoverArtifactRuntimeAuthority(artifact, {
+    symbolOrProbeId: 'transformMarkdownDiagrams',
+  })
+  const fixtureRoot = await mkdtemp(join(tmpdir(), 'website-reference-markdown-probe-'))
+  let nuxt
+  try {
+    await symlink(join(repositoryRoot, 'node_modules'), join(fixtureRoot, 'node_modules'), 'dir')
+    // Satisfy the artifact's declared peer contract without starting Content's database lifecycle.
+    const contentContractStub = defineNuxtModule({
+      meta: { name: '@nuxt/content', version: '3.5.0' },
+      setup() {},
+    })
+    nuxt = await loadNuxt({
+      cwd: fixtureRoot,
+      ready: true,
+      overrides: {
+        compatibilityDate: '2025-11-24',
+        modules: [contentContractStub, authority.file],
+        runtimeConfig: { public: {} },
+        srcDir: fixtureRoot,
+      },
+    })
+    const context = {
+      file: {
+        id: 'reference-behavior-probe.md',
+        body: [
+          '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="24px" config=\'{"theme":"forest","flowchart":{"curve":"step"}}\'}',
+          '---',
+          'title: YAML Title',
+          'displayMode: standard',
+          'toolbar:',
+          '  title: YAML Toolbar',
+          '  fontSize: 12px',
+          'config:',
+          '  theme: dark',
+          '  flowchart:',
+          '    htmlLabels: false',
+          '---',
+          'graph TD',
+          '  A --> B',
+          '```',
+          '',
+        ].join('\n'),
+      },
+    }
+    await nuxt.callHook('content:file:beforeParse', context)
+    const toolbarMatch = context.file.body.match(/:toolbar='([^']+)'/)
+    const codeMatch = context.file.body.match(/code="([^"]+)"/)
+    if (!toolbarMatch?.[1] || !codeMatch?.[1]) return false
+    const toolbar = JSON.parse(toolbarMatch[1])
+    const decoded = decodeURIComponent(codeMatch[1])
+    const frontmatter = decoded.match(/^---\n([\s\S]*?)\n---/)?.[1]
+    if (!frontmatter) return false
+    const data = parseYaml(frontmatter)
+    return isDeepStrictEqual(toolbar, { fontSize: '24px', title: 'YAML Toolbar' })
+      && data?.title === 'Inline Title'
+      && data?.displayMode === 'compact'
+      && data?.toolbar?.title === 'YAML Toolbar'
+      && data?.toolbar?.fontSize === '24px'
+      && data?.config?.theme === 'forest'
+      && data?.config?.flowchart?.curve === 'step'
+      && data?.config?.flowchart?.htmlLabels === false
+  }
+  catch {
+    return false
+  }
+  finally {
+    try {
+      await nuxt?.close()
+    }
+    finally {
+      await rm(fixtureRoot, { recursive: true, force: true })
+    }
+  }
 }
 
 function typeCheckMatches(records) {
@@ -447,13 +848,55 @@ function typeCheckMatches(records) {
     && values.every(record => EXPECTED_VALUE_TYPES[record.path] === record.valueType)
 }
 
-function evidenceCheckMatches(records) {
+async function discoverDeclarationAuthority(artifact, declarations, descriptor, workspaceRoot) {
+  const matches = []
+  for (const relativePath of declarations.files) {
+    try {
+      matches.push(await discoverArtifactEvidence(artifact, {
+        relativePath,
+        symbolOrProbeId: descriptor.symbol,
+        workspaceRoot,
+      }))
+    }
+    catch (error) {
+      if (error?.category !== 'unsupported-constraint-evidence') throw error
+    }
+  }
+  if (matches.length !== 1) {
+    throw new ReferenceVerificationInfrastructureFailure(
+      'unsupported-constraint-evidence',
+      matches.length === 0
+        ? `declaration authority was not discovered: ${descriptor.symbol}`
+        : `declaration authority is ambiguous: ${descriptor.symbol}`,
+    )
+  }
+  return matches[0]
+}
+
+async function discoverExpectedEvidenceAuthorities(artifact, declarations, workspaceRoot) {
+  const descriptors = [...new Set(Object.values(EVIDENCE))]
+  const identifiers = await Promise.all(descriptors.map(descriptor => descriptor.kind === 'declaration'
+    ? discoverDeclarationAuthority(artifact, declarations, descriptor, workspaceRoot)
+    : discoverArtifactRuntimeAuthority(artifact, {
+        symbolOrProbeId: descriptor.symbol,
+      }).then(authority => authority.evidence)))
+  return new Map(descriptors.map((descriptor, index) => [descriptor, identifiers[index]]))
+}
+
+function expectedEvidenceIdentifiers(descriptors, authorities) {
+  return descriptors.map(descriptor => authorities.get(descriptor))
+}
+
+function evidenceCheckMatches(records, authorities) {
   return records.length === Object.keys(EXPECTED_EVIDENCE).length
     && records.every((record) => {
       const expected = EXPECTED_EVIDENCE[record.path]
       return expected !== undefined
-        && isDeepStrictEqual(record.evidence, expected.record)
-        && isDeepStrictEqual(record.supportedConstraint?.evidence ?? [], expected.supported)
+        && isDeepStrictEqual(record.evidence, expectedEvidenceIdentifiers(expected.record, authorities))
+        && isDeepStrictEqual(
+          record.supportedConstraint?.evidence ?? [],
+          expectedEvidenceIdentifiers(expected.supported, authorities),
+        )
     })
 }
 
@@ -700,38 +1143,79 @@ async function verifyWebsiteReferenceOrThrow({
   loadCorpus = options => loadWebsiteReferenceCorpus(options),
   verifySnippets = options => verifyReferenceSnippets(options),
 } = {}) {
+  const resolvedRepositoryRoot = repositoryRoot
+    ?? resolve(dirname(fileURLToPath(import.meta.url)), '../..')
   const artifact = await resolveArtifact({ repositoryRoot })
   const records = await loadCorpus({ artifact, repositoryRoot })
   const declarations = await discoverPublicDeclarations(artifact)
-  const [moduleExport, snapshotExport, allowances, semanticProbes, minimumProbes, snippetResult]
+  const [
+    moduleExport,
+    snapshotExport,
+    componentSourceExport,
+    mermaidConfigExport,
+    themeExport,
+    allowances,
+    semanticProbes,
+    minimumProbes,
+    snippetResult,
+    evidenceAuthorities,
+  ]
     = await Promise.all([
       discoverArtifactRuntimeExport(artifact, {
-        relativePath: 'dist/runtime/configuration/module.js',
         exportName: 'resolveModuleConfiguration',
         workspaceRoot: repositoryRoot,
       }),
       discoverArtifactRuntimeExport(artifact, {
-        relativePath: 'dist/runtime/configuration/runtime-options.js',
         exportName: 'resolveRuntimeOptionsSnapshot',
         workspaceRoot: repositoryRoot,
       }),
-      probeDirectMermaidConfigAllowances(artifact, { workspaceRoot: repositoryRoot }),
+      discoverArtifactRuntimeExport(artifact, {
+        exportName: 'resolveMermaidComponentSource',
+        workspaceRoot: repositoryRoot,
+      }),
+      discoverArtifactRuntimeExport(artifact, {
+        exportName: 'materializeMermaidConfigForInvocation',
+        workspaceRoot: repositoryRoot,
+      }),
+      discoverArtifactRuntimeExport(artifact, {
+        exportName: 'resolveMermaidTheme',
+        workspaceRoot: repositoryRoot,
+      }),
+      probeDirectMermaidConfigAllowances(artifact),
       runSemanticTypeScriptProbes(artifact, declarations),
       runSemanticTypeScriptProbes(artifact, declarations, { probes: snippetProbes(records) }),
       verifySnippets({ artifact, records, repositoryRoot }),
+      discoverExpectedEvidenceAuthorities(artifact, declarations, repositoryRoot),
     ])
   const resolveModuleConfiguration = moduleExport.value
   const resolveRuntimeOptionsSnapshot = snapshotExport.value
-  if (typeof resolveModuleConfiguration !== 'function' || typeof resolveRuntimeOptionsSnapshot !== 'function') {
+  const resolveMermaidComponentSource = componentSourceExport.value
+  const materializeMermaidConfigForInvocation = mermaidConfigExport.value
+  const resolveMermaidTheme = themeExport.value
+  if (typeof resolveModuleConfiguration !== 'function'
+    || typeof resolveRuntimeOptionsSnapshot !== 'function'
+    || typeof resolveMermaidComponentSource !== 'function'
+    || typeof materializeMermaidConfigForInvocation !== 'function'
+    || typeof resolveMermaidTheme !== 'function') {
     throw new TypeError('Reference runtime probe exports must be functions')
   }
   const moduleResolution = resolveModuleConfiguration({ nuxtResolvedOptions: {}, runtimeOverrides: {} })
   const debugFalse = resolveRuntimeOptionsSnapshot({ debug: false })
   const debugTrue = resolveRuntimeOptionsSnapshot({ debug: true })
+  const markdownPrecedenceMatches = await markdownBehaviorMatches(artifact, resolvedRepositoryRoot)
   const typesMatch = typeCheckMatches(records) && semanticProbes.every(probe => probe.passed)
   const snippetsMatch = minimumProbes.every(probe => probe.passed)
     && snippetResult.typescript === true
     && snippetResult.markdown === true
+  const defaultsMatch = defaultCheckMatches(records, moduleResolution)
+  const conditionalDefaultsMatch = conditionalCheckMatches(records, debugFalse, debugTrue)
+  const precedenceMatches = precedenceBehaviorMatches({
+    materializeMermaidConfigForInvocation,
+    resolveMermaidComponentSource,
+    resolveMermaidTheme,
+    resolveModuleConfiguration,
+    resolveRuntimeOptionsSnapshot,
+  }) && markdownPrecedenceMatches
   const mismatches = await checkReferenceParity(records, {
     artifactVersion: '3.0.0',
     paths: EXPECTED_PATHS,
@@ -739,12 +1223,16 @@ async function verifyWebsiteReferenceOrThrow({
     runtimePaths: CONFIGURATION_ACCEPTANCE.runtimeConfigPublicContentMermaid,
     checks: {
       types: typesMatch ? 'match' : 'mismatch',
-      defaults: defaultCheckMatches(records, moduleResolution) ? 'match' : 'mismatch',
-      conditionalDefaults: conditionalCheckMatches(records, debugFalse, debugTrue) ? 'match' : 'mismatch',
+      defaults: defaultsMatch ? 'match' : 'mismatch',
+      conditionalDefaults: conditionalDefaultsMatch ? 'match' : 'mismatch',
+      precedence: precedenceMatches ? 'match' : 'mismatch',
       delegatedDescendants: boundaryCheckMatches(records) ? 'match' : 'mismatch',
       exceptions: exceptionCheckMatches(records, allowances) ? 'match' : 'mismatch',
       deprecations: deprecationCheckMatches(records) ? 'match' : 'mismatch',
-      constraintEvidence: evidenceCheckMatches(records) ? 'match' : 'mismatch',
+      constraintEvidence: evidenceCheckMatches(records, evidenceAuthorities)
+        && supportedConstraintBehaviorMatches(records, resolveModuleConfiguration)
+        ? 'match'
+        : 'mismatch',
       snippets: snippetsMatch ? 'match' : 'mismatch',
     },
   })

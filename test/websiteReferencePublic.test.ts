@@ -60,7 +60,8 @@ describe('website public Reference projection', () => {
       },
     })
     expect(Object.values(model.sections).map(records => records.length)).toEqual([10, 22, 4, 6, 1])
-    expect(JSON.stringify(model)).not.toMatch(/artifact:|evidence|artifactRoot|manifestPath|\.pnpm|\/Users\/|#ModuleOptions|minimumExample[^}]*"id"/)
+    expect(JSON.stringify(model)).not.toMatch(/artifact:|artifactRoot|manifestPath|\.pnpm|\/Users\/|#ModuleOptions|minimumExample[^}]*"id"/)
+    expect(Object.values(model.sections).flat().every(record => record.evidenceCategories.length > 0)).toBe(true)
   })
 
   it('allowlists every nested public structure after the model has been validated', async () => {
@@ -92,7 +93,7 @@ describe('website public Reference projection', () => {
     const projected = projectWebsiteReferencePublicModel(tampered as unknown as LoadedReferenceRecords)
 
     expect(projected).toEqual(baseline)
-    expect(JSON.stringify(projected)).not.toMatch(/artifact:|evidence|artifactRoot|manifestPath|\.pnpm|\/Users\/|reference-probe:/)
+    expect(JSON.stringify(projected)).not.toMatch(/artifact:|artifactRoot|manifestPath|\.pnpm|\/Users\/|reference-probe:/)
   })
 
   it('preserves exact conditional defaults and kind-specific public semantics', async () => {
@@ -119,8 +120,21 @@ describe('website public Reference projection', () => {
       },
       summary: 'Package defaults plus debug-derived fields unless explicitly overridden.',
     })
-    expect(loaderInit).not.toHaveProperty('errorSemantics')
+    expect(loaderInit.errorSemantics).toBe('Unsafe transport values fail before Mermaid receives them.')
     expect(loaderInit).not.toHaveProperty('supportedConstraint')
+    expect(records.find(record => record.path === 'loader.lazy')).toMatchObject({
+      errorSemantics: 'Values other than boolean or the closed object fail validation.',
+    })
+    expect(records.find(record => record.path === 'expand')).toMatchObject({
+      errorSemantics: 'Unknown keys or invalid value kinds fail validation.',
+    })
+    expect(records.find(record => record.path === 'debug')).toMatchObject({
+      evidenceCategories: ['Public type declaration', 'Artifact behavior probe'],
+      supportedConstraint: {
+        summary: 'Boolean debug state selects package-owned conditional defaults.',
+        evidenceCategories: ['Artifact behavior probe'],
+      },
+    })
     expect(authoring).toMatchObject({
       kind: 'authoring-input',
       syntax: expect.any(String),

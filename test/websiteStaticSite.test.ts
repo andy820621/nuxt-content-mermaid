@@ -7,8 +7,10 @@ import {
   classifyRequestFailure,
   closeVerificationResources,
   createPlainStaticServer,
+  REFERENCE_MODEL_SCOPE_MARKER,
   runWebsiteStaticCli,
   runStaticSiteVerification,
+  verifyReferenceModelRouteScope,
   WEBSITE_STATIC_CASES,
 } from '../scripts/website/static-site.mjs'
 
@@ -32,6 +34,81 @@ afterEach(async () => {
 })
 
 describe('shared production static-site lifecycle', () => {
+  it('keeps the serialized Reference model in the Reference initial route graph', async () => {
+    const publicDirectory = await mkdtemp(join(tmpdir(), 'nuxt-content-mermaid-reference-scope-'))
+    temporaryDirectories.push(publicDirectory)
+    await mkdir(join(publicDirectory, '_nuxt'), { recursive: true })
+    await mkdir(join(publicDirectory, 'reference'), { recursive: true })
+    await writeFile(
+      join(publicDirectory, 'reference/index.html'),
+      `<main>${REFERENCE_MODEL_SCOPE_MARKER}</main><link rel="modulepreload" href="/_nuxt/reference-model.js">`,
+    )
+    await writeFile(
+      join(publicDirectory, 'index.html'),
+      '<main>Home</main><script type="module" src="/_nuxt/home.js"></script>',
+    )
+    await writeFile(join(publicDirectory, '_nuxt/reference-model.js'), `export default ${JSON.stringify(REFERENCE_MODEL_SCOPE_MARKER)}`)
+    await writeFile(join(publicDirectory, '_nuxt/home.js'), 'export default "home"')
+
+    await expect(verifyReferenceModelRouteScope({
+      publicDirectory,
+      routeManifest: [
+        { logicalRoute: '/', physicalFiles: ['index.html'] },
+        { logicalRoute: '/reference', physicalFiles: ['reference/index.html'] },
+      ],
+    })).resolves.toEqual({
+      modelAssets: ['_nuxt/reference-model.js'],
+      referenceRoute: '/reference',
+      scoped: true,
+    })
+  })
+
+  it('rejects a generated non-Reference initial graph that includes the serialized model', async () => {
+    const publicDirectory = await mkdtemp(join(tmpdir(), 'nuxt-content-mermaid-reference-leak-'))
+    temporaryDirectories.push(publicDirectory)
+    await mkdir(join(publicDirectory, '_nuxt'), { recursive: true })
+    await mkdir(join(publicDirectory, 'reference'), { recursive: true })
+    await writeFile(
+      join(publicDirectory, 'reference/index.html'),
+      `<main>${REFERENCE_MODEL_SCOPE_MARKER}</main><script type="module" src="/_nuxt/reference-model.js"></script>`,
+    )
+    await writeFile(
+      join(publicDirectory, 'index.html'),
+      '<main>Home</main><link rel="modulepreload" href="/_nuxt/reference-model.js">',
+    )
+    await writeFile(join(publicDirectory, '_nuxt/reference-model.js'), `export default ${JSON.stringify(REFERENCE_MODEL_SCOPE_MARKER)}`)
+
+    await expect(verifyReferenceModelRouteScope({
+      publicDirectory,
+      routeManifest: [
+        { logicalRoute: '/', physicalFiles: ['index.html'] },
+        { logicalRoute: '/reference', physicalFiles: ['reference/index.html'] },
+      ],
+    })).rejects.toThrow(/non-Reference.*serialized Reference model/i)
+  })
+
+  it('rejects a generated non-Reference payload that contains the serialized model', async () => {
+    const publicDirectory = await mkdtemp(join(tmpdir(), 'nuxt-content-mermaid-reference-payload-leak-'))
+    temporaryDirectories.push(publicDirectory)
+    await mkdir(join(publicDirectory, '_nuxt'), { recursive: true })
+    await mkdir(join(publicDirectory, 'reference'), { recursive: true })
+    await writeFile(
+      join(publicDirectory, 'reference/index.html'),
+      `<main>${REFERENCE_MODEL_SCOPE_MARKER}</main><script type="module" src="/_nuxt/reference-model.js"></script>`,
+    )
+    await writeFile(join(publicDirectory, 'index.html'), '<main>Home</main>')
+    await writeFile(join(publicDirectory, '_payload.json'), JSON.stringify(REFERENCE_MODEL_SCOPE_MARKER))
+    await writeFile(join(publicDirectory, '_nuxt/reference-model.js'), `export default ${JSON.stringify(REFERENCE_MODEL_SCOPE_MARKER)}`)
+
+    await expect(verifyReferenceModelRouteScope({
+      publicDirectory,
+      routeManifest: [
+        { logicalRoute: '/', physicalFiles: ['index.html'] },
+        { logicalRoute: '/reference', physicalFiles: ['reference/index.html'] },
+      ],
+    })).rejects.toThrow(/non-Reference.*payload.*serialized Reference model/i)
+  })
+
   it('composes recovery and migration cases into the shared route inventory', () => {
     expect(WEBSITE_STATIC_CASES.map(routeCase => ({
       id: routeCase.id,

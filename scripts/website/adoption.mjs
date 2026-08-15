@@ -229,6 +229,14 @@ async function expectReferenceCoreContent(page) {
     await page.locator('[data-reference-record] > details.reference-occurrences').count() === REFERENCE_RECORD_COUNT,
     'every Reference record must expose its accepted surfaces',
   )
+  expectEvidence(
+    await page.locator('[data-reference-record] [data-reference-evidence-categories]').count() === REFERENCE_RECORD_COUNT,
+    'every Reference record must expose human-readable evidence categories',
+  )
+  expectEvidence(
+    await page.locator('[data-reference-supported-constraint] [data-supported-constraint-evidence]').count() === 23,
+    'every Supported Constraint must expose a human-readable evidence category',
+  )
 
   const html = await page.content()
   expectEvidence(

@@ -14,6 +14,7 @@ interface PublicReferenceBase {
   description: string
   purpose: string
   ownership: string
+  evidenceCategories: readonly PublicReferenceEvidenceCategory[]
   occurrences: readonly ReferenceOccurrence[]
   scope: string
   boundary: string
@@ -24,6 +25,13 @@ interface PublicReferenceBase {
   explicitNegatives?: readonly string[]
 }
 
+export type PublicReferenceEvidenceCategory
+  = | 'Public type declaration'
+    | 'Packaged default'
+    | 'Artifact behavior probe'
+    | 'Artifact validation probe'
+    | 'Artifact capability allowlist'
+
 interface PublicConfigurationSemantics {
   precedence: readonly string[]
   default?: ReferenceSummary<'literal' | 'conditional' | 'inherited' | 'omitted'>
@@ -31,7 +39,10 @@ interface PublicConfigurationSemantics {
   minimumExample?: Omit<ReferenceMinimumExample, 'id'>
   lifecycle?: string
   errorSemantics?: string
-  supportedConstraint?: Readonly<{ summary: string }>
+  supportedConstraint?: Readonly<{
+    summary: string
+    evidenceCategories: readonly PublicReferenceEvidenceCategory[]
+  }>
   recommendedRange?: ReferenceSummary<'recommendation' | 'none'>
   localValidation?: ReferenceSummary<'validation' | 'none'>
 }
@@ -42,7 +53,7 @@ interface PublicGroupSemantics {
   reset?: ReferenceSummary<'value' | 'omission' | 'none'>
   minimumExample?: Omit<ReferenceMinimumExample, 'id'>
   lifecycle?: string
-  errorSemantics?: undefined
+  errorSemantics?: string
   supportedConstraint?: undefined
   recommendedRange?: undefined
   localValidation?: undefined

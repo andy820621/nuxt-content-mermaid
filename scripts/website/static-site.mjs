@@ -17,6 +17,7 @@ const CONTENT_TYPES = {
   '.woff2': 'font/woff2',
 }
 const DEFAULT_REPOSITORY_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)))
+export const REFERENCE_MODEL_SCOPE_MARKER = 'Only the module surface accepts this build-time switch.'
 
 export { WEBSITE_STATIC_CASES }
 
@@ -66,6 +67,83 @@ export async function buildGeneratedRouteManifest({ publicDirectory, allowedLogi
     logicalRoute,
     physicalFiles: groups.get(logicalRoute),
   }))
+}
+
+function initialJavaScriptAssets(html) {
+  const assets = []
+  for (const element of html.matchAll(/<(?:script|link)\b[^>]*>/gi)) {
+    const tag = element[0]
+    const attributes = Object.fromEntries([...tag.matchAll(/([:\w-]+)\s*=\s*(["'])(.*?)\2/g)]
+      .map(match => [match[1].toLowerCase(), match[3]]))
+    const isScript = /^<script\b/i.test(tag) && attributes.src
+    const isModulePreload = /^<link\b/i.test(tag)
+      && attributes.rel?.split(/\s+/).includes('modulepreload')
+      && attributes.href
+    const source = isScript ? attributes.src : isModulePreload ? attributes.href : null
+    if (!source) continue
+    const url = new URL(source, 'https://generated-site.invalid')
+    if (url.origin !== 'https://generated-site.invalid') continue
+    const path = decodeURIComponent(url.pathname).replace(/^\/+/, '')
+    if (path.endsWith('.js') || path.endsWith('.mjs')) assets.push(path)
+  }
+  return [...new Set(assets)]
+}
+
+async function readOptionalText(path) {
+  try {
+    return await readFile(path, 'utf8')
+  }
+  catch (error) {
+    if (error?.code === 'ENOENT') return null
+    throw error
+  }
+}
+
+export async function verifyReferenceModelRouteScope({
+  publicDirectory,
+  routeManifest,
+  marker = REFERENCE_MODEL_SCOPE_MARKER,
+  referenceRoute = '/reference',
+}) {
+  const root = resolve(publicDirectory)
+  const modelAssets = []
+  for (const file of await listFiles(root)) {
+    if (!file.endsWith('.js') && !file.endsWith('.mjs')) continue
+    if ((await readFile(join(root, file), 'utf8')).includes(marker)) modelAssets.push(file)
+  }
+  modelAssets.sort()
+  expectObservation(modelAssets.length > 0, 'serialized Reference model is missing from generated JavaScript')
+
+  const reference = routeManifest.find(route => route.logicalRoute === referenceRoute)
+  expectObservation(Boolean(reference), `generated output is missing ${referenceRoute} for Reference model scope`)
+  const modelAssetSet = new Set(modelAssets)
+  for (const route of routeManifest) {
+    const payloadFile = route.logicalRoute === '/'
+      ? '_payload.json'
+      : `${route.logicalRoute.replace(/^\/+/, '')}/_payload.json`
+    const payload = await readOptionalText(join(root, payloadFile))
+    if (route.logicalRoute !== referenceRoute && payload !== null) {
+      expectObservation(
+        !payload.includes(marker),
+        `non-Reference route ${route.logicalRoute} payload contains the serialized Reference model`,
+      )
+    }
+    for (const physicalFile of route.physicalFiles) {
+      const html = await readFile(join(root, physicalFile), 'utf8')
+      const initialAssets = initialJavaScriptAssets(html)
+      const referencesModelAsset = initialAssets.some(asset => modelAssetSet.has(asset))
+      if (route.logicalRoute === referenceRoute) {
+        expectObservation(html.includes(marker), 'Reference initial HTML is missing the complete serialized Reference model')
+        expectObservation(referencesModelAsset, 'Reference hydration graph is missing the serialized Reference model')
+      }
+      else {
+        expectObservation(!html.includes(marker), `non-Reference route ${route.logicalRoute} contains the serialized Reference model`)
+        expectObservation(!referencesModelAsset, `non-Reference route ${route.logicalRoute} loads the serialized Reference model`)
+      }
+    }
+  }
+
+  return { modelAssets, referenceRoute, scoped: true }
 }
 
 export async function createPlainStaticServer({ publicDirectory, directRoutes }) {
@@ -320,6 +398,9 @@ export async function runStaticSiteVerification({
     publicDirectory,
     allowedLogicalRoutes,
   })
+  const referenceModelScope = manifest.some(route => route.logicalRoute === '/reference')
+    ? await verifyReferenceModelRouteScope({ publicDirectory, routeManifest: manifest })
+    : undefined
   const directRoutes = Object.fromEntries(cases.map(routeCase => [routeCase.directUrl, routeCase.physicalFile]))
   const server = await startServer({ publicDirectory, directRoutes })
   let browser
@@ -373,6 +454,7 @@ export async function runStaticSiteVerification({
     return {
       phase: 'static-site',
       manifest,
+      ...(referenceModelScope ? { referenceModelScope } : {}),
       routes,
       requestBoundary: {
         requestCount: requests.length,

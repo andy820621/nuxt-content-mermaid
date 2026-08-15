@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { WebsiteReferencePublicModel } from '../../scripts/website/reference-public.mjs'
+import generatedReference from '#build/website-reference-model.ts'
 
 const { data: page } = await useAsyncData('website-reference-page', () => (
   queryCollection('pages').path('/reference').first()
 ))
-const { websiteReference } = useAppConfig()
-const reference = websiteReference as unknown as WebsiteReferencePublicModel
+const reference = generatedReference as WebsiteReferencePublicModel
 
 if (!page.value) throw createError({ statusCode: 404, statusMessage: 'Reference page metadata not found' })
 

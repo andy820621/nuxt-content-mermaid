@@ -45,6 +45,9 @@ const props = defineProps<{ record: PublicAuthoringInput }>()
       <dt>Ownership</dt><dd>{{ props.record.ownership }}</dd>
       <dt>Downstream Ownership</dt><dd>{{ props.record.downstreamOwnership }}</dd>
       <dt>Boundary</dt><dd>{{ props.record.boundary }}</dd>
+      <dt>Evidence</dt><dd data-reference-evidence-categories>
+        {{ props.record.evidenceCategories.join(', ') }}
+      </dd>
       <dt>Lifecycle Status</dt><dd>{{ props.record.deprecation.summary }}</dd>
     </dl>
     <section

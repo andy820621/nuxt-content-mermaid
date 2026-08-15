@@ -13,6 +13,7 @@ export type ReferenceMismatchCategory
     | 'missing-fragment'
     | 'missing-path'
     | 'missing-required-prose'
+    | 'precedence-mismatch'
     | 'runtime-only-enabled'
     | 'snippet-failure'
     | 'type-mismatch'
@@ -31,6 +32,7 @@ export interface VerifiedArtifactIdentity {
   phase: string
   artifactRoot: string
   manifestPath: string
+  moduleEntryPath?: string
   packageMetadata: {
     name: string
     version: string
@@ -215,15 +217,24 @@ export function discoverArtifactEvidence(
 export function discoverArtifactRuntimeExport(
   artifact: VerifiedArtifactIdentity,
   options: {
-    relativePath: string
+    relativePath?: string
     exportName: string
     workspaceRoot?: string
   },
 ): Promise<Readonly<{ evidence: ArtifactEvidenceIdentifier, value: unknown }>>
 
+export function discoverArtifactRuntimeAuthority(
+  artifact: VerifiedArtifactIdentity,
+  options: { symbolOrProbeId: string },
+): Promise<Readonly<{
+  evidence: ArtifactEvidenceIdentifier
+  file: string
+  relativePath: string
+  source: string
+}>>
+
 export function discoverRuntimeEvidence(
   artifact: VerifiedArtifactIdentity,
-  options?: { workspaceRoot?: string },
 ): Promise<Readonly<{
   literalDefaults: readonly ArtifactEvidenceIdentifier[]
   conditionalDefaults: readonly ArtifactEvidenceIdentifier[]
@@ -234,7 +245,6 @@ export function discoverRuntimeEvidence(
 
 export function probeDirectMermaidConfigAllowances(
   artifact: VerifiedArtifactIdentity,
-  options?: { workspaceRoot?: string },
 ): Promise<typeof DIRECT_MERMAID_CONFIG_ALLOWANCES>
 
 export function discoverPublicDeclarations(
@@ -264,6 +274,7 @@ export function checkReferenceParity(
       | 'types'
       | 'defaults'
       | 'conditionalDefaults'
+      | 'precedence'
       | 'delegatedDescendants'
       | 'exceptions'
       | 'deprecations'

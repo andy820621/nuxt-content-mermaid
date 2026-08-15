@@ -1,4 +1,4 @@
-import { access, readFile, realpath } from 'node:fs/promises'
+import { access, readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { dirname, extname, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
@@ -64,6 +64,7 @@ export const REFERENCE_MISMATCH_CATEGORIES = Object.freeze([
   'missing-fragment',
   'missing-path',
   'missing-required-prose',
+  'precedence-mismatch',
   'runtime-only-enabled',
   'snippet-failure',
   'type-mismatch',
@@ -358,53 +359,228 @@ export async function discoverArtifactRuntimeExport(artifact, {
   exportName,
   workspaceRoot,
 }) {
-  const evidence = await discoverArtifactEvidence(artifact, {
-    relativePath,
-    symbolOrProbeId: exportName,
-    workspaceRoot,
-  })
+  const authority = relativePath
+    ? Object.freeze({
+        evidence: await discoverArtifactEvidence(artifact, {
+          relativePath,
+          symbolOrProbeId: exportName,
+          workspaceRoot,
+        }),
+        relativePath,
+      })
+    : await discoverArtifactRuntimeAuthority(artifact, {
+        symbolOrProbeId: exportName,
+      })
   const artifactRoot = await verificationRealpath(artifact.artifactRoot, 'verified artifact root')
-  const modulePath = await verificationRealpath(resolve(artifactRoot, relativePath), 'runtime probe module')
+  const modulePath = await verificationRealpath(resolve(artifactRoot, authority.relativePath), 'runtime probe module')
   let module
   try {
     module = await import(pathToFileURL(modulePath).href)
   }
   catch (error) {
-    infrastructureFailure('unreadable-verification-infrastructure', `runtime probe module is unreadable: ${relativePath}`, error)
+    infrastructureFailure('unreadable-verification-infrastructure', `runtime probe module is unreadable: ${authority.relativePath}`, error)
   }
   if (!Object.hasOwn(module, exportName)) {
     infrastructureFailure('unsupported-constraint-evidence', `runtime probe export was not discovered: ${exportName}`)
   }
-  return Object.freeze({ evidence, value: module[exportName] })
+  return Object.freeze({ evidence: authority.evidence, value: module[exportName] })
+}
+
+const ARTIFACT_RUNTIME_INVENTORIES = new WeakMap()
+const RUNTIME_SOURCE_EXTENSIONS = new Set(['.cjs', '.js', '.mjs'])
+
+async function readArtifactManifest(artifact, artifactRoot) {
+  const manifestPath = await verificationRealpath(artifact.manifestPath, 'verified artifact manifest')
+  if (!isWithin(artifactRoot, manifestPath)) {
+    infrastructureFailure('evidence-escape', 'verified artifact manifest escapes the artifact root')
+  }
+  try {
+    return JSON.parse(await readFile(manifestPath, 'utf8'))
+  }
+  catch (error) {
+    infrastructureFailure('unreadable-verification-infrastructure', 'verified artifact manifest is unreadable', error)
+  }
+}
+
+function runtimeEntryTargets(value, targets = []) {
+  if (isNonEmptyString(value)) {
+    if (RUNTIME_SOURCE_EXTENSIONS.has(extname(value))) targets.push(value)
+    return targets
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) runtimeEntryTargets(entry, targets)
+    return targets
+  }
+  if (value && typeof value === 'object') {
+    for (const entry of Object.values(value)) runtimeEntryTargets(entry, targets)
+  }
+  return targets
+}
+
+function inventoryRoot(entry) {
+  const normalized = entry.replace(/^\.\//, '')
+  const wildcard = normalized.search(/[*?[\]{}]/)
+  if (wildcard < 0) {
+    return RUNTIME_SOURCE_EXTENSIONS.has(extname(normalized)) ? dirname(normalized) : normalized
+  }
+  const prefix = normalized.slice(0, wildcard)
+  return prefix.endsWith('/') ? prefix.slice(0, -1) : dirname(prefix)
+}
+
+function manifestInventoryRoots(artifact, manifest) {
+  const roots = new Map()
+  const addRoot = (entry, optional) => {
+    if (!isNonEmptyString(entry)) return
+    const root = inventoryRoot(entry) || '.'
+    roots.set(root, (roots.get(root) ?? true) && optional)
+  }
+
+  if (isNonEmptyString(artifact.moduleEntryPath)) {
+    const declaredArtifactRoot = resolve(artifact.artifactRoot)
+    const moduleEntry = resolve(artifact.moduleEntryPath)
+    if (!isWithin(declaredArtifactRoot, moduleEntry)) {
+      infrastructureFailure('evidence-escape', 'verified artifact module entry escapes the artifact root')
+    }
+    addRoot(relative(declaredArtifactRoot, moduleEntry), false)
+  }
+  for (const target of runtimeEntryTargets([manifest.main, manifest.module, manifest.exports])) {
+    addRoot(target, false)
+  }
+  for (const entry of Array.isArray(manifest.files) ? manifest.files : []) {
+    if (!isNonEmptyString(entry)) continue
+    const normalized = entry.replace(/^\.\//, '')
+    addRoot(normalized, true)
+  }
+  if (roots.size === 0) roots.set('.', false)
+  return [...roots].map(([path, optional]) => ({ path, optional }))
+}
+
+async function createArtifactRuntimeInventory(artifact) {
+  assertVerifiedArtifact(artifact)
+  const artifactRoot = await verificationRealpath(artifact.artifactRoot, 'verified artifact root')
+  const manifest = await readArtifactManifest(artifact, artifactRoot)
+  const visitedDirectories = new Set()
+  const visitedFiles = new Set()
+  const inventory = []
+
+  async function visit(candidate, { optional = false } = {}) {
+    let canonical
+    let metadata
+    try {
+      canonical = await realpath(candidate)
+      metadata = await stat(canonical)
+    }
+    catch (error) {
+      if (optional && error?.code === 'ENOENT') return
+      infrastructureFailure('unreadable-verification-infrastructure', 'artifact package inventory is unreadable', error)
+    }
+    if (!isWithin(artifactRoot, canonical)) {
+      infrastructureFailure('evidence-escape', 'artifact package inventory symlink escapes the verified artifact root')
+    }
+    if (metadata.isDirectory()) {
+      if (visitedDirectories.has(canonical)) return
+      visitedDirectories.add(canonical)
+      let entries
+      try {
+        entries = await readdir(canonical, { withFileTypes: true })
+      }
+      catch (error) {
+        infrastructureFailure('unreadable-verification-infrastructure', 'artifact package directory is unreadable', error)
+      }
+      for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+        if (entry.name === 'node_modules') continue
+        await visit(resolve(canonical, entry.name))
+      }
+      return
+    }
+    if (!metadata.isFile() || !RUNTIME_SOURCE_EXTENSIONS.has(extname(canonical)) || visitedFiles.has(canonical)) return
+    visitedFiles.add(canonical)
+    let source
+    try {
+      source = await readFile(canonical, 'utf8')
+    }
+    catch (error) {
+      infrastructureFailure('unreadable-verification-infrastructure', 'artifact runtime source is unreadable', error)
+    }
+    inventory.push(Object.freeze({
+      file: canonical,
+      relativePath: relative(artifactRoot, canonical).split(sep).join('/'),
+      source,
+    }))
+  }
+
+  for (const entry of manifestInventoryRoots(artifact, manifest)) {
+    const candidate = resolve(artifactRoot, entry.path)
+    if (!isWithin(artifactRoot, candidate)) {
+      infrastructureFailure('evidence-escape', 'artifact package inventory path escapes the verified artifact root')
+    }
+    await visit(candidate, { optional: entry.optional })
+  }
+  return Object.freeze(inventory.sort((left, right) => left.relativePath.localeCompare(right.relativePath)))
+}
+
+function observeArtifactRuntimeInventory(artifact) {
+  let observation = ARTIFACT_RUNTIME_INVENTORIES.get(artifact)
+  if (!observation) {
+    observation = createArtifactRuntimeInventory(artifact)
+    ARTIFACT_RUNTIME_INVENTORIES.set(artifact, observation)
+    observation.catch(() => ARTIFACT_RUNTIME_INVENTORIES.delete(artifact))
+  }
+  return observation
+}
+
+export async function discoverArtifactRuntimeAuthority(artifact, {
+  symbolOrProbeId,
+} = {}) {
+  if (!isNonEmptyString(symbolOrProbeId) || symbolOrProbeId.includes('#')) {
+    infrastructureFailure('unsupported-constraint-evidence', 'runtime authority discovery requires a stable symbol or probe id')
+  }
+  const inventory = await observeArtifactRuntimeInventory(artifact)
+  const matches = inventory.filter(({ file, source }) => sourceDefinesEvidence(source, file, symbolOrProbeId))
+  if (matches.length !== 1) {
+    infrastructureFailure(
+      'unsupported-constraint-evidence',
+      matches.length === 0
+        ? `runtime authority was not discovered: ${symbolOrProbeId}`
+        : `runtime authority is ambiguous: ${symbolOrProbeId}`,
+    )
+  }
+  const authority = matches[0]
+  return Object.freeze({
+    evidence: `artifact:${authority.relativePath}#${symbolOrProbeId}`,
+    file: authority.file,
+    relativePath: authority.relativePath,
+    source: authority.source,
+  })
 }
 
 const RUNTIME_EVIDENCE_PROBES = Object.freeze({
   literalDefaults: Object.freeze([
-    ['dist/runtime/constants.js', 'DEFAULT_RUNTIME_OPTIONS'],
+    'DEFAULT_RUNTIME_OPTIONS',
   ]),
   conditionalDefaults: Object.freeze([
-    ['dist/runtime/configuration/runtime-options.js', 'resolveDebugDefaults'],
+    'resolveDebugDefaults',
   ]),
   validatorsAndPrecedence: Object.freeze([
-    ['dist/runtime/configuration/module.js', 'resolveModuleConfiguration'],
-    ['dist/runtime/configuration/module.js', 'validateRuntimeOptions'],
+    'resolveModuleConfiguration',
+    'validateRuntimeOptions',
   ]),
   openPayloads: Object.freeze([
-    ['dist/runtime/configuration/core.js', 'assertStrictData'],
-    ['dist/runtime/direct-mermaid-config.js', 'assertDirectMermaidConfig'],
+    'assertStrictData',
+    'assertDirectMermaidConfig',
   ]),
   directMermaidConfigAllowances: Object.freeze([
-    ['dist/runtime/constants.js', 'DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS'],
-    ['dist/runtime/constants.js', 'MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS'],
-    ['dist/runtime/constants.js', 'MERMAID_11_16_1_REGEXP_PATHS'],
+    'DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS',
+    'MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS',
+    'MERMAID_11_16_1_REGEXP_PATHS',
   ]),
 })
 
-export async function discoverRuntimeEvidence(artifact, { workspaceRoot } = {}) {
+export async function discoverRuntimeEvidence(artifact) {
   const result = {}
   for (const [category, probes] of Object.entries(RUNTIME_EVIDENCE_PROBES)) {
-    result[category] = await Promise.all(probes.map(([relativePath, symbolOrProbeId]) => (
-      discoverArtifactEvidence(artifact, { relativePath, symbolOrProbeId, workspaceRoot })
+    result[category] = await Promise.all(probes.map(async symbolOrProbeId => (
+      (await discoverArtifactRuntimeAuthority(artifact, { symbolOrProbeId })).evidence
     )))
   }
   return result
@@ -418,23 +594,16 @@ function capabilityPaths(value, exportName) {
   return Object.freeze(value.map(path => path.join('.')))
 }
 
-export async function probeDirectMermaidConfigAllowances(artifact, { workspaceRoot } = {}) {
-  const relativePath = 'dist/runtime/constants.js'
+export async function probeDirectMermaidConfigAllowances(artifact) {
   const [functions, regexps, opaque] = await Promise.all([
     discoverArtifactRuntimeExport(artifact, {
-      relativePath,
       exportName: 'MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS',
-      workspaceRoot,
     }),
     discoverArtifactRuntimeExport(artifact, {
-      relativePath,
       exportName: 'MERMAID_11_16_1_REGEXP_PATHS',
-      workspaceRoot,
     }),
     discoverArtifactRuntimeExport(artifact, {
-      relativePath,
       exportName: 'DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS',
-      workspaceRoot,
     }),
   ])
   return Object.freeze({
@@ -1047,25 +1216,14 @@ function parseArtifactConfigurationInventory(source, file) {
 }
 
 async function probeArtifactRuntimeConfigurationInventory(artifact) {
-  assertVerifiedArtifact(artifact)
-  const relativePath = 'dist/runtime/configuration/module.js'
-  await Promise.all([
-    discoverArtifactEvidence(artifact, { relativePath, symbolOrProbeId: 'MODULE_OPTION_KEYS' }),
-    discoverArtifactEvidence(artifact, { relativePath, symbolOrProbeId: 'validateRuntimeOptions' }),
+  const [keys, validator] = await Promise.all([
+    discoverArtifactRuntimeAuthority(artifact, { symbolOrProbeId: 'MODULE_OPTION_KEYS' }),
+    discoverArtifactRuntimeAuthority(artifact, { symbolOrProbeId: 'validateRuntimeOptions' }),
   ])
-  const artifactRoot = await verificationRealpath(artifact.artifactRoot, 'verified artifact root')
-  const file = await verificationRealpath(resolve(artifactRoot, relativePath), 'artifact configuration validator')
-  if (!isWithin(artifactRoot, file)) {
-    infrastructureFailure('evidence-escape', 'artifact configuration validator escapes the verified artifact root')
+  if (keys.file !== validator.file) {
+    infrastructureFailure('unreadable-verification-infrastructure', 'artifact configuration allowlist and validator are not co-located')
   }
-  let source
-  try {
-    source = await readFile(file, 'utf8')
-  }
-  catch (error) {
-    infrastructureFailure('unreadable-verification-infrastructure', 'artifact configuration validator is unreadable', error)
-  }
-  return parseArtifactConfigurationInventory(source, file)
+  return parseArtifactConfigurationInventory(validator.source, validator.file)
 }
 
 function collectClosedConfigurationPaths(checker, type, prefix, paths, visited, location) {
@@ -1171,6 +1329,7 @@ const PARITY_CHECK_CATEGORIES = Object.freeze({
   types: 'type-mismatch',
   defaults: 'default-mismatch',
   conditionalDefaults: 'conditional-mismatch',
+  precedence: 'precedence-mismatch',
   delegatedDescendants: 'delegated-descendant',
   exceptions: 'exception-mismatch',
   deprecations: 'deprecation-mismatch',
