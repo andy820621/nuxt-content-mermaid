@@ -2,23 +2,33 @@ import { loadWebsiteReferenceCorpus } from './reference-corpus.mjs'
 
 const PACKAGE_IDENTITY = '@barzhsieh/nuxt-content-mermaid@3.0.0'
 const ARTIFACT_VERSION = '3.0.0'
+const SUMMARY_OBJECT_FIELDS = Object.freeze({
+  'loader.init': Object.freeze({
+    value: Object.freeze(['startOnLoad', 'theme', 'fontFamily', 'securityLevel']),
+    outcomes: Object.freeze({
+      'debug:false': Object.freeze(['logLevel', 'suppressErrorRendering']),
+      'debug:true': Object.freeze(['logLevel', 'suppressErrorRendering']),
+    }),
+  }),
+})
 
 function projectStringList(values) {
   return Object.freeze(values.map(value => value))
 }
 
-// Summary values are public literal data rather than model metadata. Project
-// their recursive JSON shape independently so metadata objects never flow
-// through this open-key boundary.
-function projectLiteralValue(value) {
-  if (value === null || ['boolean', 'number', 'string'].includes(typeof value)) return value
-  if (Array.isArray(value)) return Object.freeze(value.map(projectLiteralValue))
-  if (value && typeof value === 'object') {
-    return Object.freeze(Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, projectLiteralValue(item)]),
-    ))
-  }
+function projectLiteralScalar(value) {
+  if (value === null || ['boolean', 'string'].includes(typeof value)) return value
+  if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError('Reference public literal values must be JSON data')
+}
+
+function projectLiteralObject(value, fields) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('Reference public literal objects must match their public schema')
+  }
+  return Object.freeze(Object.fromEntries(
+    fields.map(field => [field, projectLiteralScalar(value[field])]),
+  ))
 }
 
 function projectOccurrence(occurrence) {
@@ -41,18 +51,26 @@ function projectDeprecation(deprecation) {
   })
 }
 
-function projectSummaryOutcomes(outcomes) {
+function projectSummaryOutcomes(record, outcomes) {
+  const outcomeFields = SUMMARY_OBJECT_FIELDS[record.path]?.outcomes
+  if (!outcomeFields) return Object.freeze({})
   return Object.freeze(Object.fromEntries(
-    Object.entries(outcomes).map(([condition, outcome]) => [condition, projectLiteralValue(outcome)]),
+    Object.entries(outcomeFields).map(([condition, fields]) => [
+      condition,
+      projectLiteralObject(outcomes[condition], fields),
+    ]),
   ))
 }
 
-function projectSummary(summary) {
+function projectSummary(record, summary) {
+  const valueFields = SUMMARY_OBJECT_FIELDS[record.path]?.value
   return Object.freeze({
     kind: summary.kind,
     summary: summary.summary,
-    ...(Object.hasOwn(summary, 'value') ? { value: projectLiteralValue(summary.value) } : {}),
-    ...(summary.outcomes ? { outcomes: projectSummaryOutcomes(summary.outcomes) } : {}),
+    ...(Object.hasOwn(summary, 'value')
+      ? { value: valueFields ? projectLiteralObject(summary.value, valueFields) : projectLiteralScalar(summary.value) }
+      : {}),
+    ...(summary.outcomes ? { outcomes: projectSummaryOutcomes(record, summary.outcomes) } : {}),
   })
 }
 
@@ -104,24 +122,24 @@ function projectBase(record) {
 function projectConfigurationSemantics(record) {
   return {
     precedence: projectStringList(record.precedence),
-    ...(record.default ? { default: projectSummary(record.default) } : {}),
-    ...(record.reset ? { reset: projectSummary(record.reset) } : {}),
+    ...(record.default ? { default: projectSummary(record, record.default) } : {}),
+    ...(record.reset ? { reset: projectSummary(record, record.reset) } : {}),
     ...(record.minimumExample ? { minimumExample: projectMinimumExample(record.minimumExample) } : {}),
     ...(record.lifecycle ? { lifecycle: record.lifecycle } : {}),
     ...(record.errorSemantics ? { errorSemantics: record.errorSemantics } : {}),
     ...(record.supportedConstraint
       ? { supportedConstraint: projectSupportedConstraint(record.supportedConstraint) }
       : {}),
-    ...(record.recommendedRange ? { recommendedRange: projectSummary(record.recommendedRange) } : {}),
-    ...(record.localValidation ? { localValidation: projectSummary(record.localValidation) } : {}),
+    ...(record.recommendedRange ? { recommendedRange: projectSummary(record, record.recommendedRange) } : {}),
+    ...(record.localValidation ? { localValidation: projectSummary(record, record.localValidation) } : {}),
   }
 }
 
 function projectGroupSemantics(record) {
   return {
     precedence: projectStringList(record.precedence),
-    ...(record.default ? { default: projectSummary(record.default) } : {}),
-    ...(record.reset ? { reset: projectSummary(record.reset) } : {}),
+    ...(record.default ? { default: projectSummary(record, record.default) } : {}),
+    ...(record.reset ? { reset: projectSummary(record, record.reset) } : {}),
     ...(record.minimumExample ? { minimumExample: projectMinimumExample(record.minimumExample) } : {}),
     ...(record.lifecycle ? { lifecycle: record.lifecycle } : {}),
   }
