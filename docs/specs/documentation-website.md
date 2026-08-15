@@ -6,7 +6,8 @@
 
 - 2026-08-15：完成第一階段簡化，網站收斂為一個 Nuxt Content collection、通用文件 route/layout 與六篇手寫 Markdown。
 - 2026-08-15：完成第二階段 landing 優化，以薄 Vue shell 排版首頁，並讓 Mermaid demo 保持內容驅動。
-- 2026-08-15：核准第三階段品牌資源整合；本次規格已完成，程式尚未實作。
+- 2026-08-15：完成第三階段品牌資源整合，以正式 wordmark、favicon 與靜態社群 metadata 建立網站識別。
+- 2026-08-15：完成第四階段 wordmark 簡化，以單一 SVG 配合 CSS `currentColor` 支援 light/dark theme。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
@@ -129,8 +130,7 @@ Theme 使用套件既有的 `useMermaidTheme()` 作為網站與 diagram 的共�
 | 資源 | 用途 |
 | --- | --- |
 | `nuxt-content-mermaid-icon.svg` | Header 的獨立圖示。 |
-| `nuxt-content-mermaid-wordmark.svg` | Dark mode Header 使用的白色／綠色 wordmark。 |
-| `nuxt-content-mermaid-wordmark-dark.svg` | Light mode Header 使用的黑色／綠色 wordmark；由原版只修改根層 `color` 為 `#000000`。 |
+| `nuxt-content-mermaid-wordmark.svg` | Header 唯一 wordmark；Nuxt／Mermaid 路徑使用 `currentColor`，Content 路徑固定為綠色。 |
 | `nuxt-content-mermaid-logo.svg` | 完整 icon + wordmark 品牌原稿；本階段不直接渲染。 |
 | `nuxt-content-mermaid.png` | Open Graph 與 Twitter 共用的靜態社群圖片。 |
 | `nuxt-content-mermaid.webp`、`nuxt-content-mermaid_wide.png` | 既有替代輸出；本階段不作為 metadata 圖片。 |
@@ -143,9 +143,9 @@ Theme 使用套件既有的 `useMermaidTheme()` 作為網站與 diagram 的共�
 Header 首頁連結由以下視覺組成：
 
 1. `nuxt-content-mermaid-icon.svg`。
-2. 依目前網站 theme 選擇的 wordmark：dark mode 使用原版，light mode 使用 `wordmark-dark.svg`。
+2. 一個 inline `<svg>` wrapper，透過三個 same-origin external `<use>` 引用 `nuxt-content-mermaid-wordmark.svg` 的 `#nuxt`、`#content` 與 `#mermaid` paths。
 
-Vue 可以從既有 `activeTheme` 計算當前 wordmark URL，但不得建立第二個 theme state。Icon 是裝飾圖，wordmark 提供 `Nuxt Content Mermaid` 的替代文字；整組仍是一個可存取的首頁連結。小螢幕可縮小 wordmark 並讓文字導覽換列，但不得退回純文字品牌或隱藏首頁入口。
+Wordmark SVG 根層 `color` 使用 `currentColor`；Header CSS 以既有 `--text` token 設定 wrapper 的 `color`，因此 Nuxt／Mermaid paths 隨網站 theme 切換，`#content` path 的 `#00DC82` 保持不變。Vue 不計算 theme-specific asset URL，也不建立第二個 theme state。Icon 是裝飾圖，wordmark wrapper 以 `<title>` 提供 `Nuxt Content Mermaid` 的 accessible name；整組仍是一個可存取的首頁連結。小螢幕可縮小 wordmark 並讓文字導覽換列，但不得退回純文字品牌或隱藏首頁入口。
 
 ### Public asset mapping
 
@@ -389,6 +389,17 @@ website/
 - Root scripts、CI、artifact 與 release files。
 
 第三階段不新增 dependency、Vue component、content model、schema、generator、manifest pipeline、test 或永久網站驗證。
+
+## 第四階段檔案變更範圍
+
+| 檔案 | 動作 | 設計責任 |
+| --- | --- | --- |
+| `src/assets/nuxt-content-mermaid-wordmark.svg` | 修改 | 根層 `color` 改為 `currentColor`，paths 與品牌綠色不變。 |
+| `src/assets/nuxt-content-mermaid-wordmark-dark.svg` | 刪除 | 移除重複的 theme-specific asset。 |
+| `website/app.vue` | 修改 | 以單一 `<svg>` wrapper 和三個 external `<use>` 取代 theme-specific `<img>` 與 computed URL。 |
+| `website/assets/css/main.css` | 修改 | 以 `var(--text)` 控制 wordmark 的 `currentColor`。 |
+
+第四階段不修改 favicon、社群 metadata、內容、routes、layout、navigation、Mermaid demo 或品質與交付邊界，也不新增 component、loader、dependency、generator 或驗證。
 
 ## 品質與交付邊界
 

@@ -11,11 +11,6 @@ const route = useRoute()
 
 const nextTheme = computed(() => activeTheme.value === 'dark' ? 'light' : 'dark')
 
-const wordmarkUrl = computed(() => activeTheme.value === 'dark'
-  ? '/assets/nuxt-content-mermaid-wordmark.svg'
-  : '/assets/nuxt-content-mermaid-wordmark-dark.svg',
-)
-
 useHead(() => ({
   htmlAttrs: {
     'data-theme': activeTheme.value,
@@ -64,13 +59,19 @@ function toggleTheme() {
             width="96"
             height="96"
           >
-          <img
+          <svg
             class="site-brand__wordmark"
-            :src="wordmarkUrl"
-            alt="Nuxt Content Mermaid"
+            viewBox="0 0 743 50"
             width="743"
             height="50"
+            role="img"
+            aria-labelledby="site-brand-wordmark-title"
           >
+            <title id="site-brand-wordmark-title">Nuxt Content Mermaid</title>
+            <use href="/assets/nuxt-content-mermaid-wordmark.svg#nuxt" />
+            <use href="/assets/nuxt-content-mermaid-wordmark.svg#content" />
+            <use href="/assets/nuxt-content-mermaid-wordmark.svg#mermaid" />
+          </svg>
         </NuxtLink>
 
         <nav

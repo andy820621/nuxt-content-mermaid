@@ -119,6 +119,7 @@ code {
   display: block;
   width: clamp(10.75rem, 17vw, 13rem);
   height: auto;
+  color: var(--text);
 }
 
 .site-nav {
