@@ -8,33 +8,9 @@ Nuxt Content Mermaid turns Mermaid diagram source in Nuxt Content into interacti
 A Nuxt application or developer consuming a released version of nuxt-content-mermaid through documented or typed behavior.
 _Avoid_: Caller, consumer
 
-**Prospective Package User**:
-A developer with a working Nuxt Content application who is evaluating nuxt-content-mermaid and is prepared to install it immediately if its purpose, compatibility, and result are convincing.
-_Avoid_: Visitor, lead, general audience
-
-**First Successful Render**:
-The adoption milestone at which a Prospective Package User has confirmed compatibility, installed nuxt-content-mermaid, and observed a Mermaid diagram render successfully in their own application.
-_Avoid_: Page view, demo view, package download
-
-**Canonical Package Documentation**:
-The authoritative human-readable description of the exact stable package artifact identified by the documentation. It may be clarified independently of a package release but never describes unreleased behavior as stable or claims to cover a newer artifact while Website Synchronization is pending.
-_Avoid_: README, preview documentation, maintainer specification
-
-**Distribution Summary**:
-The concise package-facing introduction that states product fit and a compatibility summary, provides a deliberately bounded Quick Start to First Successful Render, and points to Canonical Package Documentation. It does not independently define the complete public contract.
-_Avoid_: Canonical Package Documentation, complete reference
-
-**Contract Demo**:
-A live runtime-backed example rendered by the exact stable package artifact identified by the documentation that provides product evidence to a Prospective Package User. It may expose interaction when required by a Launch Capability. Experimental, regression, and unreleased playground behavior is not a Contract Demo.
-_Avoid_: Playground, screenshot, test fixture
-
-**Website Synchronization**:
-The required release follow-up that verifies and, where necessary, updates the disclosed package version, Canonical Package Documentation, and affected Contract Demos against the exact newly published stable package artifact. A package release remains valid while synchronization is pending, but the corresponding release-checklist item remains incomplete.
-_Avoid_: Atomic release, website deployment, package rollback
-
-**Launch Capability**:
-A product ability required before the initial documentation website can become authoritative. Capabilities outside this closed set are neither required nor guaranteed in V1 unless an explicit specification change adds them.
-_Avoid_: Page count, feature wishlist, permanent scope
+**Documentation Website**:
+The handwritten, content-driven documentation under `website/`, powered by Nuxt Content. It helps Package Users understand and use nuxt-content-mermaid, while remaining independent from root quality checks, CI, package artifacts, and release contracts.
+_Avoid_: Package quality gate, release deliverable
 
 **Supported Constraint**:
 A boundary on Package-Owned Integration Behavior established by an explicitly adopted downstream contract, an algorithmic invariant, or an explicit product contract. It remains part of the public contract whether or not the package rejects every out-of-bound input locally, and it must have boundary or behavior evidence.
