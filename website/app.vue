@@ -5,13 +5,39 @@ const activeTheme = computed<'light' | 'dark'>(() =>
   currentTheme.value === 'dark' ? 'dark' : 'light',
 )
 
+const siteOrigin = 'https://nuxt-content-mermaid.barz.app'
+const socialImageUrl = `${siteOrigin}/assets/nuxt-content-mermaid.png`
+const route = useRoute()
+
 const nextTheme = computed(() => activeTheme.value === 'dark' ? 'light' : 'dark')
+
+const wordmarkUrl = computed(() => activeTheme.value === 'dark'
+  ? '/assets/nuxt-content-mermaid-wordmark.svg'
+  : '/assets/nuxt-content-mermaid-wordmark-dark.svg',
+)
 
 useHead(() => ({
   htmlAttrs: {
     'data-theme': activeTheme.value,
   },
+  link: [
+    { rel: 'icon', href: '/assets/favicon/favicon.ico', sizes: 'any' },
+    { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-32x32.png', sizes: '32x32' },
+    { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-16x16.png', sizes: '16x16' },
+    { rel: 'apple-touch-icon', href: '/assets/favicon/apple-touch-icon.png', sizes: '180x180' },
+  ],
 }))
+
+useSeoMeta({
+  ogSiteName: 'Nuxt Content Mermaid',
+  ogType: 'website',
+  ogUrl: () => new URL(route.path, siteOrigin).href,
+  ogImage: socialImageUrl,
+  ogImageAlt: 'Nuxt Content Mermaid',
+  twitterCard: 'summary_large_image',
+  twitterImage: socialImageUrl,
+  twitterImageAlt: 'Nuxt Content Mermaid',
+})
 
 function toggleTheme() {
   setMermaidTheme(nextTheme.value)
@@ -30,7 +56,22 @@ function toggleTheme() {
         <NuxtLink
           class="site-brand"
           to="/"
-        >Nuxt Content Mermaid</NuxtLink>
+        >
+          <img
+            class="site-brand__icon"
+            src="/assets/nuxt-content-mermaid-icon.svg"
+            alt=""
+            width="96"
+            height="96"
+          >
+          <img
+            class="site-brand__wordmark"
+            :src="wordmarkUrl"
+            alt="Nuxt Content Mermaid"
+            width="743"
+            height="50"
+          >
+        </NuxtLink>
 
         <nav
           class="site-nav"

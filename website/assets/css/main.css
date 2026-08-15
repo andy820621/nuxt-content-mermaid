@@ -102,22 +102,23 @@ code {
 }
 
 .site-brand {
+  display: inline-flex;
   flex: none;
-  color: var(--text);
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  align-items: center;
+  gap: 0.65rem;
   text-decoration: none;
 }
 
-.site-brand::before {
-  display: inline-block;
-  width: 0.65rem;
-  height: 0.65rem;
-  margin-right: 0.55rem;
-  background: var(--accent);
-  border-radius: 50% 50% 50% 0;
-  content: "";
-  transform: rotate(-45deg);
+.site-brand__icon {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+}
+
+.site-brand__wordmark {
+  display: block;
+  width: clamp(10.75rem, 17vw, 13rem);
+  height: auto;
 }
 
 .site-nav {
@@ -471,6 +472,10 @@ code {
     min-height: 14rem;
   }
 
+  .landing-demo::before {
+    inset: -0.75rem;
+  }
+
   .feature-grid {
     grid-template-columns: 1fr;
     margin-top: 4rem;
@@ -500,9 +505,8 @@ code {
     width: calc(100% - 1.25rem);
   }
 
-  .site-brand {
-    max-width: 10rem;
-    line-height: 1.15;
+  .site-brand__wordmark {
+    width: 10.5rem;
   }
 
   .site-nav {
