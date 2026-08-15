@@ -148,7 +148,7 @@ code {
   gap: 0.25rem;
 }
 
-.mobile-menu-toggle,
+.icon-button.mobile-menu-toggle,
 .mobile-documentation-menu {
   display: none;
 }
@@ -479,7 +479,7 @@ code {
     margin-left: auto;
   }
 
-  .mobile-menu-toggle {
+  .icon-button.mobile-menu-toggle {
     display: inline-grid;
   }
 
