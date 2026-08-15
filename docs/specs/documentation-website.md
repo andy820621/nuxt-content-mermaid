@@ -138,7 +138,7 @@ Desktop header 繼續直接顯示 `Documentation` 與 `Troubleshooting`，deskto
 
 `app.vue` 使用 `mobileMenuOpen` 作為唯一 navigation UI state，不建立 store、composable、component 或另一套 navigation model。Hamburger 必須提供 `aria-expanded`、`aria-controls` 與動態 Open／Close accessible label；選單使用 `<nav aria-label="Documentation">`，active link 保留 `aria-current="page"`。
 
-`app.vue` 與 `pages/[...slug].vue` 使用相同的 `docs-navigation` `useAsyncData` key，因此共用 navigation payload；catch-all route 與 layout 的既有 props data flow 不變。兩個呈現端只各自把 Content navigation tree flatten 成連結清單，不抽出網站 utility。查詢失敗沿用 Nuxt 的既有頁面／generate 錯誤處理，不新增 fallback UI、schema 或 validator。
+`app.vue` 使用獨立的 `mobile-docs-navigation` `useAsyncData` key，避免與 `pages/[...slug].vue` 的 `docs-navigation` inline handler 產生 Nuxt incompatible-options warning。兩個查詢都直接呼叫 `queryCollectionNavigation('docs')`；以目前五個靜態 links 的規模，允許這個小幅重複來維持既有 catch-all route／layout props data flow 與四檔案實作範圍。兩個呈現端只各自把 Content navigation tree flatten 成連結清單，不抽出網站 utility。查詢失敗沿用 Nuxt 的既有頁面／generate 錯誤處理，不新增 fallback UI、schema 或 validator。
 
 Desktop sidebar 與 mobile menu 的 active state 使用同一視覺語言：左側 `2px` accent 指示線、`var(--accent)` 文字、較高字重與 `var(--accent-soft)` 背景。Hover 只使用 `var(--surface)`，focus-visible 使用 accent outline，避免 active state 只靠低對比背景或單一色彩表達。
 

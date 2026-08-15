@@ -6,7 +6,7 @@ const { currentTheme, setMermaidTheme } = useMermaidTheme()
 const mobileMenuButton = useTemplateRef<HTMLButtonElement>('mobileMenuButton')
 const mobileMenuOpen = ref(false)
 
-const { data: navigation } = await useAsyncData('docs-navigation', () => {
+const { data: navigation } = await useAsyncData('mobile-docs-navigation', () => {
   return queryCollectionNavigation('docs')
 })
 
