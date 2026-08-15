@@ -8,6 +8,14 @@ export default defineNuxtConfig({
     '@barzhsieh/nuxt-content-mermaid',
   ],
   css: ['~/assets/css/main.css'],
+  mdc: {
+    highlight: {
+      theme: {
+        default: 'github-light',
+        dark: 'github-dark-high-contrast',
+      },
+    },
+  },
   nitro: {
     publicAssets: [
       {

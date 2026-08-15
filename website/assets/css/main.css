@@ -63,6 +63,14 @@ code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
+html[data-theme='dark'] .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
 .site-shell {
   min-height: 100vh;
 }
@@ -398,6 +406,19 @@ code {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+}
+
+.docs-content :not(pre) > code {
+  padding: 0.125rem 0.375rem;
+  background: var(--surface);
+  border-radius: 0.375rem;
+  font-size: 0.875em;
 }
 
 .docs-content table {
