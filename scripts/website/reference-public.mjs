@@ -3,14 +3,57 @@ import { loadWebsiteReferenceCorpus } from './reference-corpus.mjs'
 const PACKAGE_IDENTITY = '@barzhsieh/nuxt-content-mermaid@3.0.0'
 const ARTIFACT_VERSION = '3.0.0'
 
-function clonePublicValue(value) {
-  if (Array.isArray(value)) return Object.freeze(value.map(clonePublicValue))
+function projectStringList(values) {
+  return Object.freeze(values.map(value => value))
+}
+
+// Summary values are public literal data rather than model metadata. Project
+// their recursive JSON shape independently so metadata objects never flow
+// through this open-key boundary.
+function projectLiteralValue(value) {
+  if (value === null || ['boolean', 'number', 'string'].includes(typeof value)) return value
+  if (Array.isArray(value)) return Object.freeze(value.map(projectLiteralValue))
   if (value && typeof value === 'object') {
     return Object.freeze(Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, clonePublicValue(item)]),
+      Object.entries(value).map(([key, item]) => [key, projectLiteralValue(item)]),
     ))
   }
-  return value
+  throw new TypeError('Reference public literal values must be JSON data')
+}
+
+function projectOccurrence(occurrence) {
+  return Object.freeze({
+    surface: occurrence.surface,
+    path: occurrence.path,
+    scope: occurrence.scope,
+    precedence: occurrence.precedence,
+  })
+}
+
+function projectOccurrences(occurrences) {
+  return Object.freeze(occurrences.map(projectOccurrence))
+}
+
+function projectDeprecation(deprecation) {
+  return Object.freeze({
+    status: deprecation.status,
+    summary: deprecation.summary,
+  })
+}
+
+function projectSummaryOutcomes(outcomes) {
+  return Object.freeze(Object.fromEntries(
+    Object.entries(outcomes).map(([condition, outcome]) => [condition, projectLiteralValue(outcome)]),
+  ))
+}
+
+function projectSummary(summary) {
+  return Object.freeze({
+    kind: summary.kind,
+    summary: summary.summary,
+    ...(Object.hasOwn(summary, 'value') ? { value: projectLiteralValue(summary.value) } : {}),
+    ...(summary.outcomes ? { outcomes: projectSummaryOutcomes(summary.outcomes) } : {}),
+  })
 }
 
 function projectMinimumExample(example) {
@@ -24,6 +67,21 @@ function projectSupportedConstraint(constraint) {
   return Object.freeze({ summary: constraint.summary })
 }
 
+function projectPackageFields(packageFields) {
+  return Object.freeze({
+    set: projectStringList(packageFields.set),
+    read: projectStringList(packageFields.read),
+  })
+}
+
+function projectAllowances(allowances) {
+  return Object.freeze({
+    functionPaths: projectStringList(allowances.functionPaths),
+    regexpPaths: projectStringList(allowances.regexpPaths),
+    opaqueIdentityPaths: projectStringList(allowances.opaqueIdentityPaths),
+  })
+}
+
 function projectBase(record) {
   return {
     kind: record.kind,
@@ -33,37 +91,37 @@ function projectBase(record) {
     description: record.description,
     purpose: record.purpose,
     ownership: record.ownership,
-    occurrences: clonePublicValue(record.occurrences),
+    occurrences: projectOccurrences(record.occurrences),
     scope: record.scope,
     boundary: record.boundary,
-    deprecation: clonePublicValue(record.deprecation),
+    deprecation: projectDeprecation(record.deprecation),
     ...(record.explicitNegatives
-      ? { explicitNegatives: clonePublicValue(record.explicitNegatives) }
+      ? { explicitNegatives: projectStringList(record.explicitNegatives) }
       : {}),
   }
 }
 
 function projectConfigurationSemantics(record) {
   return {
-    precedence: clonePublicValue(record.precedence),
-    ...(record.default ? { default: clonePublicValue(record.default) } : {}),
-    ...(record.reset ? { reset: clonePublicValue(record.reset) } : {}),
+    precedence: projectStringList(record.precedence),
+    ...(record.default ? { default: projectSummary(record.default) } : {}),
+    ...(record.reset ? { reset: projectSummary(record.reset) } : {}),
     ...(record.minimumExample ? { minimumExample: projectMinimumExample(record.minimumExample) } : {}),
     ...(record.lifecycle ? { lifecycle: record.lifecycle } : {}),
     ...(record.errorSemantics ? { errorSemantics: record.errorSemantics } : {}),
     ...(record.supportedConstraint
       ? { supportedConstraint: projectSupportedConstraint(record.supportedConstraint) }
       : {}),
-    ...(record.recommendedRange ? { recommendedRange: clonePublicValue(record.recommendedRange) } : {}),
-    ...(record.localValidation ? { localValidation: clonePublicValue(record.localValidation) } : {}),
+    ...(record.recommendedRange ? { recommendedRange: projectSummary(record.recommendedRange) } : {}),
+    ...(record.localValidation ? { localValidation: projectSummary(record.localValidation) } : {}),
   }
 }
 
 function projectGroupSemantics(record) {
   return {
-    precedence: clonePublicValue(record.precedence),
-    ...(record.default ? { default: clonePublicValue(record.default) } : {}),
-    ...(record.reset ? { reset: clonePublicValue(record.reset) } : {}),
+    precedence: projectStringList(record.precedence),
+    ...(record.default ? { default: projectSummary(record.default) } : {}),
+    ...(record.reset ? { reset: projectSummary(record.reset) } : {}),
     ...(record.minimumExample ? { minimumExample: projectMinimumExample(record.minimumExample) } : {}),
     ...(record.lifecycle ? { lifecycle: record.lifecycle } : {}),
   }
@@ -75,7 +133,7 @@ function projectRecord(record) {
     return Object.freeze({
       ...base,
       ...projectGroupSemantics(record),
-      children: clonePublicValue(record.children),
+      children: projectStringList(record.children),
     })
   }
   if (record.kind === 'configuration-value') {
@@ -90,7 +148,7 @@ function projectRecord(record) {
       ...base,
       syntax: record.syntax,
       transportTarget: record.transportTarget,
-      sourcePrecedence: clonePublicValue(record.sourcePrecedence),
+      sourcePrecedence: projectStringList(record.sourcePrecedence),
       downstreamOwnership: record.downstreamOwnership,
       minimumExample: projectMinimumExample(record.minimumExample),
     })
@@ -99,11 +157,11 @@ function projectRecord(record) {
     ...base,
     constraint: record.constraint,
     delegatedOwner: record.delegatedOwner,
-    transportRestrictions: clonePublicValue(record.transportRestrictions),
-    packageFields: clonePublicValue(record.packageFields),
+    transportRestrictions: projectStringList(record.transportRestrictions),
+    packageFields: projectPackageFields(record.packageFields),
     unknownKeyPolicy: record.unknownKeyPolicy,
-    allowances: clonePublicValue(record.allowances),
-    exclusions: clonePublicValue(record.exclusions),
+    allowances: projectAllowances(record.allowances),
+    exclusions: projectStringList(record.exclusions),
     packageBehavior: record.packageBehavior,
   })
 }

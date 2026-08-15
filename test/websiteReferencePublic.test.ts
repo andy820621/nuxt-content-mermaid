@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { verifyWebsiteArtifactIdentity } from '../scripts/website/artifact.mjs'
+import type { LoadedReferenceRecords } from '../scripts/website/reference-parity.mjs'
 
 async function exactInstalledArtifact() {
   return verifyWebsiteArtifactIdentity({
@@ -12,6 +13,25 @@ async function exactInstalledArtifact() {
       },
     }),
   })
+}
+
+function recordObject(records: unknown[], path: string) {
+  const record = records.find((candidate): candidate is Record<string, unknown> => (
+    typeof candidate === 'object'
+    && candidate !== null
+    && 'path' in candidate
+    && candidate.path === path
+  ))
+  if (!record) throw new Error(`Missing Reference fixture: ${path}`)
+  return record
+}
+
+function objectField(record: Record<string, unknown>, field: string) {
+  const value = record[field]
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`Missing Reference object field: ${record.path}.${field}`)
+  }
+  return value as Record<string, unknown>
 }
 
 describe('website public Reference projection', () => {
@@ -41,6 +61,34 @@ describe('website public Reference projection', () => {
     })
     expect(Object.values(model.sections).map(records => records.length)).toEqual([10, 22, 4, 6, 1])
     expect(JSON.stringify(model)).not.toMatch(/artifact:|evidence|artifactRoot|manifestPath|\.pnpm|\/Users\/|#ModuleOptions|minimumExample[^}]*"id"/)
+  })
+
+  it('allowlists every nested public structure after the model has been validated', async () => {
+    const { loadWebsiteReferenceCorpus } = await import('../scripts/website/reference-corpus.mjs')
+    const { projectWebsiteReferencePublicModel } = await import('../scripts/website/reference-public.mjs')
+    const records = await loadWebsiteReferenceCorpus({ artifact: await exactInstalledArtifact() })
+    const baseline = projectWebsiteReferencePublicModel(records)
+    const tampered = structuredClone(records) as unknown as Array<Record<string, unknown>>
+    const loaderInit = recordObject(tampered, 'loader.init')
+    const enabled = recordObject(tampered, 'enabled')
+    const delegated = recordObject(tampered, 'delegated.component-direct-config')
+    const occurrence = (loaderInit.occurrences as Array<Record<string, unknown>>)[0]
+
+    if (!occurrence) throw new Error('Missing loader.init occurrence fixture')
+    occurrence.evidence = ['artifact:dist/runtime/private.mjs#probe']
+    occurrence.artifactRoot = '/Users/private/node_modules/.pnpm/package'
+    objectField(loaderInit, 'deprecation').manifestPath = '/Users/private/package.json'
+    objectField(loaderInit, 'default').evidence = ['artifact:dist/runtime/private.mjs#default']
+    objectField(enabled, 'supportedConstraint').artifactRoot = '/Users/private/artifact'
+    objectField(enabled, 'recommendedRange').evidence = ['reference-probe:range']
+    objectField(enabled, 'localValidation').manifestPath = '/Users/private/manifest'
+    objectField(delegated, 'packageFields').evidence = ['artifact:dist/runtime/private.mjs#fields']
+    objectField(delegated, 'allowances').probeId = 'reference-probe:allowances'
+
+    const projected = projectWebsiteReferencePublicModel(tampered as unknown as LoadedReferenceRecords)
+
+    expect(projected).toEqual(baseline)
+    expect(JSON.stringify(projected)).not.toMatch(/artifact:|evidence|artifactRoot|manifestPath|\.pnpm|\/Users\/|reference-probe:/)
   })
 
   it('preserves exact conditional defaults and kind-specific public semantics', async () => {
