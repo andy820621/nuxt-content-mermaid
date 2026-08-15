@@ -8,7 +8,7 @@
 - 2026-08-15：完成第二階段 landing 優化，以薄 Vue shell 排版首頁，並讓 Mermaid demo 保持內容驅動。
 - 2026-08-15：完成第三階段品牌資源整合，以正式 wordmark、favicon 與靜態社群 metadata 建立網站識別。
 - 2026-08-15：完成第四階段 wordmark 簡化，以單一 SVG 配合 CSS `currentColor` 支援 light/dark theme。
-- 2026-08-15：核准第五階段 responsive navigation 優化；本次規格已完成，程式尚未實作。
+- 2026-08-15：完成第五階段 responsive navigation 優化，以單一手機文件選單與高辨識 active state 改善導覽。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
