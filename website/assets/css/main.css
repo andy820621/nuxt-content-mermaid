@@ -575,7 +575,7 @@ html[data-theme='dark'] .shiki span {
   }
 
   .site-brand__wordmark {
-    width: 10.5rem;
+    display: none;
   }
 }
 

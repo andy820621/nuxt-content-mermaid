@@ -31,6 +31,7 @@ const nextTheme = computed(() => activeTheme.value === 'dark' ? 'light' : 'dark'
 
 useHead(() => ({
   htmlAttrs: {
+    lang: 'en',
     'data-theme': activeTheme.value,
   },
   bodyAttrs: {
@@ -108,6 +109,8 @@ onBeforeUnmount(() => {
     <a
       class="skip-link"
       href="#main-content"
+      :inert="mobileMenuOpen"
+      :aria-hidden="mobileMenuOpen ? 'true' : undefined"
     >Skip to content</a>
 
     <header class="site-header">
@@ -115,6 +118,7 @@ onBeforeUnmount(() => {
         <NuxtLink
           class="site-brand"
           to="/"
+          aria-label="Nuxt Content Mermaid"
         >
           <img
             class="site-brand__icon"
