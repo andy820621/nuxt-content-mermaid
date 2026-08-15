@@ -8,6 +8,7 @@
 - 2026-08-15：完成第二階段 landing 優化，以薄 Vue shell 排版首頁，並讓 Mermaid demo 保持內容驅動。
 - 2026-08-15：完成第三階段品牌資源整合，以正式 wordmark、favicon 與靜態社群 metadata 建立網站識別。
 - 2026-08-15：完成第四階段 wordmark 簡化，以單一 SVG 配合 CSS `currentColor` 支援 light/dark theme。
+- 2026-08-15：核准第五階段 responsive navigation 優化；本次規格已完成，程式尚未實作。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
@@ -17,6 +18,7 @@
 
 ```text
 全站 app shell
+├── queryCollectionNavigation('docs') → 手機全畫面文件選單
 ├── / → pages/index.vue → landing shell
 │   └── queryCollection('docs').path('/').first()
 │       └── ContentRenderer → 首頁 Markdown Mermaid fence
@@ -46,6 +48,7 @@ Landing 與 docs layout 解決的是不同問題，因此不應讓 docs layout �
 - 保留目前容易理解的文件 collection、catch-all route、sidebar 與 TOC。
 - 讓一人維護者主要透過 Markdown 維護公開文件。
 - 保留全站 light/dark theme toggle 與 GitHub repository 入口。
+- 讓手機導覽收斂為單一 hamburger 入口，並讓目前頁面在所有 theme 下清楚可辨。
 - 以正式 wordmark、favicon 與靜態社群圖片建立一致的網站識別。
 - 不因首頁視覺優化重建 records、demo contract、生成器或驗證系統。
 - 讓網站繼續完全退出套件品質與交付流程。
@@ -111,13 +114,33 @@ export default defineContentConfig({
 - `Troubleshooting`，連到 `/troubleshooting`。
 - Light/dark theme toggle。
 - GitHub repository link，連到 `https://github.com/andy820621/nuxt-content-mermaid`。
+- 由 `queryCollectionNavigation('docs')` 取得的手機文件選單。
 - `NuxtPage`。
 
 Header 在 landing 與所有文件頁都顯示。Landing 不強制 dark mode；theme toggle 在所有頁面都可用。
 
 Theme 使用套件既有的 `useMermaidTheme()` 作為網站與 diagram 的共同狀態，並由全站 root 的 theme attribute 套用 CSS variables。不得為網站另外建立 theme store、theme record 或加入只為 toggle 服務的 UI framework。Theme preference 的跨 reload 持久化不是本次契約。
 
-小螢幕下 header 的品牌、Documentation、Troubleshooting、theme toggle 與 GitHub link 都必須保持可達。文字導覽可以用純 CSS 移到第二列或縮短間距，但本次不引入搜尋、drawer framework 或複雜 navigation state。
+### Responsive navigation
+
+Desktop header 繼續直接顯示 `Documentation` 與 `Troubleshooting`，desktop 文件頁也繼續顯示 sticky sidebar。
+
+在既有 `48rem` breakpoint 以下：
+
+- Header 收斂成單列，只直接顯示品牌、theme toggle、GitHub link 與 hamburger。
+- 原本的 `Documentation`／`Troubleshooting` 文字列隱藏，不得換行到第二列。
+- Hamburger 開啟 Header 下方的全畫面文件選單；選單在 landing 與所有文件 route 都使用相同內容。
+- 選單標題為 `Documentation`，直接列出 `queryCollectionNavigation('docs')` 產生的 Getting Started、Writing Diagrams、Configuration、Troubleshooting 與 Migration to v3。
+- 首頁因 `navigation: false` 不進入文件樹；使用者仍可透過 Header 品牌返回 `/`。
+- 選單固定在 Header 下方、覆蓋主內容並自行捲動；它不是 modal dialog，不加入 backdrop、搜尋、分類或 drawer framework。
+- 開啟時 hamburger 切換為關閉圖示，背景內容不可互動且不可捲動；Header 的 theme、GitHub 與關閉按鈕仍可操作。
+- 點擊文件連結、按下 Escape 或 route 改變時關閉選單；Escape 關閉後將焦點還給 hamburger。
+
+`app.vue` 使用 `mobileMenuOpen` 作為唯一 navigation UI state，不建立 store、composable、component 或另一套 navigation model。Hamburger 必須提供 `aria-expanded`、`aria-controls` 與動態 Open／Close accessible label；選單使用 `<nav aria-label="Documentation">`，active link 保留 `aria-current="page"`。
+
+`app.vue` 與 `pages/[...slug].vue` 使用相同的 `docs-navigation` `useAsyncData` key，因此共用 navigation payload；catch-all route 與 layout 的既有 props data flow 不變。兩個呈現端只各自把 Content navigation tree flatten 成連結清單，不抽出網站 utility。查詢失敗沿用 Nuxt 的既有頁面／generate 錯誤處理，不新增 fallback UI、schema 或 validator。
+
+Desktop sidebar 與 mobile menu 的 active state 使用同一視覺語言：左側 `2px` accent 指示線、`var(--accent)` 文字、較高字重與 `var(--accent-soft)` 背景。Hover 只使用 `var(--surface)`，focus-visible 使用 accent outline，避免 active state 只靠低對比背景或單一色彩表達。
 
 ## 品牌資源
 
@@ -298,12 +321,12 @@ Cards 是 landing presentation，不進入 frontmatter、collection schema 或�
 
 `website/layouts/docs.vue` 繼續負責：
 
-- 左側 sidebar：來自 `queryCollectionNavigation('docs')`。
+- Desktop 左側 sidebar：來自 `queryCollectionNavigation('docs')`。
 - 中央文件 slot。
 - 右側 TOC：來自 `page.body.toc.links`。
 - Responsive 文件閱讀排版。
 
-因為 header 與 skip link 上移到 `app.vue`，docs layout 不再重複擁有 header。它不增加搜尋、footer community links、surround navigation 或 mobile drawer framework。
+因為 header、skip link 與 mobile navigation 都由 `app.vue` 擁有，docs layout 不再重複擁有 header，也不建立第二個 mobile menu。`48rem` 以下完全隱藏 `.docs-sidebar`，中央內容直接使用單欄；右側 TOC 維持既有 responsive 行為。Layout 不增加搜尋、footer community links、surround navigation 或 mobile drawer framework。
 
 ### Troubleshooting
 
@@ -401,6 +424,17 @@ website/
 
 第四階段不修改 favicon、社群 metadata、內容、routes、layout、navigation、Mermaid demo 或品質與交付邊界，也不新增 component、loader、dependency、generator 或驗證。
 
+## 第五階段檔案變更範圍
+
+| 檔案 | 動作 | 設計責任 |
+| --- | --- | --- |
+| `website/app.vue` | 修改 | 共用 `docs-navigation` payload、手機 hamburger、全畫面文件選單、關閉與焦點行為。 |
+| `website/layouts/docs.vue` | 修改 | 保留 desktop sticky sidebar，手機完全隱藏 sidebar。 |
+| `website/assets/css/main.css` | 修改 | 單列手機 Header、全畫面選單、背景鎖定，以及 light/dark 都清楚的 active／hover／focus styles。 |
+| `docs/specs/documentation-website.md` | 修改 | 固定第五階段 responsive navigation 契約與驗收條件。 |
+
+第五階段不修改 Content、routes、collection、favicon、社群 metadata、dependencies、root scripts、CI、artifact 或 release，也不新增 component、composable、store、utility、UI framework、永久測試或網站 verifier。
+
 ## 品質與交付邊界
 
 以下 root commands 不得讀取、解析或驗證 `website/**`：
@@ -442,18 +476,24 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 5. `content/1.index.md` 只有三個核准 frontmatter fields 與一個 Mermaid fence。
 6. 首頁 Mermaid diagram 成功經過 Markdown → Content → package transform → browser render。
 7. 三張 cards 使用核准的 titles，且不由 schema 或資料檔生成。
-8. Header 在 landing 與文件頁都顯示 Documentation、Troubleshooting、theme toggle 與 GitHub link。
+8. Desktop Header 在 landing 與文件頁直接顯示 Documentation、Troubleshooting、theme toggle 與 GitHub link；手機 Header 只直接顯示品牌、theme toggle、GitHub 與 hamburger。
 9. Theme toggle 同步網站外觀與 Mermaid theme，landing 不強制 dark mode。
-10. `pages/[...slug].vue` 繼續處理五個文件 routes，`layouts/docs.vue` 繼續提供 sidebar 與 TOC。
+10. `pages/[...slug].vue` 繼續處理五個文件 routes；`layouts/docs.vue` 在 desktop 提供 sidebar 與 TOC，在手機完全隱藏 sidebar。
 11. `/` 不出現在 sidebar；Troubleshooting 保留 route、名稱與 sidebar entry。
-12. Desktop landing 是 hero 雙欄與三欄 cards；mobile 改為單欄，header 仍可操作。
+12. Desktop landing 是 hero 雙欄與三欄 cards；mobile 改為單欄，Header 保持單列且不再讓文字導覽換行。
 13. Repo 中沒有 landing collection/schema、index.yml、MDC landing component、demo asset 或替代 records。
 14. Contract Demo、artifact identity、lazy proof、verifier 與其他網站驗證系統仍不存在。
 15. Root、CI、artifact 與 release 繼續不讀取或驗證網站。
 16. 一次性 `pnpm --dir website generate` 成功產生既有 routes，但不形成永久 gate。
+17. 手機 hamburger 在 landing 與文件頁都顯示相同的五個文件 links，並能以 link click、Escape 與 route change 關閉。
+18. Mobile menu 開啟時主內容不可互動或捲動，Header actions 仍可操作；Escape 關閉後焦點返回 hamburger。
+19. Desktop sidebar 與 mobile menu 的 active link 都具有 accent 指示線、accent 文字、soft background 與 `aria-current="page"`，在 light／dark theme 下清楚可辨。
+20. 一次性畫面檢查涵蓋 desktop/mobile × light/dark、hamburger open/close、active state、keyboard focus 與無水平溢位，但不新增永久 browser test。
 
 ## 官方與研究依據
 
+- [Nuxt Content：Getting Started responsive navigation](https://content.nuxt.com/docs/getting-started)
+- [Nuxt ESLint：ESLint Module responsive navigation](https://eslint.nuxt.com/packages/module)
 - [Nuxt Content：Collection Types](https://content.nuxt.com/docs/collections/types)
 - [Nuxt Content：queryCollection](https://content.nuxt.com/docs/utils/query-collection)
 - [Nuxt Content：queryCollectionNavigation](https://content.nuxt.com/guide/displaying/navigation)
