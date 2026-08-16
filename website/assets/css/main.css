@@ -203,13 +203,13 @@ html[data-theme='dark'] .shiki span {
 
 .landing-hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(27rem, 1.1fr);
-  gap: clamp(3rem, 7vw, 6.5rem);
+  grid-template-columns: minmax(0, 1.08fr) minmax(25rem, 0.92fr);
+  gap: clamp(2.75rem, 6vw, 5.5rem);
   align-items: center;
 }
 
 .landing-hero__copy {
-  max-width: 38rem;
+  max-width: 41rem;
 }
 
 .landing-eyebrow {
@@ -224,10 +224,10 @@ html[data-theme='dark'] .shiki span {
 .landing h1 {
   max-width: 13ch;
   margin: 0;
-  font-size: clamp(3rem, 6vw, 5.5rem);
+  font-size: clamp(3rem, 5.5vw, 5.25rem);
   font-weight: 780;
-  letter-spacing: -0.065em;
-  line-height: 0.98;
+  letter-spacing: -0.038em;
+  line-height: 0.99;
 }
 
 .landing-description {
@@ -235,6 +235,10 @@ html[data-theme='dark'] .shiki span {
   margin: 1.6rem 0 2rem;
   color: var(--muted);
   font-size: clamp(1.05rem, 2vw, 1.25rem);
+}
+
+.landing-demo-content {
+  min-width: 0;
 }
 
 .primary-cta {
@@ -260,11 +264,6 @@ html[data-theme='dark'] .shiki span {
 .landing-demo {
   position: relative;
   min-width: 0;
-  padding: clamp(1rem, 2vw, 1.5rem);
-  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 1.25rem;
-  box-shadow: var(--shadow);
 }
 
 .landing-demo::before {
@@ -276,12 +275,97 @@ html[data-theme='dark'] .shiki span {
   filter: blur(18px);
 }
 
-.landing-demo .mermaid-block {
+.landing-demo__surface {
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.landing-demo__tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.55rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: color-mix(in srgb, var(--surface) 45%, var(--surface-elevated));
+  border-bottom: 1px solid var(--border);
+}
+
+.landing-demo__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.landing-demo__tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0.55rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.landing-demo__tab:hover,
+.landing-demo__tab--active {
+  color: var(--text);
+  background: var(--surface-elevated);
+}
+
+.landing-demo__tab-badge {
+  display: inline-grid;
+  width: 1.4rem;
+  height: 1.4rem;
+  place-items: center;
+  color: var(--accent-contrast);
+  background: var(--accent-strong);
+  border-radius: 0.3rem;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.landing-demo__panel {
+  min-width: 0;
+  min-height: 22rem;
+}
+
+.landing-demo__panel--preview {
+  padding: clamp(0.85rem, 2vw, 1.25rem);
+}
+
+.landing-demo__panel--preview .mermaid-block {
   margin: 0;
 }
 
-.landing-demo .mermaid-wrapper {
-  min-height: 17rem;
+.landing-demo__panel--preview .mermaid-wrapper {
+  min-height: 19.5rem;
+}
+
+.landing-demo__panel--source pre {
+  min-height: 22rem;
+  margin: 0;
+  overflow: auto;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  color: var(--text);
+  background: transparent;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.landing-demo__panel--source code {
+  font: inherit;
 }
 
 .feature-grid {
@@ -462,7 +546,7 @@ html[data-theme='dark'] .shiki span {
 
 @media (max-width: 62rem) {
   .landing-hero {
-    grid-template-columns: minmax(0, 1fr) minmax(24rem, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(23rem, 0.85fr);
     gap: 2.5rem;
   }
 
@@ -544,8 +628,16 @@ html[data-theme='dark'] .shiki span {
     max-width: 12ch;
   }
 
-  .landing-demo .mermaid-wrapper {
-    min-height: 14rem;
+  .landing-demo__panel {
+    min-height: 18rem;
+  }
+
+  .landing-demo__panel--preview .mermaid-wrapper {
+    min-height: 16rem;
+  }
+
+  .landing-demo__panel--source pre {
+    min-height: 18rem;
   }
 
   .landing-demo::before {

@@ -4,7 +4,9 @@
 
 **Goal:** Preserve the homepage headline while presenting one Mermaid fence as an accessible Markdown/Rendered UI demo with a narrower TD diagram and more relaxed hero typography.
 
-**Architecture:** `website/content/1.index.md` remains the only Mermaid source. Nuxt Content exposes that body as `rawbody` for a small `LandingDemoTabs` presentation component, while the parsed page continues through `ContentRenderer` and the package's real renderer in the preview slot.
+**Architecture:** `website/content/1.index.md` remains the only Mermaid source. The homepage maps the transformed `ContentMermaidTransport` node to `LandingMermaidDemo`; that wrapper decodes the existing transport `code` for the Markdown tab and forwards the same props to the real transport for the rendered tab.
+
+**Implementation correction:** The original Task 1/2 steps below proposed Nuxt Content `rawbody`. A failing browser test proved that the package file transform runs before `rawbody` is finalized, so it contains transformed MDC instead of the authored fence. Those `rawbody`, Zod schema, `LandingDemoTabs`, and slot-based instructions are superseded by the transport-wrapper architecture above and by `docs/specs/homepage-hero-source-preview.md`. They must not be executed.
 
 **Tech Stack:** Nuxt 4.5.2, Nuxt Content 3.15.2, Vue 3, TypeScript, Mermaid 11.16.1, Vitest 4.1.10, `@nuxt/test-utils` 4.1.0, Playwright 1.62.1, CSS.
 

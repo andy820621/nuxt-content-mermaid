@@ -4,12 +4,18 @@
   "type": "module",
   "scripts": {
     "dev": "nuxt dev",
-    "generate": "nuxt generate"
+    "generate": "nuxt generate",
+    "test": "vitest run"
   },
   "dependencies": {
     "@barzhsieh/nuxt-content-mermaid": "workspace:*",
     "@nuxt/content": "catalog:integrations",
     "better-sqlite3": "12.5.0",
     "nuxt": "catalog:dev"
+  },
+  "devDependencies": {
+    "@nuxt/test-utils": "catalog:test",
+    "playwright": "catalog:test",
+    "vitest": "catalog:test"
   }
 }

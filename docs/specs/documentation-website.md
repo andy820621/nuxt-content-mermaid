@@ -67,7 +67,7 @@ Landing 與 docs layout 解決的是不同問題，因此不應讓 docs layout �
 - Nuxt ESLint 的 Packages／Guide／Legacy 多層分類。
 - Landing collection、data collection、自訂 landing schema 或 landing frontmatter model。
 - `index.yml`、landing YAML、MDC 專屬 landing 元件或 demo asset。
-- Contract Demo、artifact identity、source disclosure、lazy proof 或 runtime evidence。
+- Contract Demo、artifact identity、lazy proof 或 runtime evidence；首頁核准的 Markdown／Rendered UI 雙檢視除外。
 - Reference records，或以 JSON、YAML、TypeScript、frontmatter、資料 collection 等形式建立的替代 records。
 - 網站專用 verifier、parity、freshness、schema、artifact 或 release 驗證。
 - 認證、個人化、request-time API、server-side content service 或發佈策略。
@@ -224,13 +224,20 @@ queryCollection('docs').path('/').first()
 
 找不到 page 時回傳 404。SEO title 與 description 直接使用 page 的內建欄位。
 
-Hero 右側必須直接渲染：
+Hero 右側必須以 `ContentRenderer` 渲染 page，並只覆寫 transform 產生的 transport node：
 
 ```vue
-<ContentRenderer :value="page" />
+<ContentRenderer
+  class="landing-demo-content"
+  :value="page"
+  :data="{ config: null }"
+  :components="{ ContentMermaidTransport: LandingMermaidDemo }"
+/>
 ```
 
-不得從 page body 解析 diagram source、複製 fence、轉成 component prop，或建立 landing demo adapter。`ContentRenderer` 是首頁內容的唯一 render path。
+`LandingMermaidDemo` 只接收套件 transform 已產生的 encoded `code`、`pageConfig` 與 `toolbar` props。Markdown tab 解碼同一份 `code` 並補回 fence markers；Rendered UI tab 把相同 props 交回真正的全域 `ContentMermaidTransport`。不得解析 page body AST、複製 fence 或建立第二份 diagram constant。`ContentRenderer` 仍是 page render path，真正的 transport／Mermaid component 仍是唯一 diagram render path。
+
+不得以 `rawbody` 實作 source tab；套件的 file transform 早於 collection 欄位定稿，因此該欄位會得到 transformed MDC 而不是原始 Mermaid fence。Collection 保持 schema-free。
 
 ### `content/1.index.md`
 
@@ -244,10 +251,15 @@ navigation: false
 ---
 
 ```mermaid
-flowchart LR
-  Markdown --> Content[Nuxt Content]
-  Content --> Mermaid
-  Mermaid --> Diagram[Interactive diagram]
+flowchart TD
+  Source["Write a Mermaid fence<br/>in Markdown"]
+  Content["Nuxt Content<br/>parses the page"]
+  Module["The module<br/>transforms the fence"]
+  Diagram["Interactive,<br/>theme-aware diagram"]
+
+  Source --> Content
+  Content --> Module
+  Module --> Diagram
 ```
 ````
 
@@ -265,7 +277,7 @@ flowchart LR
 
 - 以 page `title` 與 `description` 排版 hero。
 - 顯示 `Get started` primary CTA，連到 `/getting-started`。
-- 在 hero 右側放置 page `ContentRenderer`。
+- 在 hero 右側放置 page `ContentRenderer`，並以 `LandingMermaidDemo` 提供 Markdown／Rendered UI tabs。
 - 顯示三張固定功能卡片。
 
 三張卡片的 title 固定為：
@@ -290,7 +302,9 @@ Cards 是 landing presentation，不進入 frontmatter、collection schema 或�
 
 - 綠色 accent 與柔和 radial gradient。
 - 大型、直接的 hero typography。
-- Desktop 採文字／diagram 雙欄；mobile 改為上下堆疊。
+- Headline 保留原文，以約 `-0.038em` 字距、較寬的 copy column 與自然換行降低壓迫感。
+- Desktop 採較寬文字欄與較窄 TD diagram 欄；mobile 改為上下堆疊。
+- 右側使用有邊框的 Markdown／Rendered UI tab frame，預設顯示真實 rendered UI。
 - 三張簡短 cards；desktop 三欄、mobile 單欄。
 - 清楚的 primary CTA。
 
@@ -298,7 +312,7 @@ Cards 是 landing presentation，不進入 frontmatter、collection schema 或�
 
 - Stable artifact badge。
 - Live／evidence badge。
-- Source disclosure。
+- 第二份 diagram source 或 AST parser。
 - 第二個 lazy diagram。
 - Lazy proof section。
 - 重複的 final CTA。
@@ -403,7 +417,7 @@ Inline code 不使用 syntax highlighting、不改成 link、不增加 copy butt
 ### 不受影響的內容
 
 - Mermaid diagram 的正常 browser renderer、toolbar、theme 與互動行為不變。
-- Mermaid source fallback 不改成 Shiki code block，也不新增 source disclosure。
+- Mermaid source fallback 不改成 Shiki code block；首頁 source tab 只是同一 transport source 的 presentation，不改變 fallback protocol。
 - Landing Mermaid demo、文件內容、navigation、routes、TOC、SEO 與品牌資源不變。
 - Code blocks 不增加 title bar、language label、copy button、line numbers、highlighted lines 或 tabs。
 
@@ -428,6 +442,8 @@ website/content/
 website/
 ├── app.vue
 ├── assets/css/main.css
+├── components/
+│   └── LandingMermaidDemo.vue
 ├── content.config.ts
 ├── layouts/docs.vue
 ├── nuxt.config.ts
@@ -435,10 +451,12 @@ website/
 ├── pages/
 │   ├── index.vue
 │   └── [...slug].vue
+├── test/
+│   └── landingHero.e2e.test.ts
 └── tsconfig.json
 ```
 
-網站仍不需要 `components/`、`utils/`、`reference/`、`server/` 或網站專用 scripts/tests。
+網站只新增一個 page-local transport wrapper 與一個 browser behavior test；仍不需要 `utils/`、`reference/`、`server/` 或網站專用資料／產物 scripts。
 
 ## 第二階段檔案變更範圍（已完成）
 
@@ -516,6 +534,19 @@ website/
 
 第六階段不修改 Markdown、Vue components、routes、layout、navigation、Mermaid runtime、品牌資源、dependencies、workspace、root scripts、CI、artifact 或 release；也不新增 Prose／MDC component、client-side highlighter、copy control、永久測試或網站 verifier。
 
+## 第七階段檔案變更範圍（首頁 source／preview）
+
+| 檔案 | 動作 | 設計責任 |
+| --- | --- | --- |
+| `website/components/LandingMermaidDemo.vue` | 新增 | 將同一 transport `code` 投影為 Markdown tab，並把 props 交回真正的 `ContentMermaidTransport` 產生 Rendered UI tab。 |
+| `website/pages/index.vue` | 修改 | 以 `ContentRenderer.components` 只覆寫首頁的 `ContentMermaidTransport` node。 |
+| `website/content/1.index.md` | 修改 | 保持單一 fence，改成四階段 TD 流程。 |
+| `website/assets/css/main.css` | 修改 | 放鬆 hero 字距、重新分配欄寬，加入 tab frame 與 narrow viewport containment。 |
+| `website/test/landingHero.e2e.test.ts` | 新增 | 驗證真實 renderer、同源 Markdown、鍵盤 tabs、明暗 theme 與 320px overflow。 |
+| `website/package.json`、`pnpm-lock.yaml` | 修改 | 加入 website-local browser test script 與 workspace 已有的測試工具。 |
+
+第七階段不修改 package transform、renderer、toolbar、theme、lazy loading、root scripts、CI、artifact 或 release pipeline，也不新增 Nuxt UI、collection schema、`rawbody` 或第二份 diagram source。
+
 ## 品質與交付邊界
 
 以下 root commands 不得讀取、解析或驗證 `website/**`：
@@ -528,7 +559,7 @@ website/
 
 CI 不執行網站 lint、test、typecheck、build、generate、browser check 或 content check。Package artifact 與 release scripts 不讀取 website source、manifest、output 或內容。
 
-網站只保留本機 `dev` 與 `generate`。維護者或 AI agent 可以在單次工作中執行 generate 和人工檢查 routes／畫面，但不得把結果升格為永久 verifier、snapshot、manifest 或 release contract。
+網站保留本機 `dev`、`generate` 與 `test`。維護者或 AI agent 可以在單次工作中執行 browser behavior tests、generate 和人工檢查 routes／畫面，但不得把結果升格為 package verifier、snapshot、manifest 或 release contract。
 
 ## 禁止重新發明 records 或 demo contract
 
@@ -537,12 +568,12 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 - 只有一個 `docs` page collection。
 - 沒有 landing collection、data collection 或自訂 schema。
 - 沒有 `index.yml`、landing YAML 或 option inventory。
-- Landing page 直接查詢 page document，不建立 projection 或 adapter。
+- Landing page 直接查詢 page document；唯一 adapter 是把 transform 既有 transport props 投影成首頁雙檢視的 `LandingMermaidDemo`。
 - Landing Mermaid fence 是 Markdown body，不是 asset 或 TypeScript constant。
 - Sidebar 直接來自 `queryCollectionNavigation()`。
 - TOC 直接來自 Markdown headings。
 - 沒有 Reference records、record components、virtual module 或 generated Markdown。
-- 沒有 Contract Demo、artifact identity、source disclosure、lazy proof 或 evidence taxonomy。
+- 沒有 Contract Demo、artifact identity、lazy proof 或 evidence taxonomy；首頁核准的 source tab 不形成第二份 source record。
 - 沒有 parity、freshness、artifact 或 release verifier。
 - AI agent 的臨時檢查結果不得提交為網站資料模型或交付契約。
 
@@ -553,29 +584,30 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 1. `/` 只由 `pages/index.vue` 處理，不使用 docs layout。
 2. Landing 使用 `queryCollection('docs').path('/').first()` 取得首頁 page。
 3. Hero 的 title／description 來自 page 內建欄位，CTA 連到 `/getting-started`。
-4. Hero 右側直接使用 `<ContentRenderer :value="page" />`。
+4. Hero 右側使用 `ContentRenderer`，且只將 `ContentMermaidTransport` 映射到 `LandingMermaidDemo`。
 5. `content/1.index.md` 只有三個核准 frontmatter fields 與一個 Mermaid fence。
 6. 首頁 Mermaid diagram 成功經過 Markdown → Content → package transform → browser render。
-7. 三張 cards 使用核准的 titles，且不由 schema 或資料檔生成。
-8. Desktop Header 在 landing 與文件頁直接顯示 Documentation、Troubleshooting、theme toggle 與 GitHub link；手機 Header 只直接顯示品牌、theme toggle、GitHub 與 hamburger。
-9. Theme toggle 同步網站外觀與 Mermaid theme，landing 不強制 dark mode。
-10. `pages/[...slug].vue` 繼續處理五個文件 routes；`layouts/docs.vue` 在 desktop 提供 sidebar 與 TOC，在手機完全隱藏 sidebar。
-11. `/` 不出現在 sidebar；Troubleshooting 保留 route、名稱與 sidebar entry。
-12. Desktop landing 是 hero 雙欄與三欄 cards；mobile 改為單欄，Header 保持單列且不再讓文字導覽換行。
-13. Repo 中沒有 landing collection/schema、index.yml、MDC landing component、demo asset 或替代 records。
-14. Contract Demo、artifact identity、lazy proof、verifier 與其他網站驗證系統仍不存在。
-15. Root、CI、artifact 與 release 繼續不讀取或驗證網站。
-16. 一次性 `pnpm --dir website generate` 成功產生既有 routes，但不形成永久 gate。
-17. 手機 hamburger 在 landing 與文件頁都顯示相同的五個文件 links，並能以 link click、Escape 與 route change 關閉。
-18. Mobile menu 開啟時主內容不可互動或捲動，Header actions 仍可操作；Escape 關閉後焦點返回 hamburger。
-19. Desktop sidebar 與 mobile menu 的 active link 都具有 accent 指示線、accent 文字、soft background 與 `aria-current="page"`，在 light／dark theme 下清楚可辨。
-20. 一次性畫面檢查涵蓋 desktop/mobile × light/dark、hamburger open/close、active state、keyboard focus 與無水平溢位，但不新增永久 browser test。
-21. Dark theme 的 fenced code 實際使用 `github-dark-high-contrast` 產生的 `--shiki-dark` tokens，不再顯示 light tokens。
-22. Light theme 繼續使用 `github-light`，既有文件與 landing 外觀沒有無關的 palette 改變。
-23. 所有文件頁的 fenced code 使用一致的 `0.875rem` 字級、易讀 line-height、長行換行與 overflow fallback；一般 desktop／mobile viewport 不因長 install command 產生頁面水平溢位。
-24. 段落、清單與表格中的 inline code 具有可辨識的 surface、padding 與圓角，且在 light／dark theme 下保持清楚。
-25. Mermaid renderer、fallback semantics、內容、routes、navigation、TOC 與 theme state 不因 code presentation 優化而改變。
-26. 一次性 `pnpm --dir website generate` 與 desktop/mobile × light/dark 畫面檢查涵蓋 Getting Started、Writing Diagrams、Configuration、Troubleshooting 與 Migration to v3，但不新增永久驗證。
+7. `Rendered UI` 預設啟用；`Markdown` 顯示與首頁 fence 完全相同的 source，兩者共用 transform 的同一份 encoded `code`。
+8. 三張 cards 使用核准的 titles，且不由 schema 或資料檔生成。
+9. Desktop Header 在 landing 與文件頁直接顯示 Documentation、Troubleshooting、theme toggle 與 GitHub link；手機 Header 只直接顯示品牌、theme toggle、GitHub 與 hamburger。
+10. Theme toggle 同步網站外觀與 Mermaid theme，landing 不強制 dark mode。
+11. `pages/[...slug].vue` 繼續處理五個文件 routes；`layouts/docs.vue` 在 desktop 提供 sidebar 與 TOC，在手機完全隱藏 sidebar。
+12. `/` 不出現在 sidebar；Troubleshooting 保留 route、名稱與 sidebar entry。
+13. Desktop landing 是 hero 雙欄與三欄 cards；mobile 改為單欄，Header 保持單列且不再讓文字導覽換行。
+14. Repo 中沒有 landing collection/schema、index.yml、authored MDC landing component、demo asset 或替代 records。
+15. Contract Demo、artifact identity、lazy proof、verifier 與其他網站驗證系統仍不存在。
+16. Root、CI、artifact 與 release 繼續不讀取或驗證網站；browser test 只由 website-local script 執行。
+17. 一次性 `pnpm --dir website generate` 成功產生既有 routes，但不形成永久 gate。
+18. 手機 hamburger 在 landing 與文件頁都顯示相同的五個文件 links，並能以 link click、Escape 與 route change 關閉。
+19. Mobile menu 開啟時主內容不可互動或捲動，Header actions 仍可操作；Escape 關閉後焦點返回 hamburger。
+20. Desktop sidebar 與 mobile menu 的 active link 都具有 accent 指示線、accent 文字、soft background 與 `aria-current="page"`，在 light／dark theme 下清楚可辨。
+21. 畫面檢查涵蓋 desktop/mobile × light/dark、hamburger open/close、active state、keyboard focus 與無水平溢位；首頁 browser test 固定 source／preview 的核心互動與 320px containment。
+22. Dark theme 的 fenced code 實際使用 `github-dark-high-contrast` 產生的 `--shiki-dark` tokens，不再顯示 light tokens。
+23. Light theme 繼續使用 `github-light`，既有文件與 landing 外觀沒有無關的 palette 改變。
+24. 所有文件頁的 fenced code 使用一致的 `0.875rem` 字級、易讀 line-height、長行換行與 overflow fallback；一般 desktop／mobile viewport 不因長 install command 產生頁面水平溢位。
+25. 段落、清單與表格中的 inline code 具有可辨識的 surface、padding 與圓角，且在 light／dark theme 下保持清楚。
+26. Mermaid renderer、fallback semantics、內容、routes、navigation、TOC 與 theme state 不因 code presentation 優化而改變。
+27. 一次性 `pnpm --dir website generate` 與 desktop/mobile × light/dark 畫面檢查涵蓋 Getting Started、Writing Diagrams、Configuration、Troubleshooting 與 Migration to v3，但不新增文件頁永久驗證。
 
 ## 官方與研究依據
 

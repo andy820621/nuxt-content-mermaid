@@ -69,40 +69,39 @@ The four nodes represent, respectively, author input, content processing, module
 
 ## Data flow
 
-`content/1.index.md` is the single source of truth:
+`content/1.index.md` remains the single source of truth. The module's existing Markdown transform encodes the Mermaid fence once and emits `ContentMermaidTransport`. The homepage changes only the component used for that transport node:
 
 ```text
 One Mermaid fence
-├── rawbody ──> Markdown tab
-└── body AST ──> ContentRenderer ──> nuxt-content-mermaid ──> Rendered UI tab
+  └── module transform → encoded transport `code`
+        ├── decode + fence markers → Markdown tab
+        └── ContentMermaidTransport → Mermaid → Rendered UI tab
 ```
 
-The `docs` page collection declares Nuxt Content's `rawbody` field. Nuxt Content then exposes the original Markdown body alongside the parsed `body` AST.
+The homepage passes the queried page through the existing `ContentRenderer`, with a page-local component map that replaces only `ContentMermaidTransport` with `LandingMermaidDemo`. The wrapper receives the transform's existing `code`, `pageConfig`, and `toolbar` props. It reconstructs the display-only fence from `code` and forwards those same props to the real globally registered transport component.
 
-The homepage passes:
+This avoids the rejected `rawbody` approach: Nuxt Content's file transform runs before collection fields are finalized, so `rawbody` would contain transformed MDC rather than the authored Mermaid fence. The `docs` collection therefore stays schema-free.
 
-- `page.rawbody` to the source view as display-only text;
-- `page` to the existing `ContentRenderer` for the preview view.
-
-No code extracts a Mermaid node from the AST, decodes a component prop, or maintains a landing-page-specific diagram constant.
+No code parses the page AST or maintains a landing-page-specific diagram constant.
 
 ## Component boundary
 
-A small `LandingDemoTabs` presentation component owns only the two-view interface.
+A small `LandingMermaidDemo` transport wrapper owns the two-view interface.
 
-Its public contract is:
+Its public contract mirrors the existing Markdown transport props:
 
-- a required `source` string;
-- a default slot containing the real rendered preview.
+- encoded `code`;
+- optional `pageConfig`;
+- optional `toolbar`.
 
 It owns:
 
 - active-tab state;
 - tab semantics and keyboard behavior;
-- the Markdown `<pre><code>` presentation;
-- hiding and revealing the slotted preview.
+- reconstructing the Markdown `<pre><code>` presentation from the encoded transport source;
+- forwarding the same props to the real `ContentMermaidTransport` in the rendered panel.
 
-It does not know how Mermaid is parsed or rendered. The homepage remains responsible for querying the page and placing `ContentRenderer` in the preview slot.
+It does not parse the Content AST or render Mermaid itself. The homepage remains responsible for querying the page and passing it through `ContentRenderer`; the package transport and `Mermaid` component remain responsible for rendering.
 
 ## Interaction and accessibility
 
@@ -148,13 +147,13 @@ The heading must not rely on forced `<br>` elements. Its wrapping should emerge 
 - Lazy loading starts when the rendered panel becomes observable. The tab implementation must allow rendering to begin correctly when the preview is selected by default and after later tab switches.
 - Existing spinner and render-error behavior remains visible inside the rendered panel.
 - A Mermaid render failure does not affect access to the Markdown tab.
-- If `rawbody` is unexpectedly absent, the source panel shows no fabricated or duplicated definition; development verification should catch this collection-contract failure.
+- If the encoded transport source is absent, the source panel shows an empty fence instead of fabricating a second definition; browser verification catches this protocol failure.
 
 ## Verification
 
 Implementation verification must cover:
 
-- generated collection types include `rawbody`;
+- the `docs` collection remains schema-free;
 - the homepage still resolves SEO fields and 404 behavior from the queried page;
 - the Markdown tab displays the exact body from `content/1.index.md`;
 - the rendered tab still uses `ContentRenderer` and produces the built-in Mermaid UI;
@@ -170,12 +169,12 @@ Visual verification should compare representative desktop, tablet, and 320 px mo
 
 ## Existing specification changes
 
-This design supersedes only the homepage-demo constraints in `docs/specs/documentation-website.md` that prohibit reading raw page source. The following original constraints remain:
+This design supersedes only the homepage-demo constraints in `docs/specs/documentation-website.md` that prohibit source disclosure and a page-local transport adapter. The following original constraints remain:
 
 - the title and description come from page frontmatter;
 - the diagram is authored in `content/1.index.md`;
 - the page body contains one Mermaid fence;
-- `ContentRenderer` remains the only diagram render path;
+- `ContentRenderer` remains the page render path, and the real `ContentMermaidTransport` remains the diagram render path;
 - the source is not copied into Vue, assets, frontmatter, or another content block.
 
 The implementation should update the canonical documentation website specification so these contracts do not contradict each other.

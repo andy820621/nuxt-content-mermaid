@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import LandingMermaidDemo from '~/components/LandingMermaidDemo.vue'
+
 const { data: page } = await useAsyncData('landing-page', () => {
   return queryCollection('docs').path('/').first()
 })
@@ -16,6 +18,10 @@ useSeoMeta({
   ogTitle: page.value.title,
   ogDescription: page.value.description,
 })
+
+const landingContentComponents = {
+  ContentMermaidTransport: LandingMermaidDemo,
+}
 </script>
 
 <template>
@@ -43,12 +49,12 @@ useSeoMeta({
         </NuxtLink>
       </div>
 
-      <div class="landing-demo">
-        <ContentRenderer
-          :value="page"
-          :data="{ config: null }"
-        />
-      </div>
+      <ContentRenderer
+        class="landing-demo-content"
+        :value="page"
+        :data="{ config: null }"
+        :components="landingContentComponents"
+      />
     </section>
 
     <section
