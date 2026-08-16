@@ -16,14 +16,19 @@ type PendingTransitionLog = {
   release: () => void
 }
 
+function createSiteControlsPage() {
+  return createPage(undefined, {
+    colorScheme: 'light',
+    storageState: { cookies: [], origins: [] },
+  })
+}
+
 async function loadWithSystemColorMode(
   page: Awaited<ReturnType<typeof createPage>>,
   colorScheme: 'dark' | 'light',
   reducedMotion?: 'reduce' | 'no-preference',
 ) {
   await page.emulateMedia({ colorScheme, reducedMotion })
-  await page.goto(url('/'))
-  await page.evaluate((storageKey) => localStorage.removeItem(storageKey), colorModeStorageKey)
   await page.goto(url('/'), { waitUntil: 'hydration' })
   await page.waitForFunction(() => document.querySelector('button[aria-pressed]') !== null)
 }
@@ -36,14 +41,14 @@ describe('documentation website site controls', async () => {
   })
 
   it('uses the system dark preference for the initial color mode', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await loadWithSystemColorMode(page, 'dark')
 
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
   })
 
   it('shows the active dark theme and its next action', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await loadWithSystemColorMode(page, 'dark')
 
     const toggle = page.getByRole('button', { name: 'Switch to light mode' })
@@ -52,7 +57,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('persists a manually selected dark mode across a reload', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await loadWithSystemColorMode(page, 'light')
 
     await page.getByRole('button', { name: 'Switch to dark mode' }).click()
@@ -66,7 +71,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('redraws the Mermaid SVG when the color mode changes', { timeout: 10000 }, async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await loadWithSystemColorMode(page, 'light')
 
     const svg = page.locator('.mermaid-block .mermaid > svg')
@@ -89,7 +94,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('reveals the selected mode from the click origin with a 400ms view transition', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.addInitScript(() => {
       const log: ViewTransitionLog = { animations: [], calls: 0 }
       ;(window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog = log
@@ -106,20 +111,24 @@ describe('documentation website site controls', async () => {
         }
         return animate.call(this, keyframes, timing)
       }
-      ;(document as Document & {
-        startViewTransition?: (callback: () => void) => { finished: Promise<void>, ready: Promise<void> }
-      }).startViewTransition = (callback) => {
-        log.calls += 1
-        callback()
-        return { ready: Promise.resolve(), finished: Promise.resolve() }
-      }
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: (callback: () => void) => {
+          log.calls += 1
+          callback()
+          return { ready: Promise.resolve(), finished: Promise.resolve() }
+        },
+      })
     })
     await loadWithSystemColorMode(page, 'light')
 
     await page.getByRole('button', { name: 'Switch to dark mode' }).click({ position: { x: 8, y: 8 } })
 
     const log = await page.evaluate(() => {
-      return (window as Window & { __websiteThemeTransitionLog: ViewTransitionLog }).__websiteThemeTransitionLog
+      const log = (window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog
+      if (!log)
+        throw new Error('Expected the theme transition log to be initialized')
+      return log
     })
     expect(log.calls).toBe(1)
     expect(log.animations).toHaveLength(1)
@@ -131,7 +140,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('stacks the root view-transition snapshots for each theme direction', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await loadWithSystemColorMode(page, 'light')
 
     const lightStack = await page.evaluate(() => ({
@@ -151,17 +160,18 @@ describe('documentation website site controls', async () => {
   })
 
   it('changes mode without a view transition when reduced motion is preferred', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.addInitScript(() => {
       const log: ViewTransitionLog = { animations: [], calls: 0 }
       ;(window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog = log
-      ;(document as Document & {
-        startViewTransition?: (callback: () => void) => { finished: Promise<void>, ready: Promise<void> }
-      }).startViewTransition = (callback) => {
-        log.calls += 1
-        callback()
-        return { ready: Promise.resolve(), finished: Promise.resolve() }
-      }
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: (callback: () => void) => {
+          log.calls += 1
+          callback()
+          return { ready: Promise.resolve(), finished: Promise.resolve() }
+        },
+      })
     })
     await loadWithSystemColorMode(page, 'light', 'reduce')
 
@@ -169,12 +179,15 @@ describe('documentation website site controls', async () => {
 
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
     expect(await page.evaluate(() => {
-      return (window as Window & { __websiteThemeTransitionLog: ViewTransitionLog }).__websiteThemeTransitionLog.calls
+      const log = (window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog
+      if (!log)
+        throw new Error('Expected the theme transition log to be initialized')
+      return log.calls
     })).toBe(0)
   })
 
   it('changes mode when the View Transition API is unavailable', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.addInitScript(() => {
       Object.defineProperty(document, 'startViewTransition', {
         configurable: true,
@@ -189,13 +202,14 @@ describe('documentation website site controls', async () => {
   })
 
   it('falls back to a direct mode change when the view transition rejects', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.addInitScript(() => {
-      ;(document as Document & {
-        startViewTransition?: (_callback: () => void) => { finished: Promise<void>, ready: Promise<void> }
-      }).startViewTransition = () => ({
-        finished: Promise.resolve(),
-        ready: Promise.reject(new Error('view transition rejected')),
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: () => ({
+          finished: Promise.resolve(),
+          ready: Promise.reject(new Error('view transition rejected')),
+        }),
       })
     })
     await loadWithSystemColorMode(page, 'light')
@@ -206,7 +220,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('crossfades to the animated destination icon while the toggle is busy', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.addInitScript(() => {
       let release = () => {}
       const log: PendingTransitionLog = {
@@ -214,18 +228,19 @@ describe('documentation website site controls', async () => {
         release: () => release(),
       }
       ;(window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition = log
-      ;(document as Document & {
-        startViewTransition?: (callback: () => void) => { finished: Promise<void>, ready: Promise<void> }
-      }).startViewTransition = (callback) => {
-        log.calls += 1
-        callback()
-        return {
-          ready: Promise.resolve(),
-          finished: new Promise<void>((resolve) => {
-            release = resolve
-          }),
-        }
-      }
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: (callback: () => void) => {
+          log.calls += 1
+          callback()
+          return {
+            ready: Promise.resolve(),
+            finished: new Promise<void>((resolve) => {
+              release = resolve
+            }),
+          }
+        },
+      })
     })
     await loadWithSystemColorMode(page, 'light')
 
@@ -235,7 +250,10 @@ describe('documentation website site controls', async () => {
     expect(await toggle.isDisabled()).toBe(true)
     expect(await toggle.getAttribute('aria-busy')).toBe('true')
     expect(await page.evaluate(() => {
-      return (window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.calls
+      const log = (window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition
+      if (!log)
+        throw new Error('Expected the pending theme transition to be initialized')
+      return log.calls
     })).toBe(1)
 
     const animatedMoon = toggle.locator('[data-theme-icon="moon-animated"]')
@@ -251,7 +269,10 @@ describe('documentation website site controls', async () => {
     })).toMatchObject({ cursor: 'wait', opacity: 0.65 })
 
     await page.evaluate(() => {
-      ;(window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.release()
+      const log = (window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition
+      if (!log)
+        throw new Error('Expected the pending theme transition to be initialized')
+      log.release()
     })
     await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
     expect(await toggle.isDisabled()).toBe(false)
@@ -267,13 +288,16 @@ describe('documentation website site controls', async () => {
     expect(await toggle.locator('[data-theme-icon="sun"]').evaluate(element => getComputedStyle(element).opacity)).toBe('0')
 
     await page.evaluate(() => {
-      ;(window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.release()
+      const log = (window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition
+      if (!log)
+        throw new Error('Expected the pending theme transition to be initialized')
+      log.release()
     })
     await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
   })
 
   it('reveals the next theme action in a tooltip on hover', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.goto(url('/'), { waitUntil: 'hydration' })
 
     const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
@@ -294,7 +318,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('reveals the next theme action in a tooltip on keyboard focus', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.goto(url('/'), { waitUntil: 'hydration' })
 
     const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
@@ -315,7 +339,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('renders the Chinese destination as an icon pill on the English home route', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.goto(url('/'), { waitUntil: 'hydration' })
 
     const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
@@ -327,7 +351,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('links from the Chinese home route to the English home route', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.goto(url('/zh'), { waitUntil: 'hydration' })
 
     const switcher = page.getByRole('link', { name: '切換至英文' })
@@ -336,7 +360,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('links from an English documentation route to its Chinese counterpart', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.goto(url('/getting-started'), { waitUntil: 'hydration' })
 
     const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
@@ -344,7 +368,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('links from a Chinese documentation route to its English counterpart', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.goto(url('/zh/getting-started'), { waitUntil: 'hydration' })
 
     const switcher = page.getByRole('link', { name: '切換至英文' })
@@ -352,7 +376,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('reveals the localized locale action in a tooltip on keyboard focus', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.goto(url('/'), { waitUntil: 'hydration' })
 
     const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
@@ -372,7 +396,7 @@ describe('documentation website site controls', async () => {
   })
 
   it('keeps the header within a 320px viewport', async () => {
-    const page = await createPage()
+    const page = await createSiteControlsPage()
     await page.setViewportSize({ width: 320, height: 800 })
     await page.goto(url('/'), { waitUntil: 'hydration' })
 

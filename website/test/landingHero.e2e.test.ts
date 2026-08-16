@@ -4,11 +4,23 @@ import { createPage, setup, url } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
+const colorModeStorageKey = 'nuxt-content-mermaid-color-mode'
 const homepageMarkdown = readFileSync(
   fileURLToPath(new URL('../content/1.index.md', import.meta.url)),
   'utf8',
 )
 const expectedSource = homepageMarkdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, '').trim()
+
+async function createLightPage() {
+  const page = await createPage(undefined, {
+    colorScheme: 'light',
+    storageState: { cookies: [], origins: [] },
+  })
+  await page.addInitScript((storageKey) => {
+    localStorage.removeItem(storageKey)
+  }, colorModeStorageKey)
+  return page
+}
 
 describe('documentation website landing hero', async () => {
   await setup({
@@ -17,8 +29,8 @@ describe('documentation website landing hero', async () => {
   })
 
   it('shows the real render by default and exposes the exact Markdown source', async () => {
-    const page = await createPage()
-    await page.goto(url('/'))
+    const page = await createLightPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
 
     const sourceTab = page.getByRole('tab', { name: 'Markdown' })
     const previewTab = page.getByRole('tab', { name: 'Rendered UI' })
@@ -40,8 +52,8 @@ describe('documentation website landing hero', async () => {
   })
 
   it('supports Arrow, Home, and End keyboard navigation', async () => {
-    const page = await createPage()
-    await page.goto(url('/'))
+    const page = await createLightPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
 
     const sourceTab = page.getByRole('tab', { name: 'Markdown' })
     const previewTab = page.getByRole('tab', { name: 'Rendered UI' })
@@ -59,8 +71,8 @@ describe('documentation website landing hero', async () => {
   })
 
   it('uses outline icons and an underline active state in both themes', async () => {
-    const page = await createPage()
-    await page.goto(url('/'))
+    const page = await createLightPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
 
     const sourceTab = page.getByRole('tab', { name: 'Markdown' })
     const previewTab = page.getByRole('tab', { name: 'Rendered UI' })
@@ -104,9 +116,9 @@ describe('documentation website landing hero', async () => {
   })
 
   it('contains source overflow at a 320px viewport in both themes', async () => {
-    const page = await createPage()
+    const page = await createLightPage()
     await page.setViewportSize({ width: 320, height: 900 })
-    await page.goto(url('/'))
+    await page.goto(url('/'), { waitUntil: 'hydration' })
     await page.getByRole('tab', { name: 'Markdown' }).click()
 
     const overflow = await page.evaluate(() => {
@@ -129,8 +141,8 @@ describe('documentation website landing hero', async () => {
   })
 
   it('renders the Chinese landing page with zh-TW metadata and an English switch link', async () => {
-    const page = await createPage()
-    await page.goto(url('/zh'))
+    const page = await createLightPage()
+    await page.goto(url('/zh'), { waitUntil: 'hydration' })
 
     expect(await page.locator('html').getAttribute('lang')).toBe('zh-TW')
     expect(await page.getByRole('heading', { name: 'Nuxt Content 原生支援 Mermaid 圖表' }).count()).toBe(1)
@@ -141,8 +153,8 @@ describe('documentation website landing hero', async () => {
   })
 
   it('renders a Chinese documentation route without English navigation entries', async () => {
-    const page = await createPage()
-    await page.goto(url('/zh/getting-started'))
+    const page = await createLightPage()
+    await page.goto(url('/zh/getting-started'), { waitUntil: 'hydration' })
 
     expect(await page.getByRole('heading', { name: '開始使用' }).count()).toBeGreaterThan(0)
     expect(await page.getByRole('link', { name: '開始使用' }).count()).toBeGreaterThan(0)
