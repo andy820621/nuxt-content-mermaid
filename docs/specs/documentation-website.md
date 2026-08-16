@@ -541,7 +541,7 @@ website/
 | `website/components/LandingMermaidDemo.vue` | 新增 | 將同一 transport `code` 投影為 Markdown tab，並把 props 交回真正的 `ContentMermaidTransport` 產生 Rendered UI tab。 |
 | `website/pages/index.vue` | 修改 | 以 `ContentRenderer.components` 只覆寫首頁的 `ContentMermaidTransport` node。 |
 | `website/content/1.index.md` | 修改 | 保持單一 fence，改成四階段 TD 流程。 |
-| `website/assets/css/main.css` | 修改 | 放鬆 hero 字距、重新分配欄寬，加入 tab frame 與 narrow viewport containment。 |
+| `website/assets/css/main.css` | 修改 | 放鬆 hero 字距、重新分配欄寬，加入 tab frame、outline glyph、underline active state 與 narrow viewport containment。 |
 | `website/test/landingHero.e2e.test.ts` | 新增 | 驗證真實 renderer、同源 Markdown、鍵盤 tabs、明暗 theme 與 320px overflow。 |
 | `website/package.json`、`pnpm-lock.yaml` | 修改 | 加入 website-local browser test script 與 workspace 已有的測試工具。 |
 
@@ -587,7 +587,7 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 4. Hero 右側使用 `ContentRenderer`，且只將 `ContentMermaidTransport` 映射到 `LandingMermaidDemo`。
 5. `content/1.index.md` 只有三個核准 frontmatter fields 與一個 Mermaid fence。
 6. 首頁 Mermaid diagram 成功經過 Markdown → Content → package transform → browser render。
-7. `Rendered UI` 預設啟用；`Markdown` 顯示與首頁 fence 完全相同的 source，兩者共用 transform 的同一份 encoded `code`。
+7. `Rendered UI` 預設啟用；`Markdown` 顯示與首頁 fence 完全相同的 source，兩者共用 transform 的同一份 encoded `code`。兩個 trigger 使用 outline icon；active 同時由 accent 文字、較高字重與 3px underline 表達，dark theme 的低強度 glow 不取代 focus outline。
 8. 三張 cards 使用核准的 titles，且不由 schema 或資料檔生成。
 9. Desktop Header 在 landing 與文件頁直接顯示 Documentation、Troubleshooting、theme toggle 與 GitHub link；手機 Header 只直接顯示品牌、theme toggle、GitHub 與 hamburger。
 10. Theme toggle 同步網站外觀與 Mermaid theme，landing 不強制 dark mode。

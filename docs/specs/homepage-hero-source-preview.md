@@ -119,6 +119,8 @@ It does not parse the Content AST or render Mermaid itself. The homepage remains
 
 The tab frame borrows only the structural idea seen in Nuxt UI's homepage code group: a bordered header with compact tab triggers above a shared content panel. It uses this website's existing color tokens, borders, radius, typography, and shadows.
 
+The tab triggers use 18px single-color outline icons rather than `MD`／`UI` badges. The active view is expressed through `var(--accent-strong)` text and icon color, increased weight, and a 3px `var(--accent)` underline. Dark mode adds only a low-intensity underline glow; active tabs do not use a solid pill. Focus remains a separate visible outline so selection and keyboard position are never conflated.
+
 The hero headline keeps its wording and weight. Its letter spacing moves from the current highly compressed `-0.065em` toward approximately `-0.038em`; the exact value may be adjusted during visual verification. The left column becomes wider because the TD diagram requires less horizontal space than the previous LR diagram.
 
 The intended hierarchy is:
