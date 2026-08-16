@@ -49,6 +49,11 @@ body {
   transition: color 160ms ease, background-color 160ms ease;
 }
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
 ::view-transition-old(root) {
   z-index: 1;
 }

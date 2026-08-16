@@ -33,6 +33,7 @@ export function useWebsiteTheme(): WebsiteThemeController {
     if (isTransitioning.value)
       return
 
+    const targetTheme: WebsiteColorMode = activeTheme.value === 'dark' ? 'light' : 'dark'
     const documentWithTransition = document as ThemeDocument
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (prefersReducedMotion || !documentWithTransition.startViewTransition) {
@@ -61,14 +62,21 @@ export function useWebsiteTheme(): WebsiteThemeController {
           Math.max(originY, window.innerHeight - originY),
         )
         document.documentElement.animate(
-          [
-            { clipPath: `circle(0px at ${originX}px ${originY}px)` },
-            { clipPath: `circle(${radius}px at ${originX}px ${originY}px)` },
-          ],
+          targetTheme === 'dark'
+            ? [
+                { clipPath: `circle(${radius}px at ${originX}px ${originY}px)` },
+                { clipPath: `circle(0px at ${originX}px ${originY}px)` },
+              ]
+            : [
+                { clipPath: `circle(0px at ${originX}px ${originY}px)` },
+                { clipPath: `circle(${radius}px at ${originX}px ${originY}px)` },
+              ],
           {
             duration: themeTransitionDuration,
             easing: 'ease-in-out',
-            pseudoElement: '::view-transition-new(root)',
+            pseudoElement: targetTheme === 'dark'
+              ? '::view-transition-old(root)'
+              : '::view-transition-new(root)',
           },
         )
       }

@@ -46,5 +46,17 @@ export default defineNuxtConfig({
     dataValue: 'theme',
     storageKey: 'nuxt-content-mermaid-color-mode',
   },
+  icon: {
+    provider: 'none',
+    clientBundle: {
+      icons: [
+        'line-md:sunny-outline',
+        'line-md:moon',
+        'line-md:sunny-outline-twotone-loop',
+        'line-md:moon-twotone',
+        'material-symbols-light:language',
+      ],
+    },
+  },
   compatibilityDate: '2025-11-24',
 })

@@ -8,7 +8,11 @@ const colorModeStorageKey = 'nuxt-content-mermaid-color-mode'
 type ViewTransitionLog = {
   animations: Array<{ keyframes: Array<{ clipPath?: string }>, timing: { duration?: number, pseudoElement?: string } }>
   calls: number
-  click?: { x: number, y: number }
+  clicks?: Array<{ x: number, y: number }>
+  stacks?: Array<{
+    old: { animationName: string, zIndex: number }
+    new: { animationName: string, zIndex: number }
+  }>
 }
 
 type PendingTransitionLog = {
@@ -93,13 +97,13 @@ describe('documentation website site controls', async () => {
     expect(redrawn).toBe(true)
   })
 
-  it('reveals the selected mode from the click origin with a 400ms view transition', async () => {
+  it('animates the visible root snapshot in both theme directions', async () => {
     const page = await createSiteControlsPage()
     await page.addInitScript(() => {
-      const log: ViewTransitionLog = { animations: [], calls: 0 }
+      const log: ViewTransitionLog = { animations: [], calls: 0, clicks: [], stacks: [] }
       ;(window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog = log
       document.addEventListener('click', (event) => {
-        log.click = { x: event.clientX, y: event.clientY }
+        log.clicks?.push({ x: event.clientX, y: event.clientY })
       })
       const animate = Element.prototype.animate
       Element.prototype.animate = function (keyframes, timing) {
@@ -107,6 +111,12 @@ describe('documentation website site controls', async () => {
           log.animations.push({
             keyframes: keyframes as Array<{ clipPath?: string }>,
             timing: timing as { duration?: number, pseudoElement?: string },
+          })
+          const oldStyle = getComputedStyle(document.documentElement, '::view-transition-old(root)')
+          const newStyle = getComputedStyle(document.documentElement, '::view-transition-new(root)')
+          log.stacks?.push({
+            old: { animationName: oldStyle.animationName, zIndex: Number(oldStyle.zIndex) },
+            new: { animationName: newStyle.animationName, zIndex: Number(newStyle.zIndex) },
           })
         }
         return animate.call(this, keyframes, timing)
@@ -123,6 +133,7 @@ describe('documentation website site controls', async () => {
     await loadWithSystemColorMode(page, 'light')
 
     await page.getByRole('button', { name: 'Switch to dark mode' }).click({ position: { x: 8, y: 8 } })
+    await page.getByRole('button', { name: 'Switch to light mode' }).click({ position: { x: 16, y: 8 } })
 
     const log = await page.evaluate(() => {
       const log = (window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog
@@ -130,33 +141,35 @@ describe('documentation website site controls', async () => {
         throw new Error('Expected the theme transition log to be initialized')
       return log
     })
-    expect(log.calls).toBe(1)
-    expect(log.animations).toHaveLength(1)
-    expect(log.animations[0]?.timing).toMatchObject({
+    expect(log.calls).toBe(2)
+    expect(log.animations).toHaveLength(2)
+    expect(log.clicks).toHaveLength(2)
+    expect(log.stacks).toHaveLength(2)
+
+    const [darkAnimation, lightAnimation] = log.animations
+    const [darkClick, lightClick] = log.clicks ?? []
+    const [darkStack, lightStack] = log.stacks ?? []
+
+    expect(darkAnimation?.timing).toMatchObject({
+      duration: 400,
+      pseudoElement: '::view-transition-old(root)',
+    })
+    expect(darkAnimation?.keyframes[0]?.clipPath).toMatch(/^circle\((?!0px).+ at .+\)$/)
+    expect(darkAnimation?.keyframes[1]?.clipPath).toBe(`circle(0px at ${darkClick?.x}px ${darkClick?.y}px)`)
+    expect(darkStack?.old.zIndex).toBeGreaterThan(darkStack?.new.zIndex ?? Number.POSITIVE_INFINITY)
+
+    expect(lightAnimation?.timing).toMatchObject({
       duration: 400,
       pseudoElement: '::view-transition-new(root)',
     })
-    expect(log.animations[0]?.keyframes[0]?.clipPath).toBe(`circle(0px at ${log.click?.x}px ${log.click?.y}px)`)
-  })
+    expect(lightAnimation?.keyframes[0]?.clipPath).toBe(`circle(0px at ${lightClick?.x}px ${lightClick?.y}px)`)
+    expect(lightAnimation?.keyframes[1]?.clipPath).toMatch(/^circle\((?!0px).+ at .+\)$/)
+    expect(lightStack?.new.zIndex).toBeGreaterThan(lightStack?.old.zIndex ?? Number.POSITIVE_INFINITY)
 
-  it('stacks the root view-transition snapshots for each theme direction', async () => {
-    const page = await createSiteControlsPage()
-    await loadWithSystemColorMode(page, 'light')
-
-    const lightStack = await page.evaluate(() => ({
-      old: Number(getComputedStyle(document.documentElement, '::view-transition-old(root)').zIndex),
-      new: Number(getComputedStyle(document.documentElement, '::view-transition-new(root)').zIndex),
-    }))
-    expect(lightStack.new).toBeGreaterThan(lightStack.old)
-
-    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
-
-    const darkStack = await page.evaluate(() => ({
-      old: Number(getComputedStyle(document.documentElement, '::view-transition-old(root)').zIndex),
-      new: Number(getComputedStyle(document.documentElement, '::view-transition-new(root)').zIndex),
-    }))
-    expect(darkStack.old).toBeGreaterThan(darkStack.new)
+    expect(darkStack?.old.animationName).toBe('none')
+    expect(darkStack?.new.animationName).toBe('none')
+    expect(lightStack?.old.animationName).toBe('none')
+    expect(lightStack?.new.animationName).toBe('none')
   })
 
   it('changes mode without a view transition when reduced motion is preferred', async () => {
