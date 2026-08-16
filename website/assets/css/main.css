@@ -189,6 +189,19 @@ html[data-theme='dark'] .shiki span {
   cursor: pointer;
 }
 
+.locale-switcher {
+  grid-auto-flow: column;
+  grid-template-columns: 1.25rem auto;
+  gap: 0.3rem;
+  width: auto;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .theme-toggle-placeholder {
   display: inline-block;
   width: 2.5rem;

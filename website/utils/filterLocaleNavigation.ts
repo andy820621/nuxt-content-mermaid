@@ -1,6 +1,5 @@
 import type { ContentNavigationItem } from '@nuxt/content'
-
-export type SupportedLocale = 'en' | 'zh'
+import type { SupportedLocale } from '../types/i18n'
 
 function belongsToLocale(path: string | undefined, locale: SupportedLocale) {
   if (!path)

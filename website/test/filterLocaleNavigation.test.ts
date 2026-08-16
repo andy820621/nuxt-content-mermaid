@@ -1,5 +1,6 @@
 import type { ContentNavigationItem } from '@nuxt/content'
 import { describe, expect, it } from 'vitest'
+import type { SupportedLocale } from '../types/i18n'
 import { filterLocaleNavigation } from '../utils/filterLocaleNavigation'
 
 const navigation = [
@@ -21,7 +22,13 @@ const navigation = [
   },
 ] as unknown as ContentNavigationItem[]
 
+const supportedLocales = ['en', 'zh'] as const satisfies readonly SupportedLocale[]
+
 describe('filterLocaleNavigation', () => {
+  it('shares the supported locale contract', () => {
+    expect(supportedLocales).toEqual(['en', 'zh'])
+  })
+
   it('keeps English routes and nested groups for the default locale', () => {
     const result = filterLocaleNavigation(navigation, 'en')
 

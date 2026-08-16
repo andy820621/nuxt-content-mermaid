@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { ContentNavigationItem } from '@nuxt/content'
-import type { SupportedLocale } from '~/utils/filterLocaleNavigation'
+import type { SupportedLocale } from '~/types/i18n'
 import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
 
-const { locale, localeProperties, t } = useI18n()
+const { locale, localeProperties } = useI18n()
 const localePath = useLocalePath()
-const switchLocalePath = useSwitchLocalePath()
 
 const mobileMenuButton = useTemplateRef<HTMLButtonElement>('mobileMenuButton')
 const mobileMenuOpen = ref(false)
@@ -31,11 +30,6 @@ const mobileNavigationItems = computed(() => flattenPages(localizedNavigation.va
 const siteOrigin = 'https://nuxt-content-mermaid.barz.app'
 const socialImageUrl = `${siteOrigin}/assets/nuxt-content-mermaid.png`
 const route = useRoute()
-
-const nextLocale = computed<SupportedLocale>(() => locale.value === 'en' ? 'zh' : 'en')
-const nextLocaleLabel = computed(() => nextLocale.value === 'zh'
-  ? t('actions.switchToChinese')
-  : t('actions.switchToEnglish'))
 
 useHead(() => ({
   htmlAttrs: {
@@ -174,14 +168,7 @@ onBeforeUnmount(() => {
             </svg>
           </a>
 
-          <NuxtLink
-            class="icon-button locale-switch"
-            :to="switchLocalePath(nextLocale)"
-            :aria-label="nextLocaleLabel"
-            :title="nextLocaleLabel"
-          >
-            {{ nextLocale === 'zh' ? '中' : 'EN' }}
-          </NuxtLink>
+          <LocaleSwitcher />
 
           <button
             id="mobile-menu-button"

@@ -313,4 +313,73 @@ describe('documentation website site controls', async () => {
     expect(await tooltip.isVisible()).toBe(true)
     expect(await tooltip.textContent()).toBe(await toggle.getAttribute('aria-label'))
   })
+
+  it('renders the Chinese destination as an icon pill on the English home route', async () => {
+    const page = await createPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+    expect(await switcher.getAttribute('href')).toBe('/zh')
+    expect(await switcher.getAttribute('title')).toBe('Switch to Chinese')
+    expect(await switcher.textContent()).toBe('中')
+    expect(await switcher.locator('[class~="i-material-symbols-light:language"]').count()).toBe(1)
+    expect(await switcher.evaluate(element => element.clientWidth > element.clientHeight)).toBe(true)
+  })
+
+  it('links from the Chinese home route to the English home route', async () => {
+    const page = await createPage()
+    await page.goto(url('/zh'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: '切換至英文' })
+    expect(await switcher.getAttribute('href')).toBe('/')
+    expect(await switcher.textContent()).toBe('EN')
+  })
+
+  it('links from an English documentation route to its Chinese counterpart', async () => {
+    const page = await createPage()
+    await page.goto(url('/getting-started'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+    expect(await switcher.getAttribute('href')).toBe('/zh/getting-started')
+  })
+
+  it('links from a Chinese documentation route to its English counterpart', async () => {
+    const page = await createPage()
+    await page.goto(url('/zh/getting-started'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: '切換至英文' })
+    expect(await switcher.getAttribute('href')).toBe('/getting-started')
+  })
+
+  it('reveals the localized locale action in a tooltip on keyboard focus', async () => {
+    const page = await createPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+    let focused = false
+    for (let index = 0; index < 12; index += 1) {
+      await page.keyboard.press('Tab')
+      focused = await switcher.evaluate(element => element === document.activeElement)
+      if (focused)
+        break
+    }
+    expect(focused).toBe(true)
+
+    const tooltip = page.getByRole('tooltip')
+    await tooltip.waitFor({ state: 'visible', timeout: 3000 })
+    expect(await tooltip.count()).toBe(1)
+    expect(await tooltip.textContent()).toBe('Switch to Chinese')
+  })
+
+  it('keeps the header within a 320px viewport', async () => {
+    const page = await createPage()
+    await page.setViewportSize({ width: 320, height: 800 })
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+    expect(await switcher.isVisible()).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    )
+  })
 })

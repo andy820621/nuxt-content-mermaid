@@ -1,9 +1,8 @@
 import type { LocaleObject } from '@nuxtjs/i18n'
 import { fileURLToPath } from 'node:url'
+import type { SupportedLocale } from './types/i18n'
 
 const brandAssetsDir = fileURLToPath(new URL('../src/assets', import.meta.url))
-
-type SupportedLocale = 'en' | 'zh'
 
 const locales: LocaleObject<SupportedLocale>[] = [
   { code: 'en', language: 'en-US', name: 'English', file: 'en.json' },

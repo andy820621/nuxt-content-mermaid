@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SupportedLocale } from '~/utils/filterLocaleNavigation'
+import type { SupportedLocale } from '~/types/i18n'
 import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
 
 definePageMeta({
