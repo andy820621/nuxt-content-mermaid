@@ -65,11 +65,15 @@ describe('documentation website site controls', async () => {
     await loadWithSystemColorMode(page, 'light')
 
     await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+    await page.waitForFunction(storageKey =>
+      document.documentElement.dataset.theme === 'dark'
+      && localStorage.getItem(storageKey) === 'dark', colorModeStorageKey)
 
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
     expect(await page.evaluate(storageKey => localStorage.getItem(storageKey), colorModeStorageKey)).toBe('dark')
 
     await page.reload()
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
 
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
   })
