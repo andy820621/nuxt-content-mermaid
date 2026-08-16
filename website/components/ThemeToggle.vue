@@ -34,12 +34,21 @@ function toggleTheme(event: MouseEvent) {
         @click="toggleTheme"
       >
         <span
-          class="theme-toggle__icon"
+          class="theme-toggle__icon theme-toggle__icon--static"
           :data-theme-icon="activeTheme === 'dark' ? 'moon' : 'sun'"
         >
           <Icon
             aria-hidden="true"
             :name="activeTheme === 'dark' ? 'line-md:moon' : 'line-md:sunny-outline'"
+          />
+        </span>
+        <span
+          class="theme-toggle__icon theme-toggle__icon--animated"
+          :data-theme-icon="activeTheme === 'dark' ? 'moon-animated' : 'sun-animated'"
+        >
+          <Icon
+            aria-hidden="true"
+            :name="activeTheme === 'dark' ? 'line-md:moon-twotone' : 'line-md:sunny-outline-twotone-loop'"
           />
         </span>
       </button>

@@ -130,6 +130,26 @@ describe('documentation website site controls', async () => {
     expect(log.animations[0]?.keyframes[0]?.clipPath).toBe(`circle(0px at ${log.click?.x}px ${log.click?.y}px)`)
   })
 
+  it('stacks the root view-transition snapshots for each theme direction', async () => {
+    const page = await createPage()
+    await loadWithSystemColorMode(page, 'light')
+
+    const lightStack = await page.evaluate(() => ({
+      old: Number(getComputedStyle(document.documentElement, '::view-transition-old(root)').zIndex),
+      new: Number(getComputedStyle(document.documentElement, '::view-transition-new(root)').zIndex),
+    }))
+    expect(lightStack.new).toBeGreaterThan(lightStack.old)
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
+
+    const darkStack = await page.evaluate(() => ({
+      old: Number(getComputedStyle(document.documentElement, '::view-transition-old(root)').zIndex),
+      new: Number(getComputedStyle(document.documentElement, '::view-transition-new(root)').zIndex),
+    }))
+    expect(darkStack.old).toBeGreaterThan(darkStack.new)
+  })
+
   it('changes mode without a view transition when reduced motion is preferred', async () => {
     const page = await createPage()
     await page.addInitScript(() => {
@@ -185,7 +205,7 @@ describe('documentation website site controls', async () => {
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
   })
 
-  it('marks the toggle busy and unavailable until the view transition finishes', async () => {
+  it('crossfades to the animated destination icon while the toggle is busy', async () => {
     const page = await createPage()
     await page.addInitScript(() => {
       let release = () => {}
@@ -218,11 +238,38 @@ describe('documentation website site controls', async () => {
       return (window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.calls
     })).toBe(1)
 
+    const animatedMoon = toggle.locator('[data-theme-icon="moon-animated"]')
+    expect(await animatedMoon.locator('[class~="i-line-md:moon-twotone"]').count()).toBe(1)
+    await page.waitForFunction(() => {
+      const icon = document.querySelector('[data-theme-icon="moon-animated"]')
+      return icon && getComputedStyle(icon).opacity === '1'
+    })
+    expect(await toggle.locator('[data-theme-icon="moon"]').evaluate(element => getComputedStyle(element).opacity)).toBe('0')
+    expect(await toggle.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { cursor: style.cursor, opacity: Number(style.opacity) }
+    })).toMatchObject({ cursor: 'wait', opacity: 0.65 })
+
     await page.evaluate(() => {
       ;(window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.release()
     })
     await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
     expect(await toggle.isDisabled()).toBe(false)
+
+    await toggle.click()
+
+    const animatedSun = toggle.locator('[data-theme-icon="sun-animated"]')
+    expect(await animatedSun.locator('[class~="i-line-md:sunny-outline-twotone-loop"]').count()).toBe(1)
+    await page.waitForFunction(() => {
+      const icon = document.querySelector('[data-theme-icon="sun-animated"]')
+      return icon && getComputedStyle(icon).opacity === '1'
+    })
+    expect(await toggle.locator('[data-theme-icon="sun"]').evaluate(element => getComputedStyle(element).opacity)).toBe('0')
+
+    await page.evaluate(() => {
+      ;(window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.release()
+    })
+    await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
   })
 
   it('reveals the next theme action in a tooltip on hover', async () => {
@@ -238,6 +285,27 @@ describe('documentation website site controls', async () => {
       bounds.x + bounds.width / 2,
       bounds.y + bounds.height / 2,
     )
+
+    const tooltip = page.getByRole('tooltip')
+    await tooltip.waitFor({ state: 'visible', timeout: 3000 })
+    expect(await tooltip.count()).toBe(1)
+    expect(await tooltip.isVisible()).toBe(true)
+    expect(await tooltip.textContent()).toBe(await toggle.getAttribute('aria-label'))
+  })
+
+  it('reveals the next theme action in a tooltip on keyboard focus', async () => {
+    const page = await createPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
+    let focused = false
+    for (let index = 0; index < 12; index += 1) {
+      await page.keyboard.press('Tab')
+      focused = await toggle.evaluate(element => element === document.activeElement)
+      if (focused)
+        break
+    }
+    expect(focused).toBe(true)
 
     const tooltip = page.getByRole('tooltip')
     await tooltip.waitFor({ state: 'visible', timeout: 3000 })

@@ -49,6 +49,22 @@ body {
   transition: color 160ms ease, background-color 160ms ease;
 }
 
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+html[data-theme='dark']::view-transition-old(root) {
+  z-index: 2;
+}
+
+html[data-theme='dark']::view-transition-new(root) {
+  z-index: 1;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;
@@ -181,9 +197,32 @@ html[data-theme='dark'] .shiki span {
 
 .theme-toggle__icon {
   display: grid;
+  grid-area: 1 / 1;
   width: 1.25rem;
   height: 1.25rem;
   place-items: center;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.theme-toggle__icon--animated {
+  opacity: 0;
+  transform: scale(0.82);
+}
+
+.theme-toggle[aria-busy='true'] .theme-toggle__icon--static {
+  opacity: 0;
+  transform: scale(0.82);
+}
+
+.theme-toggle[aria-busy='true'] .theme-toggle__icon--animated {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.theme-toggle:disabled,
+.theme-toggle[aria-busy='true'] {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .theme-toggle__icon svg {
