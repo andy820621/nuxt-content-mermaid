@@ -3,7 +3,6 @@ import type { ContentNavigationItem } from '@nuxt/content'
 import type { SupportedLocale } from '~/utils/filterLocaleNavigation'
 import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
 
-const { activeTheme, toggle: toggleWebsiteTheme } = useWebsiteTheme()
 const { locale, localeProperties, t } = useI18n()
 const localePath = useLocalePath()
 const switchLocalePath = useSwitchLocalePath()
@@ -33,10 +32,6 @@ const siteOrigin = 'https://nuxt-content-mermaid.barz.app'
 const socialImageUrl = `${siteOrigin}/assets/nuxt-content-mermaid.png`
 const route = useRoute()
 
-const nextTheme = computed(() => activeTheme.value === 'dark' ? 'light' : 'dark')
-const nextThemeLabel = computed(() => activeTheme.value === 'dark'
-  ? t('actions.switchToLight')
-  : t('actions.switchToDark'))
 const nextLocale = computed<SupportedLocale>(() => locale.value === 'en' ? 'zh' : 'en')
 const nextLocaleLabel = computed(() => nextLocale.value === 'zh'
   ? t('actions.switchToChinese')
@@ -67,10 +62,6 @@ useSeoMeta({
   twitterImage: socialImageUrl,
   twitterImageAlt: 'Nuxt Content Mermaid',
 })
-
-function toggleTheme(event: MouseEvent) {
-  void toggleWebsiteTheme(event)
-}
 
 let mobileViewport: MediaQueryList | undefined
 
@@ -167,29 +158,7 @@ onBeforeUnmount(() => {
         </nav>
 
         <div class="site-actions">
-          <button
-            class="icon-button"
-            type="button"
-            :aria-label="nextThemeLabel"
-            :title="nextThemeLabel"
-            @click="toggleTheme"
-          >
-            <svg
-              v-if="activeTheme === 'dark'"
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-            >
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" />
-            </svg>
-            <svg
-              v-else
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-            >
-              <path d="M20.35 15.35A9 9 0 0 1 8.65 3.65a9 9 0 1 0 11.7 11.7Z" />
-            </svg>
-          </button>
+          <ThemeToggle />
 
           <a
             class="icon-button"

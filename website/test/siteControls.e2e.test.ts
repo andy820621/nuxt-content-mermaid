@@ -24,13 +24,15 @@ async function loadWithSystemColorMode(
   await page.emulateMedia({ colorScheme, reducedMotion })
   await page.goto(url('/'))
   await page.evaluate((storageKey) => localStorage.removeItem(storageKey), colorModeStorageKey)
-  await page.reload()
+  await page.goto(url('/'), { waitUntil: 'hydration' })
+  await page.waitForFunction(() => document.querySelector('button[aria-pressed]') !== null)
 }
 
 describe('documentation website site controls', async () => {
   await setup({
     rootDir: websiteRoot,
     browser: true,
+    host: process.env.WEBSITE_E2E_HOST,
   })
 
   it('uses the system dark preference for the initial color mode', async () => {
@@ -38,6 +40,15 @@ describe('documentation website site controls', async () => {
     await loadWithSystemColorMode(page, 'dark')
 
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('shows the active dark theme and its next action', async () => {
+    const page = await createPage()
+    await loadWithSystemColorMode(page, 'dark')
+
+    const toggle = page.getByRole('button', { name: 'Switch to light mode' })
+    expect(await toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(await toggle.locator('[data-theme-icon="moon"]').count()).toBe(1)
   })
 
   it('persists a manually selected dark mode across a reload', async () => {
@@ -174,7 +185,7 @@ describe('documentation website site controls', async () => {
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
   })
 
-  it('ignores repeated toggles until the active view transition finishes', async () => {
+  it('marks the toggle busy and unavailable until the view transition finishes', async () => {
     const page = await createPage()
     await page.addInitScript(() => {
       let release = () => {}
@@ -198,11 +209,11 @@ describe('documentation website site controls', async () => {
     })
     await loadWithSystemColorMode(page, 'light')
 
-    const toggle = page.locator('.site-actions > button').first()
-    await toggle.click()
+    const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
     await toggle.click()
 
-    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+    expect(await toggle.isDisabled()).toBe(true)
+    expect(await toggle.getAttribute('aria-busy')).toBe('true')
     expect(await page.evaluate(() => {
       return (window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.calls
     })).toBe(1)
@@ -210,5 +221,28 @@ describe('documentation website site controls', async () => {
     await page.evaluate(() => {
       ;(window as Window & { __websiteThemePendingTransition: PendingTransitionLog }).__websiteThemePendingTransition.release()
     })
+    await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
+    expect(await toggle.isDisabled()).toBe(false)
+  })
+
+  it('reveals the next theme action in a tooltip on hover', async () => {
+    const page = await createPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
+    const bounds = await toggle.boundingBox()
+    if (!bounds)
+      throw new Error('Theme toggle must be visible before hovering')
+
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    )
+
+    const tooltip = page.getByRole('tooltip')
+    await tooltip.waitFor({ state: 'visible', timeout: 3000 })
+    expect(await tooltip.count()).toBe(1)
+    expect(await tooltip.isVisible()).toBe(true)
+    expect(await tooltip.textContent()).toBe(await toggle.getAttribute('aria-label'))
   })
 })
