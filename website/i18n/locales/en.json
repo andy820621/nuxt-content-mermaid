@@ -1,0 +1,39 @@
+{
+  "site": {
+    "name": "Nuxt Content Mermaid",
+    "github": "Nuxt Content Mermaid on GitHub",
+    "githubTitle": "GitHub repository"
+  },
+  "navigation": {
+    "documentation": "Documentation",
+    "troubleshooting": "Troubleshooting"
+  },
+  "actions": {
+    "switchToChinese": "Switch to Chinese",
+    "switchToEnglish": "Switch to English",
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "landing": {
+    "eyebrow": "Nuxt Content × Mermaid",
+    "getStarted": "Get started",
+    "features": "Features",
+    "feature1Title": "Write diagrams in Markdown",
+    "feature1Description": "Use familiar Mermaid fences in Nuxt Content.",
+    "feature2Title": "Render interactive diagrams",
+    "feature2Description": "Get theme-aware diagrams with built-in controls.",
+    "feature3Title": "Keep the source readable",
+    "feature3Description": "Preserve readable Markdown when JavaScript is unavailable."
+  },
+  "demo": {
+    "views": "Mermaid demo views",
+    "markdown": "Markdown",
+    "renderedUi": "Rendered UI"
+  },
+  "docs": {
+    "documentation": "Documentation",
+    "onThisPage": "On this page"
+  }
+}

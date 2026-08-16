@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import LandingMermaidDemo from '~/components/LandingMermaidDemo.vue'
 
-const { data: page } = await useAsyncData('landing-page', () => {
-  return queryCollection('docs').path('/').first()
+const { locale } = useI18n()
+const localePath = useLocalePath()
+const landingKey = computed(() => `landing-page:${locale.value}`)
+
+const { data: page } = await useAsyncData(landingKey, () => {
+  return queryCollection('docs').path(localePath('/')).first()
 })
 
 if (!page.value) {
@@ -33,18 +37,16 @@ const landingContentComponents = {
   >
     <section class="landing-hero">
       <div class="landing-hero__copy">
-        <p class="landing-eyebrow">
-          Nuxt Content × Mermaid
-        </p>
+        <p class="landing-eyebrow">{{ $t('landing.eyebrow') }}</p>
         <h1>{{ page.title }}</h1>
         <p class="landing-description">
           {{ page.description }}
         </p>
         <NuxtLink
           class="primary-cta"
-          to="/getting-started"
+          :to="localePath('/getting-started')"
         >
-          Get started
+          {{ $t('landing.getStarted') }}
           <span aria-hidden="true">→</span>
         </NuxtLink>
       </div>
@@ -59,22 +61,22 @@ const landingContentComponents = {
 
     <section
       class="feature-grid"
-      aria-label="Features"
+      :aria-label="$t('landing.features')"
     >
       <article class="feature-card">
         <span class="feature-card__number">01</span>
-        <h2>Write diagrams in Markdown</h2>
-        <p>Use familiar <code>mermaid</code> fences in Nuxt Content.</p>
+        <h2>{{ $t('landing.feature1Title') }}</h2>
+        <p>{{ $t('landing.feature1Description') }}</p>
       </article>
       <article class="feature-card">
         <span class="feature-card__number">02</span>
-        <h2>Render interactive diagrams</h2>
-        <p>Get theme-aware diagrams with built-in controls.</p>
+        <h2>{{ $t('landing.feature2Title') }}</h2>
+        <p>{{ $t('landing.feature2Description') }}</p>
       </article>
       <article class="feature-card">
         <span class="feature-card__number">03</span>
-        <h2>Keep the source readable</h2>
-        <p>Preserve readable Markdown when JavaScript is unavailable.</p>
+        <h2>{{ $t('landing.feature3Title') }}</h2>
+        <p>{{ $t('landing.feature3Description') }}</p>
       </article>
     </section>
   </main>

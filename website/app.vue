@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { ContentNavigationItem } from '@nuxt/content'
+import type { SupportedLocale } from '~/utils/filterLocaleNavigation'
+import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
 
 const { currentTheme, setMermaidTheme } = useMermaidTheme()
+const { locale, localeProperties, t } = useI18n()
+const localePath = useLocalePath()
+const switchLocalePath = useSwitchLocalePath()
 
 const mobileMenuButton = useTemplateRef<HTMLButtonElement>('mobileMenuButton')
 const mobileMenuOpen = ref(false)
@@ -17,7 +22,12 @@ function flattenPages(items: ContentNavigationItem[]): ContentNavigationItem[] {
   ])
 }
 
-const mobileNavigationItems = computed(() => flattenPages(navigation.value ?? []))
+const localizedNavigation = computed(() => filterLocaleNavigation(
+  navigation.value ?? [],
+  locale.value as SupportedLocale,
+))
+
+const mobileNavigationItems = computed(() => flattenPages(localizedNavigation.value))
 
 const activeTheme = computed<'light' | 'dark'>(() =>
   currentTheme.value === 'dark' ? 'dark' : 'light',
@@ -28,10 +38,17 @@ const socialImageUrl = `${siteOrigin}/assets/nuxt-content-mermaid.png`
 const route = useRoute()
 
 const nextTheme = computed(() => activeTheme.value === 'dark' ? 'light' : 'dark')
+const nextThemeLabel = computed(() => activeTheme.value === 'dark'
+  ? t('actions.switchToLight')
+  : t('actions.switchToDark'))
+const nextLocale = computed<SupportedLocale>(() => locale.value === 'en' ? 'zh' : 'en')
+const nextLocaleLabel = computed(() => nextLocale.value === 'zh'
+  ? t('actions.switchToChinese')
+  : t('actions.switchToEnglish'))
 
 useHead(() => ({
   htmlAttrs: {
-    lang: 'en',
+    lang: localeProperties.value.language,
     'data-theme': activeTheme.value,
   },
   bodyAttrs: {
@@ -117,8 +134,8 @@ onBeforeUnmount(() => {
       <div class="site-header__inner">
         <NuxtLink
           class="site-brand"
-          to="/"
-          aria-label="Nuxt Content Mermaid"
+          :to="localePath('/')"
+          :aria-label="$t('site.name')"
         >
           <img
             class="site-brand__icon"
@@ -146,11 +163,11 @@ onBeforeUnmount(() => {
           class="site-nav"
           aria-label="Primary navigation"
         >
-          <NuxtLink to="/getting-started">
-            Documentation
+          <NuxtLink :to="localePath('/getting-started')">
+            {{ $t('navigation.documentation') }}
           </NuxtLink>
-          <NuxtLink to="/troubleshooting">
-            Troubleshooting
+          <NuxtLink :to="localePath('/troubleshooting')">
+            {{ $t('navigation.troubleshooting') }}
           </NuxtLink>
         </nav>
 
@@ -158,8 +175,8 @@ onBeforeUnmount(() => {
           <button
             class="icon-button"
             type="button"
-            :aria-label="`Switch to ${nextTheme} mode`"
-            :title="`Switch to ${nextTheme} mode`"
+            :aria-label="nextThemeLabel"
+            :title="nextThemeLabel"
             @click="toggleTheme"
           >
             <svg
@@ -182,8 +199,8 @@ onBeforeUnmount(() => {
           <a
             class="icon-button"
             href="https://github.com/andy820621/nuxt-content-mermaid"
-            aria-label="Nuxt Content Mermaid on GitHub"
-            title="GitHub repository"
+            :aria-label="$t('site.github')"
+            :title="$t('site.githubTitle')"
           >
             <svg
               aria-hidden="true"
@@ -193,13 +210,22 @@ onBeforeUnmount(() => {
             </svg>
           </a>
 
+          <NuxtLink
+            class="icon-button locale-switch"
+            :to="switchLocalePath(nextLocale)"
+            :aria-label="nextLocaleLabel"
+            :title="nextLocaleLabel"
+          >
+            {{ nextLocale === 'zh' ? '中' : 'EN' }}
+          </NuxtLink>
+
           <button
             id="mobile-menu-button"
             ref="mobileMenuButton"
             class="icon-button mobile-menu-toggle"
             type="button"
-            :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'"
-            :title="mobileMenuOpen ? 'Close menu' : 'Open menu'"
+            :aria-label="mobileMenuOpen ? $t('actions.closeMenu') : $t('actions.openMenu')"
+            :title="mobileMenuOpen ? $t('actions.closeMenu') : $t('actions.openMenu')"
             :aria-expanded="mobileMenuOpen"
             aria-controls="mobile-documentation-menu"
             @click="toggleMobileMenu"
@@ -230,9 +256,9 @@ onBeforeUnmount(() => {
     >
       <nav
         class="mobile-documentation-menu__inner"
-        aria-label="Documentation"
+        :aria-label="$t('navigation.documentation')"
       >
-        <p>Documentation</p>
+        <p>{{ $t('navigation.documentation') }}</p>
         <NuxtLink
           v-for="item in mobileNavigationItems"
           :key="item.path"

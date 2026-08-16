@@ -14,8 +14,8 @@ const props = defineProps<{
 }>()
 
 const tabs = [
-  { id: 'source', label: 'Markdown' },
-  { id: 'preview', label: 'Rendered UI' },
+  { id: 'source', labelKey: 'demo.markdown' },
+  { id: 'preview', labelKey: 'demo.renderedUi' },
 ] as const
 
 const activeTab = ref<DemoTab>('preview')
@@ -59,7 +59,7 @@ async function handleTabKeydown(event: KeyboardEvent, index: number) {
       <div
         class="landing-demo__tabs"
         role="tablist"
-        aria-label="Mermaid demo views"
+        :aria-label="$t('demo.views')"
       >
         <button
           v-for="(tab, index) in tabs"
@@ -100,7 +100,7 @@ async function handleTabKeydown(event: KeyboardEvent, index: number) {
             />
             <path d="M3 9h18M7 6.5h.01M10 6.5h.01M8 14h3M13 12h3M13 16h3" />
           </svg>
-          {{ tab.label }}
+          {{ $t(tab.labelKey) }}
         </button>
       </div>
 

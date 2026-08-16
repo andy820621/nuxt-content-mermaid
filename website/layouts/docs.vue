@@ -6,6 +6,8 @@ const props = defineProps<{
   navigation: ContentNavigationItem[]
 }>()
 
+const { t } = useI18n()
+
 function flattenPages(items: ContentNavigationItem[]): ContentNavigationItem[] {
   return items.flatMap(item => [
     ...(item.page === false ? [] : [item]),
@@ -21,7 +23,7 @@ const tocLinks = computed(() => props.page.body.toc?.links ?? [])
   <div class="docs-shell">
     <div class="docs-grid">
       <aside class="docs-sidebar">
-        <nav aria-label="Documentation">
+        <nav :aria-label="t('docs.documentation')">
           <NuxtLink
             v-for="item in sidebarItems"
             :key="item.path"
@@ -48,8 +50,8 @@ const tocLinks = computed(() => props.page.body.toc?.links ?? [])
         v-if="tocLinks.length"
         class="docs-toc"
       >
-        <nav aria-label="On this page">
-          <p>On this page</p>
+        <nav :aria-label="t('docs.onThisPage')">
+          <p>{{ t('docs.onThisPage') }}</p>
           <ul>
             <li
               v-for="link in tocLinks"

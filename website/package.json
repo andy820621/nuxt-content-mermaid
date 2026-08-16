@@ -10,6 +10,7 @@
   "dependencies": {
     "@barzhsieh/nuxt-content-mermaid": "workspace:*",
     "@nuxt/content": "catalog:integrations",
+    "@nuxtjs/i18n": "^10.6.0",
     "better-sqlite3": "12.5.0",
     "nuxt": "catalog:dev"
   },

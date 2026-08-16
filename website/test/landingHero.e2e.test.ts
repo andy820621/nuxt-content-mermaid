@@ -127,4 +127,25 @@ describe('documentation website landing hero', async () => {
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
   })
+
+  it('renders the Chinese landing page with zh-TW metadata and an English switch link', async () => {
+    const page = await createPage()
+    await page.goto(url('/zh'))
+
+    expect(await page.locator('html').getAttribute('lang')).toBe('zh-TW')
+    expect(await page.getByRole('heading', { name: 'Nuxt Content 原生支援 Mermaid 圖表' }).count()).toBe(1)
+
+    const switchLink = page.getByRole('link', { name: '切換至英文' })
+    expect(await switchLink.count()).toBe(1)
+    expect(await switchLink.getAttribute('href')).toBe('/')
+  })
+
+  it('renders a Chinese documentation route without English navigation entries', async () => {
+    const page = await createPage()
+    await page.goto(url('/zh/getting-started'))
+
+    expect(await page.getByRole('heading', { name: '開始使用' }).count()).toBeGreaterThan(0)
+    expect(await page.getByRole('link', { name: '開始使用' }).count()).toBeGreaterThan(0)
+    expect(await page.getByRole('link', { name: 'Getting Started' }).count()).toBe(0)
+  })
 })
