@@ -58,6 +58,51 @@ describe('documentation website landing hero', async () => {
     expect(await sourceTab.getAttribute('aria-selected')).toBe('true')
   })
 
+  it('uses outline icons and an underline active state in both themes', async () => {
+    const page = await createPage()
+    await page.goto(url('/'))
+
+    const sourceTab = page.getByRole('tab', { name: 'Markdown' })
+    const previewTab = page.getByRole('tab', { name: 'Rendered UI' })
+    const readTabStyle = (tab: typeof previewTab) => tab.evaluate((element) => {
+      const style = getComputedStyle(element)
+      const underline = getComputedStyle(element, '::after')
+      return {
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        fontWeight: Number.parseInt(style.fontWeight, 10),
+        underlineHeight: underline.height,
+        underlineColor: underline.backgroundColor,
+        underlineShadow: underline.boxShadow,
+      }
+    })
+
+    expect(await sourceTab.locator('.landing-demo__tab-icon').count()).toBe(1)
+    expect(await previewTab.locator('.landing-demo__tab-icon').count()).toBe(1)
+    expect(await page.locator('.landing-demo__tab-badge').count()).toBe(0)
+
+    const lightActive = await readTabStyle(previewTab)
+    const lightInactive = await readTabStyle(sourceTab)
+    expect(lightActive.color).not.toBe(lightInactive.color)
+    expect(lightActive.fontWeight).toBeGreaterThan(lightInactive.fontWeight)
+    expect(lightActive.backgroundColor).toBe('rgba(0, 0, 0, 0)')
+    expect(lightActive.underlineHeight).toBe('3px')
+    expect(lightActive.underlineColor).not.toBe('rgba(0, 0, 0, 0)')
+    expect(lightActive.underlineShadow).toBe('none')
+
+    await sourceTab.click()
+    expect((await readTabStyle(sourceTab)).underlineHeight).toBe('3px')
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
+
+    const darkActive = await readTabStyle(sourceTab)
+    const darkInactive = await readTabStyle(previewTab)
+    expect(darkActive.color).not.toBe(darkInactive.color)
+    expect(darkActive.underlineHeight).toBe('3px')
+    expect(darkActive.underlineShadow).not.toBe('none')
+  })
+
   it('contains source overflow at a 320px viewport in both themes', async () => {
     const page = await createPage()
     await page.setViewportSize({ width: 320, height: 900 })

@@ -14,8 +14,8 @@ const props = defineProps<{
 }>()
 
 const tabs = [
-  { id: 'source', label: 'Markdown', badge: 'MD' },
-  { id: 'preview', label: 'Rendered UI', badge: 'UI' },
+  { id: 'source', label: 'Markdown' },
+  { id: 'preview', label: 'Rendered UI' },
 ] as const
 
 const activeTab = ref<DemoTab>('preview')
@@ -76,10 +76,30 @@ async function handleTabKeydown(event: KeyboardEvent, index: number) {
           @click="selectTab(tab.id)"
           @keydown="handleTabKeydown($event, index)"
         >
-          <span
-            class="landing-demo__tab-badge"
+          <svg
+            v-if="tab.id === 'source'"
+            class="landing-demo__tab-icon"
             aria-hidden="true"
-          >{{ tab.badge }}</span>
+            viewBox="0 0 24 24"
+          >
+            <path d="M6 3h8l4 4v14H6z" />
+            <path d="M14 3v5h5M9 13l-2 2 2 2M15 13l2 2-2 2M13 12l-2 6" />
+          </svg>
+          <svg
+            v-else
+            class="landing-demo__tab-icon"
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          >
+            <rect
+              x="3"
+              y="4"
+              width="18"
+              height="16"
+              rx="2"
+            />
+            <path d="M3 9h18M7 6.5h.01M10 6.5h.01M8 14h3M13 12h3M13 16h3" />
+          </svg>
           {{ tab.label }}
         </button>
       </div>

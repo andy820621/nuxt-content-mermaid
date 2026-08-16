@@ -300,6 +300,7 @@ html[data-theme='dark'] .shiki span {
 }
 
 .landing-demo__tab {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -315,23 +316,42 @@ html[data-theme='dark'] .shiki span {
   cursor: pointer;
 }
 
-.landing-demo__tab:hover,
-.landing-demo__tab--active {
+.landing-demo__tab:hover:not(.landing-demo__tab--active) {
   color: var(--text);
   background: var(--surface-elevated);
 }
 
-.landing-demo__tab-badge {
-  display: inline-grid;
-  width: 1.4rem;
-  height: 1.4rem;
-  place-items: center;
-  color: var(--accent-contrast);
-  background: var(--accent-strong);
-  border-radius: 0.3rem;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 0.58rem;
-  font-weight: 800;
+.landing-demo__tab--active {
+  color: var(--accent-strong);
+  background: transparent;
+  font-weight: 730;
+}
+
+.landing-demo__tab--active::after {
+  position: absolute;
+  right: 0.7rem;
+  bottom: calc(-0.55rem - 1px);
+  left: 0.7rem;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+  content: "";
+  pointer-events: none;
+}
+
+html[data-theme='dark'] .landing-demo__tab--active::after {
+  box-shadow: 0 -3px 10px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.landing-demo__tab-icon {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .landing-demo__panel {
