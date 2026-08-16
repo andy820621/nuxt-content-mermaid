@@ -3,7 +3,7 @@
   <title id="title">Nuxt Content Mermaid icon</title>
   <defs>
     <linearGradient id="icon-green" x1="14" y1="8" x2="84" y2="90" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#00DC82"/>
+      <stop stop-color="oklch(76.5% .177 163.223)"/>
       <stop offset="1" stop-color="#00C16F"/>
     </linearGradient>
     <linearGradient id="icon-highlight" x1="48" y1="2" x2="48" y2="94" gradientUnits="userSpaceOnUse">
