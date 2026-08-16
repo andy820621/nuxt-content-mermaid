@@ -10,6 +10,7 @@ catalogs:
   dev:
     '@nuxt/devtools': 3.4.1
     '@nuxt/eslint-config': 1.17.0
+    '@nuxt/icon': 2.5.0
     '@nuxt/module-builder': 1.0.3
     '@nuxtjs/color-mode': 4.0.1
     changelogen: ^0.6.2

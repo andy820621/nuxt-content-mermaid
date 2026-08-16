@@ -15,6 +15,8 @@ export default defineNuxtConfig({
     '@nuxt/content',
     '@barzhsieh/nuxt-content-mermaid',
     '@nuxtjs/i18n',
+    '@nuxtjs/color-mode',
+    '@nuxt/icon',
   ],
   css: ['~/assets/css/main.css'],
   mdc: {
@@ -38,6 +40,12 @@ export default defineNuxtConfig({
     strategy: 'prefix_except_default',
     defaultLocale: 'en',
     detectBrowserLanguage: false,
+  },
+  colorMode: {
+    preference: 'system',
+    fallback: 'light',
+    dataValue: 'theme',
+    storageKey: 'nuxt-content-mermaid-color-mode',
   },
   compatibilityDate: '2025-11-24',
 })

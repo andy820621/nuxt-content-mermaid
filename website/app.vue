@@ -3,7 +3,7 @@ import type { ContentNavigationItem } from '@nuxt/content'
 import type { SupportedLocale } from '~/utils/filterLocaleNavigation'
 import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
 
-const { currentTheme, setMermaidTheme } = useMermaidTheme()
+const { activeTheme, toggle: toggleWebsiteTheme } = useWebsiteTheme()
 const { locale, localeProperties, t } = useI18n()
 const localePath = useLocalePath()
 const switchLocalePath = useSwitchLocalePath()
@@ -29,10 +29,6 @@ const localizedNavigation = computed(() => filterLocaleNavigation(
 
 const mobileNavigationItems = computed(() => flattenPages(localizedNavigation.value))
 
-const activeTheme = computed<'light' | 'dark'>(() =>
-  currentTheme.value === 'dark' ? 'dark' : 'light',
-)
-
 const siteOrigin = 'https://nuxt-content-mermaid.barz.app'
 const socialImageUrl = `${siteOrigin}/assets/nuxt-content-mermaid.png`
 const route = useRoute()
@@ -49,7 +45,6 @@ const nextLocaleLabel = computed(() => nextLocale.value === 'zh'
 useHead(() => ({
   htmlAttrs: {
     lang: localeProperties.value.language,
-    'data-theme': activeTheme.value,
   },
   bodyAttrs: {
     class: mobileMenuOpen.value ? 'mobile-menu-open' : undefined,
@@ -73,8 +68,8 @@ useSeoMeta({
   twitterImageAlt: 'Nuxt Content Mermaid',
 })
 
-function toggleTheme() {
-  setMermaidTheme(nextTheme.value)
+function toggleTheme(event: MouseEvent) {
+  void toggleWebsiteTheme(event)
 }
 
 let mobileViewport: MediaQueryList | undefined
