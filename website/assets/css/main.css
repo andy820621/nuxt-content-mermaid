@@ -196,12 +196,13 @@ html[data-theme='dark'] .shiki span {
 
 .locale-switcher {
   width: auto;
-  padding: 0 1rem;
+  padding: 0 .81rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: .9rem;
   font-weight: 700;
-  line-height: 1;
+  line-height: .9rem;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .theme-toggle-placeholder {

@@ -39,6 +39,7 @@ function toggleTheme(event: MouseEvent) {
         >
           <Icon
             aria-hidden="true"
+            size="20"
             :name="activeTheme === 'dark' ? 'line-md:moon' : 'line-md:sunny-outline'"
           />
         </span>
@@ -48,6 +49,7 @@ function toggleTheme(event: MouseEvent) {
         >
           <Icon
             aria-hidden="true"
+            size="20"
             :name="activeTheme === 'dark' ? 'line-md:moon-twotone' : 'line-md:sunny-outline-twotone-loop'"
           />
         </span>
