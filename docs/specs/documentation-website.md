@@ -95,7 +95,7 @@ Advanced pages 的責任如下：
 - Nuxt page/layout outlet。
 - Project ownership 與 MIT License footer。
 
-Footer 顯示專案擁有者與 MIT License。作者與 license links 在安全的新分頁開啟；footer 在短頁面貼齊 viewport 底部，長頁面則跟隨內容。
+Footer 顯示 `© 2025–present BarZ Hsieh · MIT License`。作者與 license links 在安全的新分頁開啟；footer 在短頁面貼齊 viewport 底部，長頁面則跟隨內容。
 
 ### Responsive navigation
 
