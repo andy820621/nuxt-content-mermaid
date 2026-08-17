@@ -10,7 +10,7 @@
 - 2026-08-15：完成第四階段 wordmark 簡化，以單一 SVG 配合 CSS `currentColor` 支援 light/dark theme。
 - 2026-08-15：完成第五階段 responsive navigation 優化，以單一手機文件選單與高辨識 active state 改善導覽。
 - 2026-08-15：完成第六階段 code readability 優化，以正確的 Shiki dark tokens、高對比暗色 palette 與一致的 inline／fenced code 排版改善閱讀體驗。
-- 2026-08-17：核准第八階段 desktop page TOC 優化，以 Portfolio 式 scrollspy 與 Nuxt UI 式 active 指示線改善長文件定位。
+- 2026-08-17：完成第八階段 desktop page TOC 優化，以 Portfolio 式 scrollspy 與 Nuxt UI 式 active 指示線改善長文件定位。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
