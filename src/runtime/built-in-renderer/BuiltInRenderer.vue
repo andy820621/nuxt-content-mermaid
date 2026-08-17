@@ -795,6 +795,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   height: 100%;
 }
 .mermaid-wrapper > div > :deep(svg) {
+  display: block;
   margin: 0 auto;
 }
 .mermaid-wrapper :deep(pre),
