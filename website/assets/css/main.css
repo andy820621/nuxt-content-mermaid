@@ -477,46 +477,6 @@ html[data-theme='dark'] .landing-demo__tab--active::after {
   font: inherit;
 }
 
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: clamp(5rem, 10vw, 8rem);
-}
-
-.feature-card {
-  min-width: 0;
-  padding: 1.5rem;
-  background: color-mix(in srgb, var(--surface-elevated) 75%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 0.9rem;
-}
-
-.feature-card__number {
-  color: var(--accent);
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.feature-card h2 {
-  margin: 1.35rem 0 0.6rem;
-  font-size: 1.08rem;
-  letter-spacing: -0.015em;
-  line-height: 1.3;
-}
-
-.feature-card p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.94rem;
-}
-
-.feature-card code {
-  color: var(--text);
-  font-size: 0.88em;
-}
-
 .docs-grid {
   display: grid;
   grid-template-columns: minmax(11rem, 15rem) minmax(0, 48rem) minmax(10rem, 14rem);
@@ -783,11 +743,6 @@ html[data-theme='dark'] .landing-demo__tab--active::after {
 
   .landing-demo::before {
     inset: -0.75rem;
-  }
-
-  .feature-grid {
-    grid-template-columns: 1fr;
-    margin-top: 4rem;
   }
 
   .docs-grid {

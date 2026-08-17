@@ -18,14 +18,7 @@
   },
   "landing": {
     "eyebrow": "Nuxt Content × Mermaid",
-    "getStarted": "Get started",
-    "features": "Features",
-    "feature1Title": "Write diagrams in Markdown",
-    "feature1Description": "Use familiar Mermaid fences in Nuxt Content.",
-    "feature2Title": "Render interactive diagrams",
-    "feature2Description": "Get theme-aware diagrams with built-in controls.",
-    "feature3Title": "Keep the source readable",
-    "feature3Description": "Preserve readable Markdown when JavaScript is unavailable."
+    "getStarted": "Get started"
   },
   "demo": {
     "views": "Mermaid demo views",

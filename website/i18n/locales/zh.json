@@ -18,14 +18,7 @@
   },
   "landing": {
     "eyebrow": "Nuxt Content × Mermaid",
-    "getStarted": "開始使用",
-    "features": "功能",
-    "feature1Title": "在 Markdown 中撰寫圖表",
-    "feature1Description": "在 Nuxt Content 中使用熟悉的 Mermaid 圍欄。",
-    "feature2Title": "渲染互動式圖表",
-    "feature2Description": "取得支援主題並內建控制項的圖表。",
-    "feature3Title": "保持原始碼可讀",
-    "feature3Description": "即使 JavaScript 無法使用，也保留可讀的 Markdown。"
+    "getStarted": "開始使用"
   },
   "demo": {
     "views": "Mermaid 示範檢視",

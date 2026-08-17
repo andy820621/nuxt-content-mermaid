@@ -59,25 +59,5 @@ const landingContentComponents = {
       />
     </section>
 
-    <section
-      class="feature-grid"
-      :aria-label="$t('landing.features')"
-    >
-      <article class="feature-card">
-        <span class="feature-card__number">01</span>
-        <h2>{{ $t('landing.feature1Title') }}</h2>
-        <p>{{ $t('landing.feature1Description') }}</p>
-      </article>
-      <article class="feature-card">
-        <span class="feature-card__number">02</span>
-        <h2>{{ $t('landing.feature2Title') }}</h2>
-        <p>{{ $t('landing.feature2Description') }}</p>
-      </article>
-      <article class="feature-card">
-        <span class="feature-card__number">03</span>
-        <h2>{{ $t('landing.feature3Title') }}</h2>
-        <p>{{ $t('landing.feature3Description') }}</p>
-      </article>
-    </section>
   </main>
 </template>

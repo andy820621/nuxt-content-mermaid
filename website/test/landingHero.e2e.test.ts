@@ -51,6 +51,15 @@ describe('documentation website landing hero', async () => {
     expect(await previewPanel.isVisible()).toBe(false)
   })
 
+  it('ends after the hero without a duplicated feature section', async () => {
+    const page = await createLightPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    expect(await page.locator('main.landing > section').count()).toBe(1)
+    expect(await page.locator('main.landing > .landing-hero').count()).toBe(1)
+    expect(await page.getByText('Write diagrams in Markdown').count()).toBe(0)
+  })
+
   it('supports Arrow, Home, and End keyboard navigation', async () => {
     const page = await createLightPage()
     await page.goto(url('/'), { waitUntil: 'hydration' })
