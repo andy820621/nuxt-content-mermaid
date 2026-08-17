@@ -45,7 +45,10 @@ const contentTypes: Record<string, string> = {
 }
 
 function generatedRouteFile(path: string) {
-  return join(generatedRoot, ...path.split('/').filter(Boolean), 'index.html')
+  if (path === '/')
+    return join(generatedRoot, 'index.html')
+
+  return join(generatedRoot, `${path.slice(1)}.html`)
 }
 
 function normalizeText(text: string | null) {
@@ -98,14 +101,41 @@ describe('generated documentation website', () => {
     server = createServer(async (request, response) => {
       try {
         const requestURL = new URL(request.url ?? '/', 'http://127.0.0.1')
-        let filePath = join(generatedRoot, decodeURIComponent(requestURL.pathname))
-        if ((await stat(filePath)).isDirectory())
-          filePath = join(filePath, 'index.html')
+        const pathname = decodeURIComponent(requestURL.pathname)
+        const htmlPath = pathname === '/'
+          ? join(generatedRoot, 'index.html')
+          : join(generatedRoot, `${pathname.slice(1).replace(/\/$/, '')}.html`)
+        let filePath = htmlPath
 
+        try {
+          await stat(htmlPath)
+
+          if (pathname !== '/' && pathname.endsWith('/')) {
+            response.writeHead(308, {
+              location: `${requestURL.pathname.slice(0, -1)}${requestURL.search}`,
+            })
+            response.end()
+            return
+          }
+        }
+        catch {
+          filePath = join(generatedRoot, pathname)
+          if ((await stat(filePath)).isDirectory()) {
+            if (!pathname.endsWith('/')) {
+              response.writeHead(308, { location: `${requestURL.pathname}/${requestURL.search}` })
+              response.end()
+              return
+            }
+
+            filePath = join(filePath, 'index.html')
+          }
+        }
+
+        const body = await readFile(filePath)
         response.writeHead(200, {
           'content-type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
         })
-        response.end(await readFile(filePath))
+        response.end(body)
       }
       catch {
         response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })

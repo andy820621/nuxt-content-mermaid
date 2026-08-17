@@ -29,6 +29,7 @@ export default defineNuxtConfig({
   },
   nitro: {
     prerender: {
+      autoSubfolderIndex: false,
       routes: [...PUBLIC_ROUTES, '/sitemap.xml'],
     },
     publicAssets: [
