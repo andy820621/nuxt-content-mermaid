@@ -1,6 +1,7 @@
 import type { LocaleObject } from '@nuxtjs/i18n'
 import { fileURLToPath } from 'node:url'
 import type { SupportedLocale } from './types/i18n'
+import { PUBLIC_ROUTES } from './utils/site'
 
 const brandAssetsDir = fileURLToPath(new URL('../src/assets', import.meta.url))
 
@@ -27,6 +28,9 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
+    prerender: {
+      routes: [...PUBLIC_ROUTES, '/sitemap.xml'],
+    },
     publicAssets: [
       {
         baseURL: '/assets',
