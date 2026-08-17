@@ -11,6 +11,7 @@
 - 2026-08-15：完成第五階段 responsive navigation 優化，以單一手機文件選單與高辨識 active state 改善導覽。
 - 2026-08-15：完成第六階段 code readability 優化，以正確的 Shiki dark tokens、高對比暗色 palette 與一致的 inline／fenced code 排版改善閱讀體驗。
 - 2026-08-17：完成第八階段 desktop page TOC 優化，以 Portfolio 式 scrollspy 與 Nuxt UI 式 active 指示線改善長文件定位。
+- 2026-08-17：移除重複且資訊價值偏低的首頁功能卡片，讓首頁收斂為單一 hero。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
@@ -281,23 +282,8 @@ flowchart TD
 - 以 page `title` 與 `description` 排版 hero。
 - 顯示 `Get started` primary CTA，連到 `/getting-started`。
 - 在 hero 右側放置 page `ContentRenderer`，並以 `LandingMermaidDemo` 提供 Markdown／Rendered UI tabs。
-- 顯示三張固定功能卡片。
 
-三張卡片的 title 固定為：
-
-1. `Write diagrams in Markdown`
-2. `Render interactive diagrams`
-3. `Keep the source readable`
-
-卡片 description 應以使用者結果描述，避免 `authoring surface`、`module transform`、`fallback contract` 等內部術語。初始文案為：
-
-| Title | Description |
-| --- | --- |
-| Write diagrams in Markdown | Use familiar `mermaid` fences in Nuxt Content. |
-| Render interactive diagrams | Get theme-aware diagrams with built-in controls. |
-| Keep the source readable | Preserve readable Markdown when JavaScript is unavailable. |
-
-Cards 是 landing presentation，不進入 frontmatter、collection schema 或另一份資料檔。三筆固定內容可以直接留在 `pages/index.vue`，避免為單一 caller 建立淺薄資料 module。
+Hero 是首頁唯一的內容 section。產品價值、真實 Mermaid demo 與主要 CTA 已在首屏完成溝通，不在其後重複同一組訊息。
 
 ### Visual direction
 
@@ -308,8 +294,8 @@ Cards 是 landing presentation，不進入 frontmatter、collection schema 或�
 - Headline 保留原文，以約 `-0.038em` 字距、較寬的 copy column 與自然換行降低壓迫感。
 - Desktop 採較寬文字欄與較窄 TD diagram 欄；mobile 改為上下堆疊。
 - 右側使用有邊框的 Markdown／Rendered UI tab frame，預設顯示真實 rendered UI。
-- 三張簡短 cards；desktop 三欄、mobile 單欄。
 - 清楚的 primary CTA。
+- Hero 結束後直接結束首頁內容，不為填滿版面新增次要區塊。
 
 不得取回：
 
@@ -483,11 +469,11 @@ website/
 
 | 檔案 | 動作 | 設計責任 |
 | --- | --- | --- |
-| `website/pages/index.vue` | 新增 | 查詢首頁 page、404/SEO、hero、CTA、`ContentRenderer` 與三張 cards。 |
+| `website/pages/index.vue` | 新增 | 查詢首頁 page、404/SEO、hero、CTA 與 `ContentRenderer`。 |
 | `website/app.vue` | 修改 | 成為全站 shell，提供 header、theme toggle、GitHub 與 skip link。 |
 | `website/layouts/docs.vue` | 修改 | 移除重複 header／skip link，只保留 docs sidebar、content 與 TOC。 |
 | `website/content/1.index.md` | 修改 | 只留下核准的內建 frontmatter 與一個 Mermaid fence。 |
-| `website/assets/css/main.css` | 修改 | 加入全站 header、light/dark tokens、landing hero/cards 與 responsive styles；保留 docs styles。 |
+| `website/assets/css/main.css` | 修改 | 加入全站 header、light/dark tokens、landing hero 與 responsive styles；保留 docs styles。 |
 
 本次不修改：
 
@@ -517,7 +503,7 @@ website/
 第三階段不修改：
 
 - `website/content/**`、`website/content.config.ts` 與 `website/layouts/docs.vue`。
-- Landing hero、CTA、功能 cards 與真實 Mermaid `ContentRenderer` demo。
+- Landing hero、CTA 與真實 Mermaid `ContentRenderer` demo。
 - `website/package.json`、workspace 設定與 lockfile。
 - Root scripts、CI、artifact 與 release files。
 
@@ -623,12 +609,12 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 5. `content/1.index.md` 只有三個核准 frontmatter fields 與一個 Mermaid fence。
 6. 首頁 Mermaid diagram 成功經過 Markdown → Content → package transform → browser render。
 7. `Rendered UI` 預設啟用；`Markdown` 顯示與首頁 fence 完全相同的 source，兩者共用 transform 的同一份 encoded `code`。兩個 trigger 使用 outline icon；active 同時由 accent 文字、較高字重與 3px underline 表達，dark theme 的低強度 glow 不取代 focus outline。
-8. 三張 cards 使用核准的 titles，且不由 schema 或資料檔生成。
+8. Hero 是首頁唯一的直接子 section，首頁不再重複顯示功能卡片。
 9. Desktop Header 在 landing 與文件頁直接顯示 Documentation、Troubleshooting、theme toggle 與 GitHub link；手機 Header 只直接顯示品牌、theme toggle、GitHub 與 hamburger。
 10. Theme toggle 同步網站外觀與 Mermaid theme，landing 不強制 dark mode。
 11. `pages/[...slug].vue` 繼續處理五個文件 routes；`layouts/docs.vue` 在 desktop 提供 sidebar 與 TOC，在手機完全隱藏 sidebar。
 12. `/` 不出現在 sidebar；Troubleshooting 保留 route、名稱與 sidebar entry。
-13. Desktop landing 是 hero 雙欄與三欄 cards；mobile 改為單欄，Header 保持單列且不再讓文字導覽換行。
+13. Desktop landing 是 hero 雙欄；mobile 改為上下堆疊，Header 保持單列且不再讓文字導覽換行。
 14. Repo 中沒有 landing collection/schema、index.yml、authored MDC landing component、demo asset 或替代 records。
 15. Contract Demo、artifact identity、lazy proof、verifier 與其他網站驗證系統仍不存在。
 16. Root、CI、artifact 與 release 繼續不讀取或驗證網站；browser test 只由 website-local script 執行。
