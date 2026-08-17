@@ -1,0 +1,27 @@
+{
+  "name": "nuxt-content-mermaid-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@barzhsieh/nuxt-content-mermaid": "workspace:*",
+    "@nuxt/content": "catalog:integrations",
+    "@nuxtjs/i18n": "^10.6.0",
+    "better-sqlite3": "12.5.0",
+    "nuxt": "catalog:dev",
+    "reka-ui": "^2.10.3"
+  },
+  "devDependencies": {
+    "@iconify-json/line-md": "^1.2.16",
+    "@iconify-json/material-symbols-light": "^1.2.88",
+    "@nuxt/test-utils": "catalog:test",
+    "@nuxt/icon": "catalog:dev",
+    "@nuxtjs/color-mode": "catalog:dev",
+    "playwright": "catalog:test",
+    "vitest": "catalog:test"
+  }
+}

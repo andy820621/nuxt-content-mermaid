@@ -7,6 +7,8 @@ export default defineConfig({
       '**/node_modules/**',
       '**/.git/**',
       '**/.agents/**',
+      '**/.worktrees/**',
+      'website/**',
     ],
   },
 })

@@ -1,0 +1,32 @@
+{
+  "site": {
+    "name": "Nuxt Content Mermaid",
+    "github": "Nuxt Content Mermaid on GitHub",
+    "githubTitle": "GitHub repository"
+  },
+  "navigation": {
+    "documentation": "Documentation",
+    "troubleshooting": "Troubleshooting"
+  },
+  "actions": {
+    "switchToChinese": "Switch to Chinese",
+    "switchToEnglish": "Switch to English",
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "landing": {
+    "eyebrow": "Nuxt Content × Mermaid",
+    "getStarted": "Get started"
+  },
+  "demo": {
+    "views": "Mermaid demo views",
+    "markdown": "Markdown",
+    "renderedUi": "Rendered UI"
+  },
+  "docs": {
+    "documentation": "Documentation",
+    "onThisPage": "On this page"
+  }
+}

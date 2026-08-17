@@ -1,0 +1,437 @@
+import { fileURLToPath } from 'node:url'
+import { createPage, setup, url } from '@nuxt/test-utils/e2e'
+import { describe, expect, it } from 'vitest'
+
+const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
+const colorModeStorageKey = 'nuxt-content-mermaid-color-mode'
+
+type ViewTransitionLog = {
+  animations: Array<{ keyframes: Array<{ clipPath?: string }>, timing: { duration?: number, pseudoElement?: string } }>
+  calls: number
+  clicks?: Array<{ x: number, y: number }>
+  stacks?: Array<{
+    old: { animationName: string, zIndex: number }
+    new: { animationName: string, zIndex: number }
+  }>
+}
+
+type PendingTransitionLog = {
+  calls: number
+  release: () => void
+}
+
+function createSiteControlsPage() {
+  return createPage(undefined, {
+    colorScheme: 'light',
+    storageState: { cookies: [], origins: [] },
+  })
+}
+
+async function loadWithSystemColorMode(
+  page: Awaited<ReturnType<typeof createPage>>,
+  colorScheme: 'dark' | 'light',
+  reducedMotion?: 'reduce' | 'no-preference',
+) {
+  await page.emulateMedia({ colorScheme, reducedMotion })
+  await page.goto(url('/'), { waitUntil: 'hydration' })
+  await page.waitForFunction(() => document.querySelector('button[aria-pressed]') !== null)
+}
+
+describe('documentation website site controls', async () => {
+  await setup({
+    rootDir: websiteRoot,
+    browser: true,
+    host: process.env.WEBSITE_E2E_HOST,
+  })
+
+  it('uses the system dark preference for the initial color mode', async () => {
+    const page = await createSiteControlsPage()
+    await loadWithSystemColorMode(page, 'dark')
+
+    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('shows the active dark theme and its next action', async () => {
+    const page = await createSiteControlsPage()
+    await loadWithSystemColorMode(page, 'dark')
+
+    const toggle = page.getByRole('button', { name: 'Switch to light mode' })
+    expect(await toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(await toggle.locator('[data-theme-icon="moon"]').count()).toBe(1)
+  })
+
+  it('persists a manually selected dark mode across a reload', async () => {
+    const page = await createSiteControlsPage()
+    await loadWithSystemColorMode(page, 'light')
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+    await page.waitForFunction(storageKey =>
+      document.documentElement.dataset.theme === 'dark'
+      && localStorage.getItem(storageKey) === 'dark', colorModeStorageKey)
+
+    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+    expect(await page.evaluate(storageKey => localStorage.getItem(storageKey), colorModeStorageKey)).toBe('dark')
+
+    await page.reload()
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
+
+    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('redraws the Mermaid SVG when the color mode changes', { timeout: 10000 }, async () => {
+    const page = await createSiteControlsPage()
+    await loadWithSystemColorMode(page, 'light')
+
+    const svg = page.locator('.mermaid-block .mermaid > svg')
+    await page.waitForFunction(() => document.querySelector('.mermaid-block .mermaid > svg') !== null)
+    const initialSvg = await svg.evaluate(element => element.outerHTML)
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+
+    const redrawn = await page.evaluate(async (previousSvg) => {
+      const deadline = Date.now() + 2000
+      while (Date.now() < deadline) {
+        if (document.querySelector('.mermaid-block .mermaid > svg')?.outerHTML !== previousSvg)
+          return true
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      return false
+    }, initialSvg)
+
+    expect(redrawn).toBe(true)
+  })
+
+  it('animates the visible root snapshot in both theme directions', async () => {
+    const page = await createSiteControlsPage()
+    await page.addInitScript(() => {
+      const log: ViewTransitionLog = { animations: [], calls: 0, clicks: [], stacks: [] }
+      ;(window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog = log
+      document.addEventListener('click', (event) => {
+        log.clicks?.push({ x: event.clientX, y: event.clientY })
+      })
+      const animate = Element.prototype.animate
+      Element.prototype.animate = function (keyframes, timing) {
+        if (this === document.documentElement) {
+          log.animations.push({
+            keyframes: keyframes as Array<{ clipPath?: string }>,
+            timing: timing as { duration?: number, pseudoElement?: string },
+          })
+          const oldStyle = getComputedStyle(document.documentElement, '::view-transition-old(root)')
+          const newStyle = getComputedStyle(document.documentElement, '::view-transition-new(root)')
+          log.stacks?.push({
+            old: { animationName: oldStyle.animationName, zIndex: Number(oldStyle.zIndex) },
+            new: { animationName: newStyle.animationName, zIndex: Number(newStyle.zIndex) },
+          })
+        }
+        return animate.call(this, keyframes, timing)
+      }
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: (callback: () => void) => {
+          log.calls += 1
+          callback()
+          return { ready: Promise.resolve(), finished: Promise.resolve() }
+        },
+      })
+    })
+    await loadWithSystemColorMode(page, 'light')
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click({ position: { x: 8, y: 8 } })
+    await page.getByRole('button', { name: 'Switch to light mode' }).click({ position: { x: 16, y: 8 } })
+
+    const log = await page.evaluate(() => {
+      const log = (window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog
+      if (!log)
+        throw new Error('Expected the theme transition log to be initialized')
+      return log
+    })
+    expect(log.calls).toBe(2)
+    expect(log.animations).toHaveLength(2)
+    expect(log.clicks).toHaveLength(2)
+    expect(log.stacks).toHaveLength(2)
+
+    const [darkAnimation, lightAnimation] = log.animations
+    const [darkClick, lightClick] = log.clicks ?? []
+    const [darkStack, lightStack] = log.stacks ?? []
+
+    expect(darkAnimation?.timing).toMatchObject({
+      duration: 400,
+      pseudoElement: '::view-transition-old(root)',
+    })
+    expect(darkAnimation?.keyframes[0]?.clipPath).toMatch(/^circle\((?!0px).+ at .+\)$/)
+    expect(darkAnimation?.keyframes[1]?.clipPath).toBe(`circle(0px at ${darkClick?.x}px ${darkClick?.y}px)`)
+    expect(darkStack?.old.zIndex).toBeGreaterThan(darkStack?.new.zIndex ?? Number.POSITIVE_INFINITY)
+
+    expect(lightAnimation?.timing).toMatchObject({
+      duration: 400,
+      pseudoElement: '::view-transition-new(root)',
+    })
+    expect(lightAnimation?.keyframes[0]?.clipPath).toBe(`circle(0px at ${lightClick?.x}px ${lightClick?.y}px)`)
+    expect(lightAnimation?.keyframes[1]?.clipPath).toMatch(/^circle\((?!0px).+ at .+\)$/)
+    expect(lightStack?.new.zIndex).toBeGreaterThan(lightStack?.old.zIndex ?? Number.POSITIVE_INFINITY)
+
+    expect(darkStack?.old.animationName).toBe('none')
+    expect(darkStack?.new.animationName).toBe('none')
+    expect(lightStack?.old.animationName).toBe('none')
+    expect(lightStack?.new.animationName).toBe('none')
+  })
+
+  it('changes mode without a view transition when reduced motion is preferred', async () => {
+    const page = await createSiteControlsPage()
+    await page.addInitScript(() => {
+      const log: ViewTransitionLog = { animations: [], calls: 0 }
+      ;(window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog = log
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: (callback: () => void) => {
+          log.calls += 1
+          callback()
+          return { ready: Promise.resolve(), finished: Promise.resolve() }
+        },
+      })
+    })
+    await loadWithSystemColorMode(page, 'light', 'reduce')
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+
+    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+    expect(await page.evaluate(() => {
+      const log = (window as Window & { __websiteThemeTransitionLog?: ViewTransitionLog }).__websiteThemeTransitionLog
+      if (!log)
+        throw new Error('Expected the theme transition log to be initialized')
+      return log.calls
+    })).toBe(0)
+  })
+
+  it('changes mode when the View Transition API is unavailable', async () => {
+    const page = await createSiteControlsPage()
+    await page.addInitScript(() => {
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: undefined,
+      })
+    })
+    await loadWithSystemColorMode(page, 'light')
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+
+    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('falls back to a direct mode change when the view transition rejects', async () => {
+    const page = await createSiteControlsPage()
+    await page.addInitScript(() => {
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: () => ({
+          finished: Promise.resolve(),
+          ready: Promise.reject(new Error('view transition rejected')),
+        }),
+      })
+    })
+    await loadWithSystemColorMode(page, 'light')
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+
+    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('crossfades to the animated destination icon while the toggle is busy', async () => {
+    const page = await createSiteControlsPage()
+    await page.addInitScript(() => {
+      let release = () => {}
+      const log: PendingTransitionLog = {
+        calls: 0,
+        release: () => release(),
+      }
+      ;(window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition = log
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: (callback: () => void) => {
+          log.calls += 1
+          callback()
+          return {
+            ready: Promise.resolve(),
+            finished: new Promise<void>((resolve) => {
+              release = resolve
+            }),
+          }
+        },
+      })
+    })
+    await loadWithSystemColorMode(page, 'light')
+
+    const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
+    await toggle.click()
+
+    expect(await toggle.isDisabled()).toBe(true)
+    expect(await toggle.getAttribute('aria-busy')).toBe('true')
+    expect(await page.evaluate(() => {
+      const log = (window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition
+      if (!log)
+        throw new Error('Expected the pending theme transition to be initialized')
+      return log.calls
+    })).toBe(1)
+
+    const animatedMoon = toggle.locator('[data-theme-icon="moon-animated"]')
+    expect(await animatedMoon.locator('[class~="i-line-md:moon-twotone"]').count()).toBe(1)
+    await page.waitForFunction(() => {
+      const icon = document.querySelector('[data-theme-icon="moon-animated"]')
+      return icon && getComputedStyle(icon).opacity === '1'
+    })
+    expect(await toggle.locator('[data-theme-icon="moon"]').evaluate(element => getComputedStyle(element).opacity)).toBe('0')
+    expect(await toggle.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { cursor: style.cursor, opacity: Number(style.opacity) }
+    })).toMatchObject({ cursor: 'wait', opacity: 0.65 })
+
+    await page.evaluate(() => {
+      const log = (window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition
+      if (!log)
+        throw new Error('Expected the pending theme transition to be initialized')
+      log.release()
+    })
+    await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
+    expect(await toggle.isDisabled()).toBe(false)
+
+    await toggle.click()
+
+    const animatedSun = toggle.locator('[data-theme-icon="sun-animated"]')
+    expect(await animatedSun.locator('[class~="i-line-md:sunny-outline-twotone-loop"]').count()).toBe(1)
+    await page.waitForFunction(() => {
+      const icon = document.querySelector('[data-theme-icon="sun-animated"]')
+      return icon && getComputedStyle(icon).opacity === '1'
+    })
+    expect(await toggle.locator('[data-theme-icon="sun"]').evaluate(element => getComputedStyle(element).opacity)).toBe('0')
+
+    await page.evaluate(() => {
+      const log = (window as Window & { __websiteThemePendingTransition?: PendingTransitionLog }).__websiteThemePendingTransition
+      if (!log)
+        throw new Error('Expected the pending theme transition to be initialized')
+      log.release()
+    })
+    await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null)
+  })
+
+  it('reveals the next theme action in a tooltip on hover', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
+    const bounds = await toggle.boundingBox()
+    if (!bounds)
+      throw new Error('Theme toggle must be visible before hovering')
+
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    )
+
+    const tooltip = page.getByRole('tooltip')
+    await tooltip.waitFor({ state: 'visible', timeout: 3000 })
+    expect(await tooltip.count()).toBe(1)
+    expect(await tooltip.isVisible()).toBe(true)
+    expect(await tooltip.textContent()).toBe(await toggle.getAttribute('aria-label'))
+  })
+
+  it('reveals the next theme action in a tooltip on keyboard focus', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ })
+    let focused = false
+    for (let index = 0; index < 12; index += 1) {
+      await page.keyboard.press('Tab')
+      focused = await toggle.evaluate(element => element === document.activeElement)
+      if (focused)
+        break
+    }
+    expect(focused).toBe(true)
+
+    const tooltip = page.getByRole('tooltip')
+    await tooltip.waitFor({ state: 'visible', timeout: 3000 })
+    expect(await tooltip.count()).toBe(1)
+    expect(await tooltip.isVisible()).toBe(true)
+    expect(await tooltip.textContent()).toBe(await toggle.getAttribute('aria-label'))
+  })
+
+  it('optically enlarges the theme glyph relative to the GitHub glyph', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const themeGlyph = page.locator('.theme-toggle__icon--static')
+    const githubGlyph = page.locator('a[href="https://github.com/andy820621/nuxt-content-mermaid"] svg')
+    const themeWidth = await themeGlyph.evaluate(element => Number.parseFloat(getComputedStyle(element).width))
+    const githubWidth = await githubGlyph.evaluate(element => Number.parseFloat(getComputedStyle(element).width))
+
+    expect(themeWidth).toBeCloseTo(22.4, 1)
+    expect(githubWidth).toBeCloseTo(20, 1)
+    expect(themeWidth).toBeGreaterThan(githubWidth)
+  })
+
+  it('opens the GitHub repository in a safe new tab', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const github = page.locator('a[href="https://github.com/andy820621/nuxt-content-mermaid"]')
+    expect(await github.getAttribute('target')).toBe('_blank')
+    expect((await github.getAttribute('rel'))?.split(/\s+/).sort()).toEqual(['noopener', 'noreferrer'])
+  })
+
+  it('links from the Chinese home route to the English home route', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/zh'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: '切換至英文' })
+    expect(await switcher.getAttribute('href')).toBe('/')
+    expect(await switcher.textContent()).toBe('EN')
+  })
+
+  it('links from an English documentation route to its Chinese counterpart', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/getting-started'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+    expect(await switcher.getAttribute('href')).toBe('/zh/getting-started')
+  })
+
+  it('links from a Chinese documentation route to its English counterpart', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/zh/getting-started'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: '切換至英文' })
+    expect(await switcher.getAttribute('href')).toBe('/getting-started')
+  })
+
+  it('reveals the localized locale action in a tooltip on keyboard focus', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+    let focused = false
+    for (let index = 0; index < 12; index += 1) {
+      await page.keyboard.press('Tab')
+      focused = await switcher.evaluate(element => element === document.activeElement)
+      if (focused)
+        break
+    }
+    expect(focused).toBe(true)
+
+    const tooltip = page.getByRole('tooltip')
+    await tooltip.waitFor({ state: 'visible', timeout: 3000 })
+    expect(await tooltip.count()).toBe(1)
+    expect(await tooltip.textContent()).toBe('Switch to Chinese')
+  })
+
+  it('keeps the header within a 320px viewport', async () => {
+    const page = await createSiteControlsPage()
+    await page.setViewportSize({ width: 320, height: 800 })
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+    expect(await switcher.isVisible()).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    )
+  })
+})

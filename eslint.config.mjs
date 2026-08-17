@@ -12,6 +12,9 @@ export default createConfigForNuxt({
   dirs: {
     src: ['./playground'],
   },
+}).prepend({
+  name: 'project/ignore-documentation-website',
+  ignores: ['website/**'],
 }).append({
   rules: {
     // Allow single-word component names for playground and dynamic routes

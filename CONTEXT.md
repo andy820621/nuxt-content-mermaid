@@ -1,12 +1,28 @@
 # Nuxt Content Mermaid
 
-This context turns Mermaid diagram source in Nuxt Content into interactive rendered diagrams while preserving the behavior promised to package users.
+Nuxt Content Mermaid turns Mermaid diagram source in Nuxt Content into interactive rendered diagrams while preserving the behavior promised to Package Users.
 
 ## Language
 
 **Package User**:
 A Nuxt application or developer consuming a released version of nuxt-content-mermaid through documented or typed behavior.
 _Avoid_: Caller, consumer
+
+**Documentation Website**:
+The handwritten, content-driven documentation under `website/`, powered by Nuxt Content. It helps Package Users understand and use nuxt-content-mermaid, while remaining independent from root quality checks, CI, package artifacts, and release contracts.
+_Avoid_: Package quality gate, release deliverable
+
+**Supported Constraint**:
+A boundary on Package-Owned Integration Behavior established by an explicitly adopted downstream contract, an algorithmic invariant, or an explicit product contract. It remains part of the public contract whether or not the package rejects every out-of-bound input locally, and it must have boundary or behavior evidence.
+_Avoid_: Recommended Range, validator rule
+
+**Recommended Range**:
+Advisory guidance for values expected to produce useful or conventional results without narrowing the Compatibility Contract.
+_Avoid_: Supported Constraint, valid range
+
+**Local Validation**:
+Package-owned enforcement that rejects configuration at a package boundary before the value reaches downstream behavior. Its presence or absence does not by itself establish, narrow, or expand a Supported Constraint.
+_Avoid_: Supported Constraint, documentation validation
 
 **Compatibility Contract**:
 The externally observable Package-Owned Integration Behavior a Package User can rely on, including documented or typed configuration, extension points, lifecycle, and styling hooks. Mermaid's exact SVG, layout, undocumented DOM, and exhaustive diagram behavior are excluded, as are internal implementation, exact performance, and debug log wording.

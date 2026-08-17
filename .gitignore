@@ -8,6 +8,7 @@ node_modules
 .temp
 .tmp
 .cache
+.worktrees
 
 # Yarn
 **/.yarn/cache
@@ -60,3 +61,7 @@ TODOLIST
 skills-lock.json
 vendor/agent-skills
 .agents/skills
+
+# Agent workflow scratch space
+.superpowers/
+docs/superpowers/

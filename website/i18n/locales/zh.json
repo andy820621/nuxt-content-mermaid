@@ -1,0 +1,32 @@
+{
+  "site": {
+    "name": "Nuxt Content Mermaid",
+    "github": "Nuxt Content Mermaid GitHub 儲存庫",
+    "githubTitle": "GitHub 儲存庫"
+  },
+  "navigation": {
+    "documentation": "文件",
+    "troubleshooting": "疑難排解"
+  },
+  "actions": {
+    "switchToChinese": "切換至中文",
+    "switchToEnglish": "切換至英文",
+    "switchToDark": "切換至深色模式",
+    "switchToLight": "切換至淺色模式",
+    "openMenu": "開啟選單",
+    "closeMenu": "關閉選單"
+  },
+  "landing": {
+    "eyebrow": "Nuxt Content × Mermaid",
+    "getStarted": "開始使用"
+  },
+  "demo": {
+    "views": "Mermaid 示範檢視",
+    "markdown": "Markdown",
+    "renderedUi": "渲染介面"
+  },
+  "docs": {
+    "documentation": "文件",
+    "onThisPage": "本頁內容"
+  }
+}
