@@ -11,6 +11,21 @@ const execFileAsync = promisify(execFile)
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 const generatedRoot = join(websiteRoot, '.output/public')
+const siteOrigin = 'https://nuxt-content-mermaid.barz.app'
+const publicRoutes = [
+  '/',
+  '/getting-started',
+  '/writing-diagrams',
+  '/configuration',
+  '/troubleshooting',
+  '/migration/v3',
+  '/zh',
+  '/zh/getting-started',
+  '/zh/writing-diagrams',
+  '/zh/configuration',
+  '/zh/troubleshooting',
+  '/zh/migration/v3',
+] as const
 const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g')
 const generateEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('VITEST')),
@@ -27,6 +42,14 @@ const contentTypes: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
   '.wasm': 'application/wasm',
+}
+
+function generatedRouteFile(path: string) {
+  return join(generatedRoot, ...path.split('/').filter(Boolean), 'index.html')
+}
+
+function normalizeText(text: string | null) {
+  return text?.replace(/\s+/g, ' ').trim() ?? ''
 }
 
 async function expectRenderableIcon(icon: Locator) {
@@ -54,7 +77,7 @@ async function expectRenderableIcon(icon: Locator) {
   expect(rendering.hasSvgContent || rendering.hasImageData).toBe(true)
 }
 
-describe('generated documentation website icons', () => {
+describe('generated documentation website', () => {
   let browser: Browser
   let generateOutput = ''
   let server: ReturnType<typeof createServer>
@@ -106,6 +129,151 @@ describe('generated documentation website icons', () => {
 
   it('generates without icon load failures', () => {
     expect(generateOutput).not.toContain('[Icon] failed to load icon')
+  })
+
+  it('publishes the exact production routes through canonical links and sitemap', async () => {
+    const page = await browser.newPage()
+
+    try {
+      for (const path of publicRoutes) {
+        const response = await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+
+        expect(response?.status()).toBe(200)
+        const canonical = page.locator('link[rel="canonical"]')
+        expect(await canonical.count()).toBe(1)
+        expect(await canonical.getAttribute('href'))
+          .toBe(new URL(path, siteOrigin).href)
+        expect(await page.locator('meta[property="og:url"]').getAttribute('content'))
+          .toBe(new URL(path, siteOrigin).href)
+      }
+
+      const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
+      const sitemapURLs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
+        .map(([, url]) => url)
+
+      expect(sitemapURLs).toEqual(publicRoutes.map(path => new URL(path, siteOrigin).href))
+      expect(sitemap).not.toContain('/reference')
+    }
+    finally {
+      await page.close()
+    }
+  }, 30_000)
+
+  it('serves every public route from its own prerendered document before and after hydration', async () => {
+    const noScriptContext = await browser.newContext({ javaScriptEnabled: false })
+    const noScriptPage = await noScriptContext.newPage()
+    const hydratedPage = await browser.newPage()
+    const runtimeErrors: string[] = []
+    const fallbackDocuments = await Promise.all([
+      readFile(join(generatedRoot, '200.html'), 'utf8'),
+      readFile(join(generatedRoot, '404.html'), 'utf8'),
+    ])
+
+    hydratedPage.on('console', (message) => {
+      if (message.type() === 'error')
+        runtimeErrors.push(message.text())
+    })
+    hydratedPage.on('pageerror', error => runtimeErrors.push(error.message))
+
+    try {
+      for (const path of publicRoutes) {
+        const generatedHTML = await readFile(generatedRouteFile(path), 'utf8')
+
+        expect(generatedHTML).toContain('<main')
+        expect(fallbackDocuments).not.toContain(generatedHTML)
+
+        const noScriptResponse = await noScriptPage.goto(`${staticSiteURL}${path}`, {
+          waitUntil: 'domcontentloaded',
+        })
+        expect(noScriptResponse?.status()).toBe(200)
+        const prerenderedHeading = normalizeText(
+          await noScriptPage.locator('#main-content h1').textContent(),
+        )
+        expect(prerenderedHeading.length).toBeGreaterThan(0)
+        expect(await noScriptPage.locator('link[rel="canonical"]').getAttribute('href'))
+          .toBe(new URL(path, siteOrigin).href)
+
+        const hydratedResponse = await hydratedPage.goto(`${staticSiteURL}${path}`, {
+          waitUntil: 'networkidle',
+        })
+        expect(hydratedResponse?.status()).toBe(200)
+        expect(new URL(hydratedPage.url()).pathname).toBe(path)
+        expect(normalizeText(await hydratedPage.locator('#main-content h1').textContent()))
+          .toBe(prerenderedHeading)
+      }
+
+      expect(runtimeErrors).toEqual([])
+    }
+    finally {
+      await noScriptContext.close()
+      await hydratedPage.close()
+    }
+  }, 60_000)
+
+  it('keeps internal links and fragments inside the public route manifest', async () => {
+    const page = await browser.newPage({ javaScriptEnabled: false })
+    const routeIDs = new Map<string, Set<string>>()
+    const internalLinks: URL[] = []
+
+    try {
+      for (const path of publicRoutes) {
+        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+        routeIDs.set(path, new Set(await page.locator('[id]').evaluateAll(
+          elements => elements.map(element => element.id),
+        )))
+
+        const hrefs = await page.locator('a[href]').evaluateAll(
+          links => links.map(link => link.getAttribute('href')).filter((href): href is string => Boolean(href)),
+        )
+        for (const href of hrefs) {
+          if (href.startsWith('/') || href.startsWith('#'))
+            internalLinks.push(new URL(href, new URL(path, siteOrigin)))
+        }
+      }
+
+      for (const link of internalLinks) {
+        expect(publicRoutes).toContain(link.pathname)
+        if (link.hash)
+          expect(routeIDs.get(link.pathname)).toContain(decodeURIComponent(link.hash.slice(1)))
+      }
+    }
+    finally {
+      await page.close()
+    }
+  }, 30_000)
+
+  it('advertises safe package, repository, and license links', async () => {
+    const page = await browser.newPage({ javaScriptEnabled: false })
+    const requiredURLs = [
+      'https://www.npmjs.com/package/@barzhsieh/nuxt-content-mermaid',
+      'https://github.com/andy820621/nuxt-content-mermaid',
+      'https://github.com/andy820621/nuxt-content-mermaid/blob/main/LICENSE',
+    ]
+
+    try {
+      const externalLinks: Array<{ href: string | null, rel: string | null, target: string | null }> = []
+
+      for (const path of publicRoutes) {
+        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+        externalLinks.push(...await page.locator('a[href^="http"]').evaluateAll(links => links.map(link => ({
+          href: link.getAttribute('href'),
+          rel: link.getAttribute('rel'),
+          target: link.getAttribute('target'),
+        }))))
+      }
+
+      expect([...new Set(externalLinks.map(link => link.href))])
+        .toEqual(expect.arrayContaining(requiredURLs))
+
+      for (const link of externalLinks) {
+        expect(new URL(link.href ?? '').protocol).toBe('https:')
+        if (link.target === '_blank')
+          expect(link.rel?.split(/\s+/).sort()).toEqual(['noopener', 'noreferrer'])
+      }
+    }
+    finally {
+      await page.close()
+    }
   })
 
   it('renders project ownership and license in the shared footer', async () => {

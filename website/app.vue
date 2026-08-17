@@ -2,6 +2,7 @@
 import type { ContentNavigationItem } from '@nuxt/content'
 import type { SupportedLocale } from '~/types/i18n'
 import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
+import { SITE_ORIGIN, toSiteURL } from '~/utils/site'
 
 const { locale, localeProperties } = useI18n()
 const localePath = useLocalePath()
@@ -27,8 +28,7 @@ const localizedNavigation = computed(() => filterLocaleNavigation(
 
 const mobileNavigationItems = computed(() => flattenPages(localizedNavigation.value))
 
-const siteOrigin = 'https://nuxt-content-mermaid.barz.app'
-const socialImageUrl = `${siteOrigin}/assets/nuxt-content-mermaid.png`
+const socialImageUrl = `${SITE_ORIGIN}/assets/nuxt-content-mermaid.png`
 const route = useRoute()
 
 useHead(() => ({
@@ -39,6 +39,7 @@ useHead(() => ({
     class: mobileMenuOpen.value ? 'mobile-menu-open' : undefined,
   },
   link: [
+    { rel: 'canonical', href: toSiteURL(route.path) },
     { rel: 'icon', href: '/assets/favicon/favicon.ico', sizes: 'any' },
     { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-32x32.png', sizes: '32x32' },
     { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-16x16.png', sizes: '16x16' },
@@ -49,7 +50,7 @@ useHead(() => ({
 useSeoMeta({
   ogSiteName: 'Nuxt Content Mermaid',
   ogType: 'website',
-  ogUrl: () => new URL(route.path, siteOrigin).href,
+  ogUrl: () => toSiteURL(route.path),
   ogImage: socialImageUrl,
   ogImageAlt: 'Nuxt Content Mermaid',
   twitterCard: 'summary_large_image',
