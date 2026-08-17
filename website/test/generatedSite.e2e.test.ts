@@ -210,6 +210,47 @@ describe('generated documentation website', () => {
     }
   }, 60_000)
 
+  it('keeps directly loaded content hydrated when its extracted payload is unavailable', async () => {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    const runtimeErrors: string[] = []
+
+    await context.route('**/*', async (route) => {
+      const pathname = new URL(route.request().url()).pathname
+
+      if (pathname === '/getting-started/_payload.json') {
+        await route.fulfill({
+          body: '{}',
+          contentType: 'application/json',
+          status: 503,
+        })
+        return
+      }
+
+      await route.continue()
+    })
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:'))
+        runtimeErrors.push(message.text())
+    })
+    page.on('pageerror', error => runtimeErrors.push(error.message))
+
+    try {
+      const response = await page.goto(`${staticSiteURL}/getting-started`, {
+        waitUntil: 'domcontentloaded',
+      })
+      await page.waitForTimeout(1_000)
+
+      expect(response?.status()).toBe(200)
+      expect(normalizeText(await page.locator('#main-content h1').textContent()))
+        .toBe('Getting Started')
+      expect(runtimeErrors).toEqual([])
+    }
+    finally {
+      await context.close()
+    }
+  }, 30_000)
+
   it('keeps internal links and fragments inside the public route manifest', async () => {
     const page = await browser.newPage({ javaScriptEnabled: false })
     const routeIDs = new Map<string, Set<string>>()
