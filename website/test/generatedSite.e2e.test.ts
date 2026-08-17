@@ -108,6 +108,28 @@ describe('generated documentation website icons', () => {
     expect(generateOutput).not.toContain('[Icon] failed to load icon')
   })
 
+  it('renders project ownership and license in the shared footer', async () => {
+    const page = await browser.newPage()
+
+    try {
+      for (const path of ['/', '/getting-started']) {
+        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'networkidle' })
+
+        const footer = page.getByRole('contentinfo')
+        await expect.poll(() => footer.count()).toBe(1)
+        expect((await footer.textContent())?.replace(/\s+/g, ' ').trim())
+          .toBe('© 2025–present BarZ Hsieh · MIT License')
+        expect(await footer.getByRole('link', { name: 'BarZ Hsieh' }).getAttribute('href'))
+          .toBe('https://github.com/andy820621')
+        expect(await footer.getByRole('link', { name: 'MIT License' }).getAttribute('href'))
+          .toBe('https://github.com/andy820621/nuxt-content-mermaid/blob/main/LICENSE')
+      }
+    }
+    finally {
+      await page.close()
+    }
+  })
+
   it('renders all site-control icons without a runtime icon provider', async () => {
     const blockedIconRequests: string[] = []
     const context = await browser.newContext({

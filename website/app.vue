@@ -233,6 +233,23 @@ onBeforeUnmount(() => {
       <NuxtLayout>
         <NuxtPage />
       </NuxtLayout>
+
+      <footer class="site-footer">
+        <p class="site-footer__inner">
+          © 2025–present
+          <a
+            href="https://github.com/andy820621"
+            target="_blank"
+            rel="noopener noreferrer"
+          >BarZ Hsieh</a>
+          ·
+          <a
+            href="https://github.com/andy820621/nuxt-content-mermaid/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+          >MIT License</a>
+        </p>
+      </footer>
     </div>
   </div>
 </template>

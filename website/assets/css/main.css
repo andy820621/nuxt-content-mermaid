@@ -92,7 +92,38 @@ html[data-theme='dark'] .shiki span {
 }
 
 .site-shell {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
+}
+
+.site-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.site-footer {
+  margin-top: auto;
+  border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.site-footer__inner {
+  width: min(80rem, calc(100% - 2.5rem));
+  margin: 0 auto;
+  padding: 1.25rem 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.site-footer a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+.site-footer a:hover {
+  color: var(--text);
 }
 
 .skip-link {
