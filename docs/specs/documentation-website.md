@@ -10,6 +10,7 @@
 - 2026-08-15：完成第四階段 wordmark 簡化，以單一 SVG 配合 CSS `currentColor` 支援 light/dark theme。
 - 2026-08-15：完成第五階段 responsive navigation 優化，以單一手機文件選單與高辨識 active state 改善導覽。
 - 2026-08-15：完成第六階段 code readability 優化，以正確的 Shiki dark tokens、高對比暗色 palette 與一致的 inline／fenced code 排版改善閱讀體驗。
+- 2026-08-17：核准第八階段 desktop page TOC 優化，以 Portfolio 式 scrollspy 與 Nuxt UI 式 active 指示線改善長文件定位。
 
 `docs/research/` 內的比較與網站研究是非規範性背景；若研究紀錄與本規格衝突，以本規格為準。
 
@@ -26,7 +27,7 @@
 └── 其他內容路徑 → pages/[...slug].vue → layouts/docs.vue
     ├── queryCollection('docs') → ContentRenderer
     ├── queryCollectionNavigation('docs') → 左側 sidebar
-    └── page.body.toc.links → 右側 TOC
+    └── page.body.toc.links → DocsToc → desktop 右側 scrollspy TOC
 ```
 
 首頁是獨立、薄的 Vue 排版 shell；它不是另一套內容系統。首頁 Mermaid demo 必須走真正的 Markdown → Nuxt Content → 套件 transform → `ContentRenderer` → Mermaid rendering 流程。
@@ -51,6 +52,7 @@ Landing 與 docs layout 解決的是不同問題，因此不應讓 docs layout �
 - 保留全站 light/dark theme toggle 與 GitHub repository 入口。
 - 讓手機導覽收斂為單一 hamburger 入口，並讓目前頁面在所有 theme 下清楚可辨。
 - 讓 fenced 與 inline code 在 light／dark theme、desktop／mobile 下保持清楚、可辨且容易閱讀。
+- 讓 desktop 文件讀者在捲動長文件時能持續辨識目前閱讀章節，並保留可直接分享的 heading hash navigation。
 - 以正式 wordmark、favicon 與靜態社群圖片建立一致的網站識別。
 - 不因首頁視覺優化重建 records、demo contract、生成器或驗證系統。
 - 讓網站繼續完全退出套件品質與交付流程。
@@ -70,6 +72,7 @@ Landing 與 docs layout 解決的是不同問題，因此不應讓 docs layout �
 - Contract Demo、artifact identity、lazy proof 或 runtime evidence；首頁核准的 Markdown／Rendered UI 雙檢視除外。
 - Reference records，或以 JSON、YAML、TypeScript、frontmatter、資料 collection 等形式建立的替代 records。
 - 網站專用 verifier、parity、freshness、schema、artifact 或 release 驗證。
+- Nuxt UI、手機版 TOC、TOC disclosure／drawer，或只為 TOC 引入的 UI framework。
 - 認證、個人化、request-time API、server-side content service 或發佈策略。
 
 ## Nuxt Content 3 邊界
@@ -339,10 +342,28 @@ Cards 是 landing presentation，不進入 frontmatter、collection schema 或�
 
 - Desktop 左側 sidebar：來自 `queryCollectionNavigation('docs')`。
 - 中央文件 slot。
-- 右側 TOC：來自 `page.body.toc.links`。
+- 將 `page.body.toc.links` 交給 desktop `DocsToc`。
 - Responsive 文件閱讀排版。
 
 因為 header、skip link 與 mobile navigation 都由 `app.vue` 擁有，docs layout 不再重複擁有 header，也不建立第二個 mobile menu。`48rem` 以下完全隱藏 `.docs-sidebar`，中央內容直接使用單欄；右側 TOC 維持既有 responsive 行為。Layout 不增加搜尋、footer community links、surround navigation 或 mobile drawer framework。
+
+### Desktop page TOC
+
+右側 TOC 從 layout 內的靜態兩層清單抽成 `website/components/DocsToc.vue`。元件接收 Nuxt Content 的 `TocLink[]`，擁有語意結構、active presentation 與 hash links；獨立 composable 擁有 DOM observation 與 active heading state。`layouts/docs.vue` 只傳入 links，不存取 heading DOM，也不持有 scrollspy state。
+
+資料與生命週期遵守以下契約：
+
+- 遞迴攤平 `TocLink[]`，保留文件順序與任意既有巢狀深度；observer 只查找這些 link ID 對應的元素，不以全域 `h2, h3` selector 納入非內容 heading。
+- Client mount、links 改變或 route 切換後，等待 Vue DOM 更新再重新綁定；每次重新綁定與元件卸載前都先 disconnect 舊 `IntersectionObserver`。
+- Scrollspy 參考 Portfolio 的閱讀帶演算法，使用 `rootMargin: '0px 0px -80% 0px'` 與 `[0, 0.25, 0.5, 0.75, 1]` thresholds。Heading 進入閱讀帶時加入 active set，離開時移除；閱讀帶同時包含多個 headings 時允許它們同時 active，閱讀帶暫時沒有 heading 時則保留最後進入的 heading，避免 active state 在段落中消失。
+- 初次載入、重新整理於文件中段或直接開啟 hash 時，以 viewport 上方 20% 閱讀線為準，選取最後一個位於該線之前的 heading；若尚未越過任何 heading，選取第一個可用 heading。不能要求 heading 再次穿越 observer 邊界才出現 active state。
+- 找不到某個 heading element 時略過 observation，但保留該 hash link；單一內容異常不能阻止其他 TOC links 運作。
+
+TOC 點擊沿用原生 hash navigation 與全站既有 `scroll-behavior: smooth`，不攔截 router、不以 `replaceState` 重寫歷史，也不建立第二份 navigation state。`prefers-reduced-motion: reduce` 繼續把 smooth scrolling 降為 instant scrolling。
+
+視覺採低干擾的 Nuxt UI 式 highlight 語言，不引入 Nuxt UI：清單左側是一條 `1px` muted rail，active link 在 rail 上顯示一段 `2px` accent 指示線，並同時使用 accent 文字與較高字重。子項目以縮排表達層級，但共用同一 rail；hover 只提高文字對比，focus-visible 沿用全站 accent outline。Active anchor 使用 `aria-current="location"`，因此狀態不只靠顏色傳達。
+
+右側 TOC 保留既有 `62rem` breakpoint，在較窄畫面完全隱藏。網站不建立手機 TOC，不使用既有 Reka UI dependency 的 `Collapsible`，也不為單一元件安裝 Nuxt UI。
 
 ### Troubleshooting
 
@@ -547,6 +568,19 @@ website/
 
 第七階段不修改 package transform、renderer、toolbar、theme、lazy loading、root scripts、CI、artifact 或 release pipeline，也不新增 Nuxt UI、collection schema、`rawbody` 或第二份 diagram source。
 
+## 第八階段檔案變更範圍（desktop page TOC）
+
+| 檔案 | 動作 | 設計責任 |
+| --- | --- | --- |
+| `website/components/DocsToc.vue` | 新增 | 遞迴呈現 Content TOC、原生 hash links、active semantics 與 desktop TOC markup。 |
+| `website/composables/useDocsToc.ts` | 新增 | 管理 Portfolio 式 reading band、初始 active seed、observer 重綁與 cleanup。 |
+| `website/layouts/docs.vue` | 修改 | 將 `page.body.toc.links` 交給 `DocsToc`，移除 layout 內固定兩層清單。 |
+| `website/assets/css/main.css` | 修改 | 加入共用 rail、active indicator、層級縮排與 active／hover／focus presentation。 |
+| `website/test/docsToc.e2e.test.ts` | 新增 | 驗證初始／捲動 active、巢狀 hash、缺少 heading、mobile 隱藏與 reduced motion。 |
+| `docs/specs/documentation-website.md` | 修改 | 固定第八階段 desktop TOC 契約與驗收條件。 |
+
+第八階段不修改 Content collection、Markdown、catch-all route、手機 navigation、Mermaid runtime、dependencies、root scripts、CI、artifact 或 release pipeline，也不加入 Nuxt UI、Reka Collapsible、手機 TOC、TOC store 或像素 screenshot gate。
+
 ## 品質與交付邊界
 
 以下 root commands 不得讀取、解析或驗證 `website/**`：
@@ -608,6 +642,11 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 25. 段落、清單與表格中的 inline code 具有可辨識的 surface、padding 與圓角，且在 light／dark theme 下保持清楚。
 26. Mermaid renderer、fallback semantics、內容、routes、navigation、TOC 與 theme state 不因 code presentation 優化而改變。
 27. 一次性 `pnpm --dir website generate` 與 desktop/mobile × light/dark 畫面檢查涵蓋 Getting Started、Writing Diagrams、Configuration、Troubleshooting 與 Migration to v3，但不新增文件頁永久驗證。
+28. Desktop 文件 TOC 由 `page.body.toc.links` 遞迴呈現；捲動、初次載入於文件中段與直接開啟 heading hash 時，Portfolio 式 scrollspy 都能標示目前閱讀章節。
+29. TOC active state 同時具有 rail 指示線、accent 文字、較高字重與 `aria-current="location"`；hover、focus-visible 與 active 三種狀態彼此可辨，light／dark theme 都使用既有 tokens。
+30. TOC link 維持原生 hash navigation；缺少單一 heading 不造成 runtime error，route／links 更新不遺留重複 observer。
+31. `62rem` 以下不顯示右側 TOC，網站沒有手機 TOC、TOC disclosure、Nuxt UI dependency 或 TOC 專用 navigation state。
+32. Website-local browser test 覆蓋 desktop 初始 active、捲動後 active、巢狀 hash navigation、缺少 heading、mobile 隱藏與 reduced-motion scrolling；斷言以 semantic state 與位置關係為主，不建立像素 screenshot gate。
 
 ## 官方與研究依據
 
