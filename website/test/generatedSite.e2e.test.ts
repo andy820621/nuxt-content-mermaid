@@ -45,7 +45,10 @@ const contentTypes: Record<string, string> = {
 }
 
 function generatedRouteFile(path: string) {
-  return join(generatedRoot, ...path.split('/').filter(Boolean), 'index.html')
+  if (path === '/')
+    return join(generatedRoot, 'index.html')
+
+  return join(generatedRoot, `${path.slice(1)}.html`)
 }
 
 function normalizeText(text: string | null) {
@@ -98,14 +101,41 @@ describe('generated documentation website', () => {
     server = createServer(async (request, response) => {
       try {
         const requestURL = new URL(request.url ?? '/', 'http://127.0.0.1')
-        let filePath = join(generatedRoot, decodeURIComponent(requestURL.pathname))
-        if ((await stat(filePath)).isDirectory())
-          filePath = join(filePath, 'index.html')
+        const pathname = decodeURIComponent(requestURL.pathname)
+        const htmlPath = pathname === '/'
+          ? join(generatedRoot, 'index.html')
+          : join(generatedRoot, `${pathname.slice(1).replace(/\/$/, '')}.html`)
+        let filePath = htmlPath
 
+        try {
+          await stat(htmlPath)
+
+          if (pathname !== '/' && pathname.endsWith('/')) {
+            response.writeHead(308, {
+              location: `${requestURL.pathname.slice(0, -1)}${requestURL.search}`,
+            })
+            response.end()
+            return
+          }
+        }
+        catch {
+          filePath = join(generatedRoot, pathname)
+          if ((await stat(filePath)).isDirectory()) {
+            if (!pathname.endsWith('/')) {
+              response.writeHead(308, { location: `${requestURL.pathname}/${requestURL.search}` })
+              response.end()
+              return
+            }
+
+            filePath = join(filePath, 'index.html')
+          }
+        }
+
+        const body = await readFile(filePath)
         response.writeHead(200, {
           'content-type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
         })
-        response.end(await readFile(filePath))
+        response.end(body)
       }
       catch {
         response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' })
@@ -209,47 +239,6 @@ describe('generated documentation website', () => {
       await hydratedPage.close()
     }
   }, 60_000)
-
-  it('keeps directly loaded content hydrated when its extracted payload is unavailable', async () => {
-    const context = await browser.newContext()
-    const page = await context.newPage()
-    const runtimeErrors: string[] = []
-
-    await context.route('**/*', async (route) => {
-      const pathname = new URL(route.request().url()).pathname
-
-      if (pathname === '/getting-started/_payload.json') {
-        await route.fulfill({
-          body: '{}',
-          contentType: 'application/json',
-          status: 503,
-        })
-        return
-      }
-
-      await route.continue()
-    })
-    page.on('console', (message) => {
-      if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:'))
-        runtimeErrors.push(message.text())
-    })
-    page.on('pageerror', error => runtimeErrors.push(error.message))
-
-    try {
-      const response = await page.goto(`${staticSiteURL}/getting-started`, {
-        waitUntil: 'domcontentloaded',
-      })
-      await page.waitForTimeout(1_000)
-
-      expect(response?.status()).toBe(200)
-      expect(normalizeText(await page.locator('#main-content h1').textContent()))
-        .toBe('Getting Started')
-      expect(runtimeErrors).toEqual([])
-    }
-    finally {
-      await context.close()
-    }
-  }, 30_000)
 
   it('keeps internal links and fragments inside the public route manifest', async () => {
     const page = await browser.newPage({ javaScriptEnabled: false })

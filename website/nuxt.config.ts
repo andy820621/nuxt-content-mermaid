@@ -29,6 +29,7 @@ export default defineNuxtConfig({
   },
   nitro: {
     prerender: {
+      autoSubfolderIndex: false,
       routes: [...PUBLIC_ROUTES, '/sitemap.xml'],
     },
     publicAssets: [
@@ -60,9 +61,6 @@ export default defineNuxtConfig({
         'line-md:moon-twotone',
       ],
     },
-  },
-  experimental: {
-    payloadExtraction: 'client',
   },
   compatibilityDate: '2025-11-24',
 })
