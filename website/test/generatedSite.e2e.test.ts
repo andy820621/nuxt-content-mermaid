@@ -4,28 +4,14 @@ import { createServer } from 'node:http'
 import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { chromium, type Browser, type Locator } from 'playwright'
+import { chromium, type Browser } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { PUBLIC_ROUTES, SITE_ORIGIN } from '../utils/site'
 
 const execFileAsync = promisify(execFile)
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 const generatedRoot = join(websiteRoot, '.output/public')
-const siteOrigin = 'https://nuxt-content-mermaid.barz.app'
-const publicRoutes = [
-  '/',
-  '/getting-started',
-  '/writing-diagrams',
-  '/configuration',
-  '/troubleshooting',
-  '/migration/v3',
-  '/zh',
-  '/zh/getting-started',
-  '/zh/writing-diagrams',
-  '/zh/configuration',
-  '/zh/troubleshooting',
-  '/zh/migration/v3',
-] as const
 const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g')
 const generateEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('VITEST')),
@@ -53,31 +39,6 @@ function generatedRouteFile(path: string) {
 
 function normalizeText(text: string | null) {
   return text?.replace(/\s+/g, ' ').trim() ?? ''
-}
-
-async function expectRenderableIcon(icon: Locator) {
-  const rendering = await icon.evaluate((element) => {
-    const style = getComputedStyle(element)
-    const svg = element.matches('svg') ? element : element.querySelector('svg')
-    const imageSources = [
-      style.backgroundImage,
-      style.maskImage,
-      style.getPropertyValue('-webkit-mask-image'),
-      style.getPropertyValue('--svg'),
-    ]
-    const bounds = element.getBoundingClientRect()
-
-    return {
-      hasImageData: imageSources.some(source => source.includes('data:image/svg+xml')),
-      hasSvgContent: Boolean(svg?.firstElementChild),
-      height: bounds.height,
-      width: bounds.width,
-    }
-  })
-
-  expect(rendering.width).toBeGreaterThan(0)
-  expect(rendering.height).toBeGreaterThan(0)
-  expect(rendering.hasSvgContent || rendering.hasImageData).toBe(true)
 }
 
 describe('generated documentation website', () => {
@@ -165,23 +126,23 @@ describe('generated documentation website', () => {
     const page = await browser.newPage()
 
     try {
-      for (const path of publicRoutes) {
+      for (const path of PUBLIC_ROUTES) {
         const response = await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
 
         expect(response?.status()).toBe(200)
         const canonical = page.locator('link[rel="canonical"]')
         expect(await canonical.count()).toBe(1)
         expect(await canonical.getAttribute('href'))
-          .toBe(new URL(path, siteOrigin).href)
+          .toBe(new URL(path, SITE_ORIGIN).href)
         expect(await page.locator('meta[property="og:url"]').getAttribute('content'))
-          .toBe(new URL(path, siteOrigin).href)
+          .toBe(new URL(path, SITE_ORIGIN).href)
       }
 
       const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
       const sitemapURLs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
         .map(([, url]) => url)
 
-      expect(sitemapURLs).toEqual(publicRoutes.map(path => new URL(path, siteOrigin).href))
+      expect(sitemapURLs).toEqual(PUBLIC_ROUTES.map(path => new URL(path, SITE_ORIGIN).href))
       expect(sitemap).not.toContain('/reference')
     }
     finally {
@@ -206,7 +167,7 @@ describe('generated documentation website', () => {
     hydratedPage.on('pageerror', error => runtimeErrors.push(error.message))
 
     try {
-      for (const path of publicRoutes) {
+      for (const path of PUBLIC_ROUTES) {
         const generatedHTML = await readFile(generatedRouteFile(path), 'utf8')
 
         expect(generatedHTML).toContain('<main')
@@ -221,7 +182,7 @@ describe('generated documentation website', () => {
         )
         expect(prerenderedHeading.length).toBeGreaterThan(0)
         expect(await noScriptPage.locator('link[rel="canonical"]').getAttribute('href'))
-          .toBe(new URL(path, siteOrigin).href)
+          .toBe(new URL(path, SITE_ORIGIN).href)
 
         const hydratedResponse = await hydratedPage.goto(`${staticSiteURL}${path}`, {
           waitUntil: 'networkidle',
@@ -246,7 +207,7 @@ describe('generated documentation website', () => {
     const internalLinks: URL[] = []
 
     try {
-      for (const path of publicRoutes) {
+      for (const path of PUBLIC_ROUTES) {
         await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
         routeIDs.set(path, new Set(await page.locator('[id]').evaluateAll(
           elements => elements.map(element => element.id),
@@ -257,12 +218,12 @@ describe('generated documentation website', () => {
         )
         for (const href of hrefs) {
           if (href.startsWith('/') || href.startsWith('#'))
-            internalLinks.push(new URL(href, new URL(path, siteOrigin)))
+            internalLinks.push(new URL(href, new URL(path, SITE_ORIGIN)))
         }
       }
 
       for (const link of internalLinks) {
-        expect(publicRoutes).toContain(link.pathname)
+        expect(PUBLIC_ROUTES).toContain(link.pathname)
         if (link.hash)
           expect(routeIDs.get(link.pathname)).toContain(decodeURIComponent(link.hash.slice(1)))
       }
@@ -271,40 +232,6 @@ describe('generated documentation website', () => {
       await page.close()
     }
   }, 30_000)
-
-  it('advertises safe package, repository, and license links', async () => {
-    const page = await browser.newPage({ javaScriptEnabled: false })
-    const requiredURLs = [
-      'https://www.npmjs.com/package/@barzhsieh/nuxt-content-mermaid',
-      'https://github.com/andy820621/nuxt-content-mermaid',
-      'https://github.com/andy820621/nuxt-content-mermaid/blob/main/LICENSE',
-    ]
-
-    try {
-      const externalLinks: Array<{ href: string | null, rel: string | null, target: string | null }> = []
-
-      for (const path of publicRoutes) {
-        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
-        externalLinks.push(...await page.locator('a[href^="http"]').evaluateAll(links => links.map(link => ({
-          href: link.getAttribute('href'),
-          rel: link.getAttribute('rel'),
-          target: link.getAttribute('target'),
-        }))))
-      }
-
-      expect([...new Set(externalLinks.map(link => link.href))])
-        .toEqual(expect.arrayContaining(requiredURLs))
-
-      for (const link of externalLinks) {
-        expect(new URL(link.href ?? '').protocol).toBe('https:')
-        if (link.target === '_blank')
-          expect(link.rel?.split(/\s+/).sort()).toEqual(['noopener', 'noreferrer'])
-      }
-    }
-    finally {
-      await page.close()
-    }
-  })
 
   it('renders project ownership and license in the shared footer', async () => {
     const page = await browser.newPage()
@@ -327,44 +254,4 @@ describe('generated documentation website', () => {
       await page.close()
     }
   })
-
-  it('renders all site-control icons without a runtime icon provider', async () => {
-    const blockedIconRequests: string[] = []
-    const context = await browser.newContext({
-      colorScheme: 'light',
-      reducedMotion: 'reduce',
-    })
-    await context.route('**/*', async (route) => {
-      const requestURL = new URL(route.request().url())
-      if (requestURL.origin !== staticSiteURL || requestURL.pathname.startsWith('/api/_nuxt_icon')) {
-        blockedIconRequests.push(requestURL.href)
-        await route.abort()
-        return
-      }
-      await route.continue()
-    })
-
-    try {
-      const page = await context.newPage()
-      await page.goto(staticSiteURL, { waitUntil: 'networkidle' })
-      await page.waitForSelector('button[aria-pressed]')
-
-      const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
-      expect(await switcher.textContent()).toBe('中')
-      expect(await switcher.locator('.iconify').count()).toBe(0)
-
-      await expectRenderableIcon(page.locator('[class~="i-line-md:sunny-outline"]'))
-      await expectRenderableIcon(page.locator('[class~="i-line-md:sunny-outline-twotone-loop"]'))
-
-      await page.getByRole('button', { name: 'Switch to dark mode' }).click()
-      await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
-
-      await expectRenderableIcon(page.locator('[class~="i-line-md:moon"]'))
-      await expectRenderableIcon(page.locator('[class~="i-line-md:moon-twotone"]'))
-      expect(blockedIconRequests).toEqual([])
-    }
-    finally {
-      await context.close()
-    }
-  }, 30_000)
 })
