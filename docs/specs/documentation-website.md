@@ -25,6 +25,7 @@ Landing 與 docs layout 解決不同問題，但共用同一個 Content collecti
 
 - 首次造訪者能理解套件用途、看到真實 Mermaid diagram，並前往 Getting Started。
 - 文件讀者能依序學習 diagram authoring、configuration、troubleshooting 與 v3 migration。
+- Production website 是 canonical package documentation；repository README 只保留 bounded distribution summary。
 - English 與 Traditional Chinese 使用相同資訊架構；英文為 canonical language，中文是 best-effort translation。
 - Desktop 與 mobile 都具備清楚的 navigation、active state、keyboard focus 與無水平溢位的閱讀體驗。
 - Light、dark 與 system preference 同時控制網站外觀與 Mermaid rendering，使用者選擇可跨 reload 保存。
@@ -37,7 +38,7 @@ Landing 與 docs layout 解決不同問題，但共用同一個 Content collecti
 - Landing schema、YAML、MDC landing component、資料 collection 或自訂內容生成器。
 - 搜尋 API、analytics、動態 OG image、blog、release feed 或認證／個人化。
 - Request-time content API、server-rendering dependency 或 provider-specific fallback。
-- GitHub Pages、DNS、sitemap、production-origin verification 與 authority cutover；這些由 #96 擁有。
+- Provider-specific deployment、DNS、TLS、redirect 或 hosting lifecycle management。
 - 讓 root package CI、artifact 或 release workflow 驗證 website。
 
 ## Content 與 routes
@@ -142,7 +143,7 @@ Hero 是首頁唯一的直接子 section。右側 `ContentRenderer` 只將 `Cont
 
 網站使用 repository-owned wordmark、icon、favicon 與靜態 social image。Wordmark 透過 `currentColor` 支援 light/dark theme；所有必要 icon 由 local icon collections 提供，不依賴 runtime icon provider。
 
-全站以目前 production identity `https://nuxt-content-mermaid.barz.app` 產生 Open Graph URL 與 image URL。Canonical links、sitemap、GitHub Pages workflow、custom domain activation 與 production evidence 在 #96 才成為 launch gate。
+全站以 production identity `https://nuxt-content-mermaid.barz.app` 產生 canonical、Open Graph 與 sitemap URLs。這個 origin 是公開套件文件的 canonical authority；hosting provider、DNS activation 與 production evidence 屬於營運紀錄，不是 durable product contract。
 
 ## Architecture boundaries
 

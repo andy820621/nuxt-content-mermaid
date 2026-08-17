@@ -16,7 +16,7 @@
     "type": "git",
     "url": "git+https://github.com/andy820621/nuxt-content-mermaid.git"
   },
-  "homepage": "https://www.npmjs.com/package/@barzhsieh/nuxt-content-mermaid",
+  "homepage": "https://nuxt-content-mermaid.barz.app",
   "bugs": {
     "url": "https://github.com/andy820621/nuxt-content-mermaid/issues"
   },

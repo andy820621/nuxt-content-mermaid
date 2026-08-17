@@ -1,6 +1,6 @@
 # Releasing
 
-Every stable release has exactly two maintainer actions:
+Every stable release has exactly two release-critical maintainer actions:
 
 1. Create, review, and merge a Release PR.
 2. From GitHub Actions on `main`, run **Publish stable release** with the stable
@@ -8,7 +8,9 @@ Every stable release has exactly two maintainer actions:
 
 The workflow owns the immutable tarball, npm Trusted Publishing, public-registry
 verification, annotated tag, and GitHub Release. Do not create those release
-objects manually.
+objects manually. After `finalize`, perform the independent Website
+Synchronization procedure below. A delayed website update never changes whether
+the package release completed successfully.
 
 ## 1. Create and merge the Release PR
 
@@ -76,6 +78,32 @@ Read the job graph as a durability boundary:
 | `finalize` | The annotated `vX.Y.Z` tag targets the workflow commit and the matching GitHub Release exists. |
 
 Only a run that completes `finalize` is a completed release.
+
+## 3. Synchronize the documentation website
+
+Website Synchronization starts only after the publish workflow completes
+`finalize`. The
+[production documentation site](https://nuxt-content-mermaid.barz.app) is the
+canonical package documentation, while the repository READMEs remain bounded
+distribution summaries.
+
+1. Compare the released changelog and public package surface with the canonical
+   English documentation source.
+2. If the canonical content already describes the released behavior, verify the
+   affected production routes and record that no content change was required.
+3. If documentation changed, open an ordinary documentation PR that updates the
+   English source first and the Traditional Chinese best-effort translation in
+   the same information architecture.
+4. After that PR merges, wait for the resulting production documentation
+   deployment and verify the affected routes, navigation, canonical URLs,
+   sitemap, hydration, and browser console on the production origin.
+
+Website Synchronization is not part of npm, tag, or GitHub Release durability.
+If it is delayed or its deployment fails, keep the successful package release
+unchanged, track the pending documentation work in an issue, and repair it
+through an ordinary PR or deployment retry. Do not unpublish, republish, move a
+tag, replace a GitHub Release, or roll back package state because the website is
+pending.
 
 ## One-time npm Trusted Publisher setup
 
