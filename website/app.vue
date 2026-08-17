@@ -157,6 +157,8 @@ onBeforeUnmount(() => {
           <a
             class="icon-button"
             href="https://github.com/andy820621/nuxt-content-mermaid"
+            target="_blank"
+            rel="noopener noreferrer"
             :aria-label="$t('site.github')"
             :title="$t('site.githubTitle')"
           >

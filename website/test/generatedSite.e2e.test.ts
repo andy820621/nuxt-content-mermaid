@@ -11,7 +11,6 @@ const execFileAsync = promisify(execFile)
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 const generatedRoot = join(websiteRoot, '.output/public')
-const iconLoadFailure = '[Icon] failed to load icon `material-symbols-light:language`'
 const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g')
 const generateEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('VITEST')),
@@ -105,8 +104,8 @@ describe('generated documentation website icons', () => {
     await new Promise<void>(resolve => server?.close(() => resolve()))
   })
 
-  it('generates without the material language icon load failure', () => {
-    expect(generateOutput).not.toContain(iconLoadFailure)
+  it('generates without icon load failures', () => {
+    expect(generateOutput).not.toContain('[Icon] failed to load icon')
   })
 
   it('renders all site-control icons without a runtime icon provider', async () => {
@@ -130,9 +129,12 @@ describe('generated documentation website icons', () => {
       await page.goto(staticSiteURL, { waitUntil: 'networkidle' })
       await page.waitForSelector('button[aria-pressed]')
 
+      const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+      expect(await switcher.textContent()).toBe('中')
+      expect(await switcher.locator('.iconify').count()).toBe(0)
+
       await expectRenderableIcon(page.locator('[class~="i-line-md:sunny-outline"]'))
       await expectRenderableIcon(page.locator('[class~="i-line-md:sunny-outline-twotone-loop"]'))
-      await expectRenderableIcon(page.locator('[class~="i-material-symbols-light:language"]'))
 
       await page.getByRole('button', { name: 'Switch to dark mode' }).click()
       await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')

@@ -355,7 +355,7 @@ describe('documentation website site controls', async () => {
     expect(await tooltip.textContent()).toBe(await toggle.getAttribute('aria-label'))
   })
 
-  it('renders the Chinese destination as an icon pill on the English home route', async () => {
+  it('renders the Chinese destination as a text-only pill on the English home route', async () => {
     const page = await createSiteControlsPage()
     await page.goto(url('/'), { waitUntil: 'hydration' })
 
@@ -363,8 +363,31 @@ describe('documentation website site controls', async () => {
     expect(await switcher.getAttribute('href')).toBe('/zh')
     expect(await switcher.getAttribute('title')).toBe('Switch to Chinese')
     expect(await switcher.textContent()).toBe('中')
-    expect(await switcher.locator('[class~="i-material-symbols-light:language"]').count()).toBe(1)
+    expect(await switcher.locator('.iconify').count()).toBe(0)
     expect(await switcher.evaluate(element => element.clientWidth > element.clientHeight)).toBe(true)
+  })
+
+  it('optically enlarges the theme glyph relative to the GitHub glyph', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const themeGlyph = page.locator('.theme-toggle__icon--static')
+    const githubGlyph = page.locator('a[href="https://github.com/andy820621/nuxt-content-mermaid"] svg')
+    const themeWidth = await themeGlyph.evaluate(element => Number.parseFloat(getComputedStyle(element).width))
+    const githubWidth = await githubGlyph.evaluate(element => Number.parseFloat(getComputedStyle(element).width))
+
+    expect(themeWidth).toBeCloseTo(22.4, 1)
+    expect(githubWidth).toBeCloseTo(20, 1)
+    expect(themeWidth).toBeGreaterThan(githubWidth)
+  })
+
+  it('opens the GitHub repository in a safe new tab', async () => {
+    const page = await createSiteControlsPage()
+    await page.goto(url('/'), { waitUntil: 'hydration' })
+
+    const github = page.locator('a[href="https://github.com/andy820621/nuxt-content-mermaid"]')
+    expect(await github.getAttribute('target')).toBe('_blank')
+    expect((await github.getAttribute('rel'))?.split(/\s+/).sort()).toEqual(['noopener', 'noreferrer'])
   })
 
   it('links from the Chinese home route to the English home route', async () => {

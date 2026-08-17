@@ -19,10 +19,6 @@ const nextLocaleLabel = computed(() => nextLocale.value === 'zh'
       :aria-label="nextLocaleLabel"
       :title="nextLocaleLabel"
     >
-      <Icon
-        aria-hidden="true"
-        name="material-symbols-light:language"
-      />
       <span>{{ nextLocale === 'zh' ? '中' : 'EN' }}</span>
     </NuxtLink>
   </AppTooltip>

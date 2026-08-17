@@ -54,7 +54,6 @@ export default defineNuxtConfig({
         'line-md:moon',
         'line-md:sunny-outline-twotone-loop',
         'line-md:moon-twotone',
-        'material-symbols-light:language',
       ],
     },
   },

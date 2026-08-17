@@ -78,16 +78,23 @@ it('opens the GitHub repository in a safe new tab', async () => {
 })
 ```
 
-In `website/test/generatedSite.e2e.test.ts`, replace the obsolete language-icon expectation with a client-bundle count assertion:
+In `website/test/generatedSite.e2e.test.ts`, generalize the generate warning assertion:
 
 ```ts
-it('generates a four-icon offline client bundle without icon load failures', () => {
-  expect(generateOutput).toContain('Nuxt Icon client bundle consist of 4 icons')
+it('generates without icon load failures', () => {
   expect(generateOutput).not.toContain('[Icon] failed to load icon')
 })
 ```
 
-Remove the `i-material-symbols-light:language` call from the offline rendering case; retain all four Line MD assertions and the blocked-request assertion.
+In the offline rendering case, replace the `i-material-symbols-light:language` render assertion with the generated locale-switcher contract:
+
+```ts
+const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
+expect(await switcher.textContent()).toBe('中')
+expect(await switcher.locator('.iconify').count()).toBe(0)
+```
+
+Retain all four Line MD assertions and the blocked-request assertion. Verify the four-icon bundle count from the explicit `nuxt prepare` and `nuxt generate` command output in Step 5 because Nuxt's info-level module log is not preserved by every child-process capture path.
 
 - [ ] **Step 2: Run the narrow tests and verify RED**
 
@@ -97,7 +104,7 @@ Run:
 pnpm --filter nuxt-content-mermaid-website exec vitest run test/siteControls.e2e.test.ts test/generatedSite.e2e.test.ts
 ```
 
-Expected: FAIL because the locale switcher still contains `.iconify`, the theme glyph is still 20px, the GitHub anchor lacks `target` and `rel`, and Nuxt reports a five-icon client bundle.
+Expected: FAIL because both the dev and generated locale switchers still contain `.iconify`, the theme glyph is still 20px, and the GitHub anchor lacks `target` and `rel`.
 
 - [ ] **Step 3: Implement the minimal markup, CSS, and bundle changes**
 
@@ -112,7 +119,7 @@ In `website/assets/css/main.css`, simplify the pill layout and apply optical siz
 ```css
 .locale-switcher {
   width: auto;
-  padding: 0 0.65rem;
+  padding: 0 1rem;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
