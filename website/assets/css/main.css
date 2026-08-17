@@ -633,19 +633,51 @@ html[data-theme='dark'] .landing-demo__tab--active::after {
   font-weight: 650;
 }
 
-.docs-toc ul {
+.docs-toc-list {
+  display: grid;
+  gap: 0.125rem;
   margin: 0;
-  padding-left: 1rem;
+  padding: 0;
+  border-inline-start: 1px solid var(--border);
+  list-style: none;
 }
 
-.docs-toc a {
+.docs-toc-item {
+  margin-inline-start: -1px;
+}
+
+.docs-toc-link {
+  position: relative;
+  display: block;
+  padding: 0.4rem 0.5rem 0.4rem var(--docs-toc-indent);
   color: var(--muted);
   font-size: 0.875rem;
+  line-height: 1.4;
   text-decoration: none;
 }
 
-.docs-toc a:hover {
+.docs-toc-link::before {
+  position: absolute;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  inset-inline-start: 0;
+  width: 2px;
+  background: transparent;
+  border-radius: 999px;
+  content: '';
+}
+
+.docs-toc-link:hover {
   color: var(--text);
+}
+
+.docs-toc-link--active {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.docs-toc-link--active::before {
+  background: var(--accent);
 }
 
 :where(a, button):focus-visible {

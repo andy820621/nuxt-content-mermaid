@@ -58,4 +58,77 @@ describe('documentation page TOC', async () => {
     expect(await toc.getByRole('link', { name: 'General' }).count()).toBe(0)
     expect(await toc.locator('.docs-toc-link[aria-current="location"]').count()).toBe(1)
   })
+
+  it('renders a shared rail and a non-color-only active indicator in both themes', async () => {
+    const page = await createDocsPage()
+    await waitForActiveHash(page, '#general')
+
+    const toc = page.getByRole('navigation', { name: 'On this page' })
+    const active = toc.getByRole('link', { name: 'General' })
+    const inactive = toc.getByRole('link', { name: 'Theme' })
+
+    async function readStyles() {
+      return {
+        rail: await toc.locator('.docs-toc-list').evaluate((element) => {
+          const style = getComputedStyle(element)
+          return { color: style.borderInlineStartColor, width: style.borderInlineStartWidth }
+        }),
+        active: await active.evaluate((element) => {
+          const style = getComputedStyle(element)
+          const indicator = getComputedStyle(element, '::before')
+          return {
+            color: style.color,
+            fontWeight: Number(style.fontWeight),
+            indicatorColor: indicator.backgroundColor,
+            indicatorWidth: indicator.width,
+          }
+        }),
+        inactiveColor: await inactive.evaluate(element => getComputedStyle(element).color),
+      }
+    }
+
+    const light = await readStyles()
+    expect(light.rail.width).toBe('1px')
+    expect(light.active.indicatorWidth).toBe('2px')
+    expect(light.active.indicatorColor).not.toBe('rgba(0, 0, 0, 0)')
+    expect(light.active.color).not.toBe(light.inactiveColor)
+    expect(light.active.fontWeight).toBeGreaterThanOrEqual(650)
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
+    const dark = await readStyles()
+    expect(dark.active.indicatorColor).not.toBe('rgba(0, 0, 0, 0)')
+    expect(dark.active.color).not.toBe(dark.inactiveColor)
+  })
+
+  it('keeps hover and focus distinct and hides the TOC below the desktop breakpoint', async () => {
+    const page = await createDocsPage()
+    const toc = page.getByRole('navigation', { name: 'On this page' })
+    const link = toc.getByRole('link', { name: 'Theme' })
+    const active = toc.getByRole('link', { name: 'General' })
+
+    const inactiveColor = await link.evaluate(element => getComputedStyle(element).color)
+    const activeColor = await active.evaluate(element => getComputedStyle(element).color)
+    await link.hover()
+    const hoverColor = await link.evaluate(element => getComputedStyle(element).color)
+    expect(hoverColor).not.toBe(inactiveColor)
+    expect(hoverColor).not.toBe(activeColor)
+
+    await link.focus()
+    expect(await link.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none')
+
+    await page.setViewportSize({ width: 900, height: 900 })
+    expect(await toc.isVisible()).toBe(false)
+  })
+
+  it('uses instant scrolling when reduced motion is requested', async () => {
+    const page = await createPage(undefined, {
+      colorScheme: 'light',
+      storageState: { cookies: [], origins: [] },
+    })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto(url('/configuration'), { waitUntil: 'hydration' })
+
+    expect(await page.locator('html').evaluate(element => getComputedStyle(element).scrollBehavior)).toBe('auto')
+  })
 })
