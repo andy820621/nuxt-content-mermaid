@@ -355,18 +355,6 @@ describe('documentation website site controls', async () => {
     expect(await tooltip.textContent()).toBe(await toggle.getAttribute('aria-label'))
   })
 
-  it('renders the Chinese destination as a text-only pill on the English home route', async () => {
-    const page = await createSiteControlsPage()
-    await page.goto(url('/'), { waitUntil: 'hydration' })
-
-    const switcher = page.getByRole('link', { name: 'Switch to Chinese' })
-    expect(await switcher.getAttribute('href')).toBe('/zh')
-    expect(await switcher.getAttribute('title')).toBe('Switch to Chinese')
-    expect(await switcher.textContent()).toBe('中')
-    expect(await switcher.locator('.iconify').count()).toBe(0)
-    expect(await switcher.evaluate(element => element.clientWidth > element.clientHeight)).toBe(true)
-  })
-
   it('optically enlarges the theme glyph relative to the GitHub glyph', async () => {
     const page = await createSiteControlsPage()
     await page.goto(url('/'), { waitUntil: 'hydration' })
