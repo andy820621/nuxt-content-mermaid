@@ -1,7 +1,9 @@
 # Homepage feature section removal
 
-**Date:** 2026-08-17  
-**Status:** Approved design  
+**Date:** 2026-08-17
+
+**Status:** Approved design
+
 **Scope:** Documentation website homepage
 
 ## Summary

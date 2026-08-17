@@ -1,7 +1,8 @@
 # Nuxt 生態系文件網站首頁模式研究
 
-> 研究日期：2026-08-17  
-> 範圍：Nuxt UI、Nuxt Content、Nuxt ESLint、Nuxt Image、Nuxt SEO，另以 Nuxt Scripts 補充比較  
+> 研究日期：2026-08-17
+>
+> 範圍：Nuxt UI、Nuxt Content、Nuxt ESLint、Nuxt Image、Nuxt SEO，另以 Nuxt Scripts 補充比較
 > 來源限制：只採官方 live homepage 與官方 GitHub repository；版面觀察以 1440 × 1400 桌面 viewport 實際載入首頁確認
 
 ## 結論先行
