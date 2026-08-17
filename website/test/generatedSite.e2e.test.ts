@@ -235,6 +235,13 @@ describe('generated documentation website', () => {
 
   it('renders project ownership and license in the shared footer', async () => {
     const page = await browser.newPage()
+    const footerLinks = [
+      { href: 'https://github.com/andy820621', name: 'BarZ Hsieh' },
+      {
+        href: 'https://github.com/andy820621/nuxt-content-mermaid/blob/main/LICENSE',
+        name: 'MIT License',
+      },
+    ] as const
 
     try {
       for (const path of ['/', '/getting-started']) {
@@ -244,10 +251,15 @@ describe('generated documentation website', () => {
         await expect.poll(() => footer.count()).toBe(1)
         expect((await footer.textContent())?.replace(/\s+/g, ' ').trim())
           .toBe('© 2025–present BarZ Hsieh · MIT License')
-        expect(await footer.getByRole('link', { name: 'BarZ Hsieh' }).getAttribute('href'))
-          .toBe('https://github.com/andy820621')
-        expect(await footer.getByRole('link', { name: 'MIT License' }).getAttribute('href'))
-          .toBe('https://github.com/andy820621/nuxt-content-mermaid/blob/main/LICENSE')
+
+        for (const { href, name } of footerLinks) {
+          const link = footer.getByRole('link', { name })
+
+          expect(await link.getAttribute('href')).toBe(href)
+          expect(await link.getAttribute('target')).toBe('_blank')
+          expect((await link.getAttribute('rel'))?.split(/\s+/).sort())
+            .toEqual(['noopener', 'noreferrer'])
+        }
       }
     }
     finally {
