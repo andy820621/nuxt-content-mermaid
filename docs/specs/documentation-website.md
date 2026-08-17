@@ -576,7 +576,8 @@ website/
 | `website/composables/useDocsToc.ts` | 新增 | 管理 Portfolio 式 reading band、初始 active seed、observer 重綁與 cleanup。 |
 | `website/layouts/docs.vue` | 修改 | 將 `page.body.toc.links` 交給 `DocsToc`，移除 layout 內固定兩層清單。 |
 | `website/assets/css/main.css` | 修改 | 加入共用 rail、active indicator、層級縮排與 active／hover／focus presentation。 |
-| `website/test/docsToc.e2e.test.ts` | 新增 | 驗證初始／捲動 active、巢狀 hash、缺少 heading、mobile 隱藏與 reduced motion。 |
+| `website/test/docsToc.test.ts` | 新增 | 驗證任意巢狀深度、初始 active seed、visibility state 與缺少 heading 的純邏輯。 |
+| `website/test/docsToc.e2e.test.ts` | 新增 | 在真實文件 route 驗證初始／捲動 active、hash navigation、mobile 隱藏與 reduced motion。 |
 | `docs/specs/documentation-website.md` | 修改 | 固定第八階段 desktop TOC 契約與驗收條件。 |
 
 第八階段不修改 Content collection、Markdown、catch-all route、手機 navigation、Mermaid runtime、dependencies、root scripts、CI、artifact 或 release pipeline，也不加入 Nuxt UI、Reka Collapsible、手機 TOC、TOC store 或像素 screenshot gate。
@@ -646,7 +647,7 @@ CI 不執行網站 lint、test、typecheck、build、generate、browser check �
 29. TOC active state 同時具有 rail 指示線、accent 文字、較高字重與 `aria-current="location"`；hover、focus-visible 與 active 三種狀態彼此可辨，light／dark theme 都使用既有 tokens。
 30. TOC link 維持原生 hash navigation；缺少單一 heading 不造成 runtime error，route／links 更新不遺留重複 observer。
 31. `62rem` 以下不顯示右側 TOC，網站沒有手機 TOC、TOC disclosure、Nuxt UI dependency 或 TOC 專用 navigation state。
-32. Website-local browser test 覆蓋 desktop 初始 active、捲動後 active、巢狀 hash navigation、缺少 heading、mobile 隱藏與 reduced-motion scrolling；斷言以 semantic state 與位置關係為主，不建立像素 screenshot gate。
+32. Website-local unit test 覆蓋遞迴巢狀結構、初始 active seed、visibility state 與缺少 heading；browser test 在真實文件 route 覆蓋 desktop 初始 active、捲動後 active、hash navigation、mobile 隱藏與 reduced-motion scrolling。斷言以 semantic state 與位置關係為主，不建立像素 screenshot gate。
 
 ## 官方與研究依據
 
