@@ -50,25 +50,7 @@ const tocLinks = computed(() => props.page.body.toc?.links ?? [])
         v-if="tocLinks.length"
         class="docs-toc"
       >
-        <nav :aria-label="t('docs.onThisPage')">
-          <p>{{ t('docs.onThisPage') }}</p>
-          <ul>
-            <li
-              v-for="link in tocLinks"
-              :key="link.id"
-            >
-              <a :href="`#${link.id}`">{{ link.text }}</a>
-              <ul v-if="link.children?.length">
-                <li
-                  v-for="child in link.children"
-                  :key="child.id"
-                >
-                  <a :href="`#${child.id}`">{{ child.text }}</a>
-                </li>
-              </ul>
-            </li>
-          </ul>
-        </nav>
+        <DocsToc :links="tocLinks" />
       </aside>
     </div>
   </div>
