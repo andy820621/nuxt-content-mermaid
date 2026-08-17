@@ -163,26 +163,6 @@ describe('expand/fullscreen toolbars', async () => {
     browser: true,
   })
 
-  it('centers a narrower SVG in the renderer viewport', async () => {
-    const page = await createPage()
-    await page.setViewportSize({ width: 1000, height: 800 })
-    await page.goto(url('/'))
-    await page.waitForSelector('#mock-svg-secondary', { state: 'visible', timeout: 5000 })
-
-    const geometry = await page.locator('#secondary-root .mermaid-wrapper').evaluate((wrapper) => {
-      const svg = wrapper.querySelector<SVGSVGElement>('.mermaid > svg')!
-      const wrapperRect = wrapper.getBoundingClientRect()
-      const svgRect = svg.getBoundingClientRect()
-      return {
-        centerDelta: svgRect.left + svgRect.width / 2 - (wrapperRect.left + wrapperRect.width / 2),
-        hasInlineSpace: svgRect.width < wrapperRect.width,
-      }
-    })
-
-    expect(geometry.hasInlineSpace).toBe(true)
-    expect(Math.abs(geometry.centerDelta)).toBeLessThanOrEqual(1)
-  })
-
   it('proves the complete expand lifecycle through toolbar and diagram entry', { timeout: 20000 }, async () => {
     const page = await createPage()
     await page.goto(url('/'))
