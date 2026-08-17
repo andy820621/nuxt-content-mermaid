@@ -4,11 +4,6 @@
 
 本規格是目前文件網站唯一的產品與架構契約。它描述已接受的最終邊界，不保存 agent workflow、逐步實作歷史或被淘汰的替代方案。
 
-GitHub Issues 追蹤實作、方向調整與部署進度：
-
-- #99 收斂並合併目前 website baseline。
-- #96 在 baseline 合併後處理 GitHub Pages、production evidence 與 documentation authority cutover。
-
 ## 心智模型
 
 網站是一個獨立、內容驅動的 Nuxt Content application：
