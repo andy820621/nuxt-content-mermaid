@@ -72,12 +72,13 @@ describe('stable publish workflow contract', () => {
     const publish = workflow.jobs.publish
     const commands = runCommands(publish).join('\n')
     const checkout = publish.steps.find(step => step.uses === 'actions/checkout@v6')
-    const setupNode = publish.steps.find(step => step.uses === 'actions/setup-node@v6')
+    const setupNode = publish.steps.find(step => step.uses === 'actions/setup-node@v7')
 
     expect(checkout?.with).toEqual({ 'fetch-depth': 0 })
     expect(setupNode?.with).toEqual({
       'node-version': '24.19.0',
       'registry-url': 'https://registry.npmjs.org',
+      'package-manager-cache': false,
     })
     expect(commands).toContain('git cat-file -t')
     expect(commands).toContain('package.json')

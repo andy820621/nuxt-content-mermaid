@@ -51,6 +51,9 @@ node scripts/release-verification/package-artifact.mjs \
   無論成功或失敗都清理，供 PR CI 與本機使用。
 - 提供 artifact directory 時，路徑必須為 absolute；目錄可不存在，但建立後
   必須為空。成功後保留其中唯一 `.tgz` 給 release workflow 發布。
+- Frozen install 後，pack lifecycle 必須能從只有 tracked files 的 clean checkout
+  自行產生所需的 Nuxt module types；不得依賴先前執行 `dev:prepare` 留下的
+  `.nuxt` state。
 - 每次 invocation 只允許執行一次 `pnpm pack`。
 - verifier runner 直接接收 `{ artifact, profile }`，不支援 registry 或其他
   package source adapter。

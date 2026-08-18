@@ -33,6 +33,11 @@ Review the generated notes. The PR must contain:
 Do not commit `dist` or a package archive. CI and the release verifier build
 those outputs from source.
 
+Keep `prepack` self-contained: after a frozen install, it must generate any
+required Nuxt module types and build successfully from a checkout containing
+only tracked files. Local `.nuxt` state from `dev:prepare` is not release
+evidence.
+
 Before merge, require the existing checks:
 
 - `source-verification`;
