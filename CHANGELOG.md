@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.0.2
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.1...v3.0.2)
+
+### ⚠️ Breaking Changes
+
+- `v3.0.2` is the first npm-published successor to `v3.0.0` and carries forward the `v3.0.1` removal of the legacy inline Mermaid fence shorthand `displayMode`. Replace `{displayMode="compact"}` with Mermaid YAML config:
+
+  ```yaml
+  ---
+  config:
+    gantt:
+      displayMode: compact
+  ---
+  ```
+
+  Mermaid's official top-level YAML `displayMode` remains accepted. Unsupported inline attributes preserve the complete original fence instead of being partially transformed.
+
+### 🩹 Fixes
+
+- **release:** Prepare generated Nuxt module types before the package build so `pnpm pack` succeeds from a clean checkout.
+- **release:** Use `setup-node@v7` without its removed dummy authentication fallback and explicitly disable dependency caching in the OIDC publishing job.
+
+### ℹ️ Release Recovery
+
+- `v3.0.1` was tagged but failed deterministic artifact verification before `npm publish`; no `3.0.1` package or GitHub Release was created. Its tag remains unchanged as the immutable record of that attempt.
+
+### ❤️ Contributors
+
+- Yao Tsu Hsieh ([@andy820621](https://github.com/andy820621))
+
 ## v3.0.1
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.0...v3.0.1)
