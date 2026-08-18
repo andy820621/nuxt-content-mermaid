@@ -12,12 +12,12 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
 import { runBrowserSmoke } from './browser-smoke.mjs'
-import { parseExactSemver, parseStableSemver } from './exact-semver.mjs'
+import { parseStableSemver } from './exact-semver.mjs'
 import {
   createReleaseVerificationFailure,
 } from './failure-classification.mjs'
@@ -37,30 +37,6 @@ const CONSUMER_TEMPLATE_FILES = new Set([
   'verify-package-root.mjs',
 ])
 
-function assertExactRegistryVersion(version) {
-  if (!parseExactSemver(version)) {
-    throw new Error('Registry smoke requires an exact package version')
-  }
-}
-
-function packageDependency(packageSource) {
-  if (packageSource?.kind === 'artifact') {
-    return {
-      name: packageSource.artifact.packageName,
-      version: packageSource.artifact.packageVersion,
-      dependency: pathToFileURL(packageSource.artifact.archivePath).href,
-    }
-  }
-  if (packageSource?.kind === 'registry') {
-    assertExactRegistryVersion(packageSource.packageVersion)
-    return {
-      name: packageSource.packageName,
-      version: packageSource.packageVersion,
-      dependency: packageSource.packageVersion,
-    }
-  }
-  throw new Error(`Unsupported consumer package source: ${packageSource?.kind}`)
-}
 const execFileAsync = promisify(execFile)
 
 function outputTail(output) {
@@ -240,6 +216,7 @@ function assertPublishablePacklist(packlist) {
 }
 
 async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner }) {
+  await mkdir(artifactDirectory, { recursive: true })
   if ((await readdir(artifactDirectory)).length > 0) {
     throw new Error('Artifact directory contains pre-existing state')
   }
@@ -264,6 +241,12 @@ async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner
   if (typeof packResult.name !== 'string' || typeof packResult.version !== 'string') {
     throw new TypeError('pnpm pack artifact metadata is missing package name or version')
   }
+  if (packResult.name !== PACKAGE_NAME) {
+    throw new Error(`Publishable Package Artifact has an unexpected package name: ${packResult.name}`)
+  }
+  if (!parseStableSemver(packResult.version)) {
+    throw new Error(`Publishable Package Artifact must use an exact stable version: ${packResult.version}`)
+  }
   if (!Array.isArray(packResult.files)
     || packResult.files.some(file => (
       !file
@@ -285,7 +268,6 @@ async function createArtifact({ repositoryRoot, artifactDirectory, commandRunner
     archivePath,
     filename: tarballs[0],
     sha256: createHash('sha256').update(archiveBytes).digest('hex'),
-    integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
     packlist,
     packageName: packResult.name,
     packageVersion: packResult.version,
@@ -312,97 +294,6 @@ function archiveEntries(output) {
     throw new Error('Package archive contains duplicate entries')
   }
   return entries
-}
-
-function checksumIdentity(contents) {
-  const lines = contents.trimEnd().split(/\r?\n/)
-  if (lines.length !== 1) {
-    throw new Error('Artifact checksum must contain exactly one entry')
-  }
-  const separator = lines[0].indexOf('  ')
-  if (separator < 1) {
-    throw new Error('Artifact checksum must use "sha512-<base64>  <filename>"')
-  }
-  const integritySha512 = lines[0].slice(0, separator)
-  const filename = lines[0].slice(separator + 2)
-  if (!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(integritySha512)
-    || filename.length === 0
-    || basename(filename) !== filename) {
-    throw new Error('Artifact checksum must use "sha512-<base64>  <filename>"')
-  }
-  return { filename, integritySha512 }
-}
-
-export function formatArtifactChecksum(artifact) {
-  if (!artifact
-    || basename(artifact.filename ?? '') !== artifact.filename
-    || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(artifact.integritySha512 ?? '')) {
-    throw new Error('Cannot format checksum for an invalid artifact identity')
-  }
-  return `${artifact.integritySha512}  ${artifact.filename}\n`
-}
-
-async function loadArtifact({ archivePath, checksumPath, commandRunner }) {
-  if (!isAbsolute(archivePath) || !isAbsolute(checksumPath)) {
-    throw new Error('Artifact archive and checksum paths must be absolute')
-  }
-  if (archivePath === checksumPath || !archivePath.endsWith('.tgz')) {
-    throw new Error('Artifact loader requires distinct .tgz and checksum files')
-  }
-  const artifactDirectory = dirname(archivePath)
-  const tarballs = (await readdir(artifactDirectory))
-    .filter(filename => filename.endsWith('.tgz'))
-  if (tarballs.length !== 1) {
-    throw new Error(`Workflow artifact must contain exactly one tarball; found ${tarballs.length}`)
-  }
-  if (tarballs[0] !== basename(archivePath)) {
-    throw new Error('Selected artifact tarball does not match the workflow artifact directory')
-  }
-
-  const archiveBytes = await readFile(archivePath)
-  const expected = checksumIdentity(await readFile(checksumPath, 'utf8'))
-  if (expected.filename !== basename(archivePath)) {
-    throw new Error(`Artifact checksum filename mismatch: expected ${basename(archivePath)}, received ${expected.filename}`)
-  }
-  const integritySha512 = `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`
-  if (integritySha512 !== expected.integritySha512) {
-    throw new Error('Artifact SHA-512 mismatch')
-  }
-
-  const listing = await commandRunner({
-    command: 'tar',
-    args: ['-tzf', archivePath],
-    cwd: artifactDirectory,
-  })
-  const entries = archiveEntries(listing?.stdout)
-  if (entries.filter(entry => entry === 'package/package.json').length !== 1) {
-    throw new Error('Package archive must contain exactly one package/package.json')
-  }
-  const manifestResult = await commandRunner({
-    command: 'tar',
-    args: ['-xOzf', archivePath, 'package/package.json'],
-    cwd: artifactDirectory,
-  })
-  const manifest = JSON.parse(manifestResult?.stdout ?? '')
-  if (manifest.name !== PACKAGE_NAME || !parseStableSemver(manifest.version)) {
-    throw new Error(`Archive package identity mismatch: received ${manifest.name}@${manifest.version}`)
-  }
-  const packageContract = assertArchiveDependencyContract(manifest)
-  const packlist = entries
-    .filter(entry => entry.startsWith('package/') && !entry.endsWith('/'))
-    .map(entry => entry.slice('package/'.length))
-    .toSorted()
-
-  return {
-    archivePath,
-    filename: basename(archivePath),
-    sha256: createHash('sha256').update(archiveBytes).digest('hex'),
-    integritySha512,
-    packlist,
-    packageName: manifest.name,
-    packageVersion: manifest.version,
-    packageContract,
-  }
 }
 
 function collectStringLeaves(value) {
@@ -509,13 +400,17 @@ async function inspectArchive({ archiveDirectory, artifact, commandRunner }) {
 }
 
 async function installConsumer({
-  packageSource,
+  artifact,
   consumerDirectory,
   profile,
   templateDirectory,
   commandRunner,
 }) {
-  const source = packageDependency(packageSource)
+  const source = {
+    name: artifact.packageName,
+    version: artifact.packageVersion,
+    dependency: pathToFileURL(artifact.archivePath).href,
+  }
   await assertTemplateIsClean(templateDirectory)
   await assertEmptyConsumerDirectory(consumerDirectory)
 
@@ -663,10 +558,6 @@ export function createReleaseVerificationOperations({
       }
     },
     createArtifact: input => createArtifact({
-      ...input,
-      commandRunner,
-    }),
-    loadArtifact: input => loadArtifact({
       ...input,
       commandRunner,
     }),

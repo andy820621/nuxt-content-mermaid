@@ -309,9 +309,27 @@ describe('transformMarkdownDiagrams', () => {
     })
   })
 
+  it.each([
+    ['by itself', '{displayMode="compact"}'],
+    [
+      'alongside supported attributes',
+      '{title="Inline Title" displayMode="compact" toolbar.title="Toolbar" config=\'{"theme":"forest"}\'}',
+    ],
+  ])('returns the original fence when inline displayMode appears %s', (_case, attrs) => {
+    const body = [
+      `\`\`\`mermaid ${attrs}`,
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
   it('merges YAML and inline props before passing to Mermaid', async () => {
     const body = [
-      '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="24px" config=\'{"theme":"forest","flowchart":{"curve":"step"}}\'}',
+      '```mermaid {title="Inline Title" toolbar.fontSize="24px" config=\'{"theme":"forest","flowchart":{"curve":"step"}}\'}',
       '---',
       'title: YAML Title',
       'displayMode: standard',
@@ -338,7 +356,7 @@ describe('transformMarkdownDiagrams', () => {
     const frontmatter = extractFrontmatter(extractDecodedCode(output))
     expect(frontmatter).toEqual({
       title: 'Inline Title',
-      displayMode: 'compact',
+      displayMode: 'standard',
       toolbar: {
         title: 'YAML Toolbar',
         fontSize: '24px',
@@ -355,7 +373,7 @@ describe('transformMarkdownDiagrams', () => {
 
   it('returns the original fence instead of partially transforming unsafe metadata', () => {
     const body = [
-      '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="18px" toolbar.constructor.polluted=true config=\'{"theme":"forest"}\'}',
+      '```mermaid {title="Inline Title" toolbar.fontSize="18px" toolbar.constructor.polluted=true config=\'{"theme":"forest"}\'}',
       '---',
       'title: YAML Title',
       'displayMode: standard',
@@ -374,6 +392,33 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
+  it('preserves Mermaid gantt displayMode in YAML config', () => {
+    const body = [
+      '```mermaid',
+      '---',
+      'config:',
+      '  gantt:',
+      '    displayMode: compact',
+      '---',
+      'gantt',
+      '  title Sprint plan',
+      '  section Delivery',
+      '  Build :done, 2026-08-18, 1d',
+      '```',
+      '',
+    ].join('\n')
+
+    const output = transformMarkdownDiagrams(body)
+
+    expect(extractFrontmatter(extractDecodedCode(output))).toEqual({
+      config: {
+        gantt: {
+          displayMode: 'compact',
+        },
+      },
+    })
   })
 
   it('moves frontmatter above mermaid directives before rendering', () => {

@@ -1,4 +1,4 @@
-import type { ReleaseVerificationOperations } from './runner.mjs'
+import type { PackageArtifact, ReleaseVerificationOperations } from './runner.mjs'
 
 export interface CommandInvocation {
   command: string
@@ -19,13 +19,15 @@ export interface ReleaseVerificationOperationOptions {
   temporaryRoot?: string
 }
 
-export function runCommand(invocation: CommandInvocation): Promise<CommandResult>
+export interface PackageArtifactOperations extends ReleaseVerificationOperations {
+  createArtifact: (input: {
+    repositoryRoot: string
+    artifactDirectory: string
+  }) => Promise<PackageArtifact>
+}
 
-export function formatArtifactChecksum(artifact: {
-  filename: string
-  integritySha512: string
-}): string
+export function runCommand(invocation: CommandInvocation): Promise<CommandResult>
 
 export function createReleaseVerificationOperations(
   options: ReleaseVerificationOperationOptions,
-): ReleaseVerificationOperations
+): PackageArtifactOperations

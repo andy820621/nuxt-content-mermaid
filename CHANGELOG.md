@@ -1,5 +1,54 @@
 # Changelog
 
+## v3.0.1
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.0...v3.0.1)
+
+### ⚠️ Breaking Changes
+
+- Remove the legacy inline Mermaid fence shorthand `displayMode`. This is an explicit maintainer-approved SemVer exception for `3.0.1`; Package Users accepting `^3.0.0` may receive it without a major-version update. An unsupported inline attribute now preserves the complete original fence instead of partially transforming it.
+
+  Before:
+
+  ~~~md
+  ```mermaid {displayMode="compact"}
+  gantt
+    title Release
+    section Work
+      Publish: done, 2026-08-18, 1d
+  ```
+  ~~~
+
+  After:
+
+  ~~~md
+  ```mermaid
+  ---
+  config:
+    gantt:
+      displayMode: compact
+  ---
+  gantt
+    title Release
+    section Work
+      Publish: done, 2026-08-18, 1d
+  ```
+  ~~~
+
+  Mermaid's official top-level YAML `displayMode` remains accepted; the nested `config.gantt.displayMode` form is recommended so diagram settings share the common config channel.
+
+### 🩹 Fixes
+
+- **renderer:** Center Mermaid SVGs ([#101](https://github.com/andy820621/nuxt-content-mermaid/pull/101))
+
+### 📖 Documentation
+
+- Publish the bilingual [official documentation website](https://nuxt-content-mermaid.barz.app), make it the canonical documentation source, and expose it as the npm package homepage ([#102](https://github.com/andy820621/nuxt-content-mermaid/pull/102), [#105](https://github.com/andy820621/nuxt-content-mermaid/pull/105), [#107](https://github.com/andy820621/nuxt-content-mermaid/pull/107)).
+
+### ❤️ Contributors
+
+- Yao Tsu Hsieh ([@andy820621](https://github.com/andy820621))
+
 ## v3.0.0
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v2.2.3...v3.0.0)

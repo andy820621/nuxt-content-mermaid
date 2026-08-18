@@ -48,7 +48,7 @@ describe('Markdown Diagram Protocol', () => {
       '---',
       '# Diagram',
       '',
-      '```mermaid {title="Inline Title" displayMode="compact" toolbar.fontSize="18px" config=\'{"theme":"forest"}\'}',
+      '```mermaid {title="Inline Title" toolbar.fontSize="18px" config=\'{"theme":"forest"}\'}',
       '---',
       'title: YAML Title',
       'displayMode: standard',
@@ -88,7 +88,7 @@ describe('Markdown Diagram Protocol', () => {
     })
     expect(diagram.data).toEqual({
       title: 'Inline Title',
-      displayMode: 'compact',
+      displayMode: 'standard',
       toolbar: {
         title: 'YAML Toolbar',
         fontSize: '18px',

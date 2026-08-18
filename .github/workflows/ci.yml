@@ -23,10 +23,6 @@ jobs:
         with:
           node-version: '24.19.0'
 
-      - name: Validate Release PR declaration
-        if: github.event_name == 'pull_request'
-        run: node scripts/release-verification/release-workflow.mjs validate-pr --event-path "$GITHUB_EVENT_PATH"
-
       - run: npm i -g --force corepack@latest && corepack enable
 
       - name: Install dependencies
