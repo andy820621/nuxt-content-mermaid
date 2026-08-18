@@ -13,7 +13,8 @@
     "@nuxtjs/i18n": "^10.6.0",
     "better-sqlite3": "12.5.0",
     "nuxt": "catalog:dev",
-    "reka-ui": "^2.10.3"
+    "reka-ui": "^2.10.3",
+    "remark-breaks": "^4.0.0"
   },
   "devDependencies": {
     "@iconify-json/line-md": "^1.2.16",

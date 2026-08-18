@@ -19,6 +19,15 @@ export default defineNuxtConfig({
     '@nuxt/icon',
   ],
   css: ['~/assets/css/main.css'],
+  content: {
+    build: {
+      markdown: {
+        remarkPlugins: {
+          'remark-breaks': {},
+        },
+      },
+    },
+  },
   mdc: {
     highlight: {
       theme: {
