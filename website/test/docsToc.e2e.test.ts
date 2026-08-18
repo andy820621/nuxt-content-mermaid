@@ -60,7 +60,7 @@ describe('documentation page TOC', async () => {
   })
 
   it('renders Mermaid fences when page config frontmatter is absent', async () => {
-    const page = await createDocsPage('/zh/writing-diagrams')
+    const page = await createDocsPage('/zh')
 
     expect(await page.locator('.mermaid-block').count()).toBeGreaterThan(0)
   })
