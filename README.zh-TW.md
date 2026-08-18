@@ -12,7 +12,7 @@
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
 **@barzhsieh/nuxt-content-mermaid** 會將 Nuxt Content Markdown 中的
-`mermaid` 程式碼圍欄轉換為響應式、可互動的圖表，並支援延遲載入、深淺色
+`mermaid` 程式碼圍欄 (fence) 轉換為響應式、可互動的圖表，並支援延遲載入、深淺色
 主題、工具列控制，以及由應用程式提供的渲染元件。
 
 [英文正式文件](https://nuxt-content-mermaid.barz.app) 是 canonical package
@@ -24,10 +24,10 @@ translation，可能比英文內容稍晚同步。若兩者有差異，請以英
 
 當 Nuxt Content 應用程式需要下列能力時，可使用本模組：
 
-- 在 Markdown 中以 Mermaid 程式碼圍欄撰寫圖表；
+- 在 Markdown 中以 Mermaid 程式碼圍欄 (fence) 撰寫圖表；
 - 在瀏覽器中渲染圖表，並使用套件提供的載入與錯誤狀態；
 - 跟隨應用程式的深色與淺色模式；
-- 在全域、單一頁面或單一圍欄設定圖表；
+- 在全域、單一頁面或單一圍欄 (fence) 設定圖表；
 - 選用延遲渲染、工具列控制或自訂渲染元件。
 
 本模組管理相容的 Mermaid 版本；應用程式負責 Nuxt、Nuxt Content peer

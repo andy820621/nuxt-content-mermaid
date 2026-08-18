@@ -8,11 +8,14 @@
     "generate": "nuxi generate"
   },
   "dependencies": {
-    "better-sqlite3": "^12.4.6"
+    "better-sqlite3": "12.6.2"
   },
   "devDependencies": {
     "@nuxt/content": "catalog:integrations",
     "@nuxtjs/color-mode": "catalog:dev",
     "nuxt": "catalog:dev"
+  },
+  "volta": {
+    "node": "24.19.0"
   }
 }

@@ -23,8 +23,8 @@ Landing 與 docs layout 解決不同問題，但共用同一個 Content collecti
 
 ## 產品目標
 
-- 首次造訪者能理解套件用途、看到真實 Mermaid diagram，並前往 Getting Started。
-- 文件讀者能依序學習 diagram authoring、configuration、troubleshooting 與 v3 migration。
+- 首次造訪的 Package User 能理解套件用途、看到真實 Mermaid diagram，並前往 Getting Started。
+- Package User 依序完成模組啟用與第一張圖、diagram authoring、configuration，接著依需求深入主題與樣式、自訂渲染或互動操作；遇到問題可前往 troubleshooting，升級時可前往 v3 migration。
 - Production website 是 canonical package documentation；repository README 只保留 bounded distribution summary。
 - English 與 Traditional Chinese 使用相同資訊架構；英文為 canonical language，中文是 best-effort translation。
 - Desktop 與 mobile 都具備清楚的 navigation、active state、keyboard focus 與無水平溢位的閱讀體驗。
@@ -51,18 +51,34 @@ website/content/
 ├── 2.getting-started.md             # /getting-started
 ├── 3.writing-diagrams.md            # /writing-diagrams
 ├── 4.configuration.md               # /configuration
-├── 5.troubleshooting.md             # /troubleshooting
-├── 6.migration/1.v3.md              # /migration/v3
+├── 5.advanced/
+│   ├── 1.themes-and-styling.md      # /advanced/themes-and-styling
+│   ├── 2.custom-rendering.md        # /advanced/custom-rendering
+│   └── 3.interactions.md            # /advanced/interactions
+├── 6.troubleshooting.md             # /troubleshooting
+├── 7.migration/1.v3.md              # /migration/v3
 └── zh/
     ├── 1.index.md                   # /zh
     ├── 2.getting-started.md         # /zh/getting-started
     ├── 3.writing-diagrams.md        # /zh/writing-diagrams
     ├── 4.configuration.md           # /zh/configuration
-    ├── 5.troubleshooting.md         # /zh/troubleshooting
-    └── 6.migration/1.v3.md          # /zh/migration/v3
+    ├── 5.advanced/
+    │   ├── 1.themes-and-styling.md  # /zh/advanced/themes-and-styling
+    │   ├── 2.custom-rendering.md    # /zh/advanced/custom-rendering
+    │   └── 3.interactions.md        # /zh/advanced/interactions
+    ├── 6.troubleshooting.md         # /zh/troubleshooting
+    └── 7.migration/1.v3.md          # /zh/migration/v3
 ```
 
-首頁設定 `navigation: false`，不出現在 docs navigation。網站沒有 `/reference` route；public configuration guidance 位於 `/writing-diagrams` 與 `/configuration`。
+首頁設定 `navigation: false`，不出現在 docs navigation。`advanced` 只提供三個 leaf pages，不提供 `/advanced` 或 `/zh/advanced` landing route。網站沒有 `/reference` route；public configuration guidance 位於 `/writing-diagrams` 與 `/configuration`。
+
+Advanced pages 的責任如下：
+
+- Themes and Styling 說明 `useMermaidTheme()`、Theme Resolution Policy、color-mode coexistence 與 package-owned CSS hooks。
+- Custom Rendering 說明 Custom Renderer Candidate 的解析、Rendering Ownership、extension inputs，以及 built-in renderer 的 fallback 邊界。
+- Interactions 說明 Built-in Renderer 的 toolbar、copy、fullscreen、expand、zoom 與可及性操作；成功解析的 Custom Renderer 取代這些行為。
+
+`queryCollectionNavigation('docs')` 依此內容樹產生 sidebar 與 mobile navigation。`PUBLIC_ROUTES` 僅列出公開 leaf routes，並同時供 prerender 與 sitemap 使用。
 
 `@nuxtjs/i18n` 使用 `prefix_except_default`：英文 route 不加 prefix，繁中使用 `/zh`。Shell labels 由小型 locale JSON 管理，文章內容仍由各語系 Markdown 負責。`filterLocaleNavigation()` 只保留目前 locale 的 navigation tree；locale switcher 對應目前 route 的另一語系位置。
 
@@ -162,10 +178,9 @@ Root commands 與 CI 排除 `website/**`；package artifact 與 release scripts 
 Baseline 整合至少驗證：
 
 ```bash
-pnpm lint
+pnpm lint --fix
 pnpm test
 pnpm test:types
-pnpm test:package-artifact
 pnpm --dir website test
 pnpm --dir website generate
 pnpm exec vue-tsc -p website/tsconfig.json --noEmit
@@ -182,4 +197,4 @@ Website-local tests 應涵蓋：
 - Desktop page TOC scrollspy、hash navigation 與 responsive visibility。
 - Shared footer ownership、license links 與 short-page placement。
 
-這些驗證只保護 website baseline，不形成 package release contract。Production deployment、route manifest、canonical closure、sitemap 與 manual authority-cutover evidence 由 #96 追加。
+這些驗證只保護 Documentation Website baseline，不形成 package release contract。Static output 的 route、canonical metadata、sitemap、hydration 與 no-JavaScript reading path 均屬 website-local verification boundary。

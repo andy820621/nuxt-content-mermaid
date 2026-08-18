@@ -59,6 +59,12 @@ describe('documentation page TOC', async () => {
     expect(await toc.locator('.docs-toc-link[aria-current="location"]').count()).toBe(1)
   })
 
+  it('renders Mermaid fences when page config frontmatter is absent', async () => {
+    const page = await createDocsPage('/zh')
+
+    expect(await page.locator('.mermaid-block').count()).toBeGreaterThan(0)
+  })
+
   it('renders a shared rail and a non-color-only active indicator in both themes', async () => {
     const page = await createDocsPage()
     await waitForActiveHash(page, '#general')
