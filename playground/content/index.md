@@ -21,7 +21,6 @@ Edit the source of this page to see how easy it is!
 ```mermaid {title="Mermaid 2" toolbar='{"title": "Sample Diagram inline", "fontSize":"16px"}' config='{"theme":"dark"}'}
 ---
 title: Sample Flowchart
-displayMode: compact
 config:
   theme: base
 toolbar:

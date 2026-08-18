@@ -14,7 +14,7 @@ const MARKDOWN_METADATA_PHASE = {
 } as const satisfies ConfigurationValidationPhase
 
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
-const INLINE_ATTRIBUTE_KEYS = new Set(['title', 'displayMode', 'config', 'toolbar'])
+const INLINE_ATTRIBUTE_KEYS = new Set(['title', 'config', 'toolbar'])
 const TOOLBAR_KEYS = new Set(['title', 'fontSize', 'fullscreenToolbarScale', 'buttons'])
 const TOOLBAR_BUTTON_KEYS = new Set(['copy', 'fullscreen', 'expand'])
 
@@ -115,7 +115,7 @@ export function resolveFenceInlineAttributes(
   if (!attrs || !hasOnlyKeys(attrs, INLINE_ATTRIBUTE_KEYS)) return null
 
   const normalized = cloneOwnedData(attrs)
-  for (const key of ['title', 'displayMode'] as const) {
+  for (const key of ['title'] as const) {
     if (!hasOwn(attrs, key)) continue
 
     const attribute = valueAt(attrs, key)
