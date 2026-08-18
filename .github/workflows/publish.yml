@@ -1,12 +1,9 @@
 name: Publish stable release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Stable exact version to publish (x.y.z)
-        required: true
-        type: string
+  push:
+    tags:
+      - 'v*'
 
 permissions: {}
 
@@ -15,221 +12,94 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  verify-and-pack:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      artifact-name: ${{ steps.identity.outputs.artifact-name }}
-      archive-filename: ${{ steps.identity.outputs.archive-filename }}
-      integrity-sha512: ${{ steps.identity.outputs.integrity-sha512 }}
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.19.0'
-
-      - name: Verify Release PR and release identity
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: node scripts/release-verification/release-workflow.mjs preflight --version "$RELEASE_VERSION"
-
-      - name: Enable Corepack
-        run: npm install --global --force corepack@latest && corepack enable
-
-      - name: Install frozen dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Prepare module and playground
-        run: pnpm dev:prepare
-
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Verify source
-        run: pnpm verify:source
-
-      - name: Pack publishable artifact once
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: >-
-          node scripts/release-verification/release-workflow.mjs pack
-          --version "$RELEASE_VERSION"
-          --artifact-directory "$RUNNER_TEMP/release-artifact"
-          > "$RUNNER_TEMP/release-manifest.json"
-
-      - name: Export immutable artifact identity
-        id: identity
-        env:
-          ARTIFACT_NAME: release-${{ github.run_id }}-${{ github.run_attempt }}
-          MANIFEST_PATH: ${{ runner.temp }}/release-manifest.json
-        run: |
-          node --input-type=module <<'NODE'
-          import { appendFile, readFile } from 'node:fs/promises'
-          const manifest = JSON.parse(await readFile(process.env.MANIFEST_PATH, 'utf8'))
-          await appendFile(process.env.GITHUB_OUTPUT, [
-            `artifact-name=${process.env.ARTIFACT_NAME}`,
-            `archive-filename=${manifest.artifact.filename}`,
-            `integrity-sha512=${manifest.artifact.integritySha512}`,
-            '',
-          ].join('\n'))
-          NODE
-
-      - name: Upload immutable publishable artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ steps.identity.outputs.artifact-name }}
-          path: |
-            ${{ runner.temp }}/release-artifact/*.tgz
-            ${{ runner.temp }}/release-artifact/artifact.sha512
-          if-no-files-found: error
-          retention-days: 7
-
-  smoke:
-    needs: verify-and-pack
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: v3-minimum
-            node-version: '22.19.0'
-          - profile: v3-known-latest
-            node-version: '24.19.0'
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: Enable Corepack
-        run: npm install --global --force corepack@latest && corepack enable
-
-      - name: Install verification dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Download publishable artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.verify-and-pack.outputs.artifact-name }}
-          path: ${{ runner.temp }}/release-artifact
-
-      - name: Verify compatibility profile against downloaded artifact
-        env:
-          ARCHIVE_FILENAME: ${{ needs.verify-and-pack.outputs.archive-filename }}
-          PROFILE: ${{ matrix.profile }}
-        run: >-
-          node scripts/release-verification/package-artifact.mjs
-          --package-source artifact
-          --archive "$RUNNER_TEMP/release-artifact/$ARCHIVE_FILENAME"
-          --checksum "$RUNNER_TEMP/release-artifact/artifact.sha512"
-          --profile "$PROFILE"
-
   publish:
-    needs: [verify-and-pack, smoke]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
 
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.sha }}
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.19.0'
-
-      - name: Install Trusted Publishing npm CLI
-        run: npm install --global npm@11.17.0 && npm --version
-
-      - name: Download verified publishable artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.verify-and-pack.outputs.artifact-name }}
-          path: ${{ runner.temp }}/release-artifact
-
-      - name: Reconcile and publish through npm OIDC
-        env:
-          ARCHIVE_FILENAME: ${{ needs.verify-and-pack.outputs.archive-filename }}
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: >-
-          node scripts/release-verification/release-workflow.mjs publish
-          --version "$RELEASE_VERSION"
-          --archive "$RUNNER_TEMP/release-artifact/$ARCHIVE_FILENAME"
-          --checksum "$RUNNER_TEMP/release-artifact/artifact.sha512"
-
-  registry-smoke:
-    needs: [verify-and-pack, publish]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.19.0'
-
-      - name: Enable Corepack
-        run: npm install --global --force corepack@latest && corepack enable
-
-      - name: Install verification dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Verify exact public registry package
-        env:
-          ARTIFACT_INTEGRITY: ${{ needs.verify-and-pack.outputs.integrity-sha512 }}
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: >-
-          node scripts/release-verification/release-workflow.mjs registry-smoke
-          --version "$RELEASE_VERSION"
-          --integrity "$ARTIFACT_INTEGRITY"
-
-  finalize:
-    needs: [verify-and-pack, registry-smoke]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
           node-version: '24.19.0'
+          registry-url: 'https://registry.npmjs.org'
 
-      - name: Reconcile annotated tag and GitHub Release
+      - name: Validate release identity
+        run: |
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" != "tag" ]; then
+            echo "Stable releases require an annotated tag." >&2
+            exit 1
+          fi
+          if [ "$(git rev-parse "$GITHUB_REF_NAME^{commit}")" != "$(git rev-parse HEAD)" ]; then
+            echo "Release tag does not identify the checked-out commit." >&2
+            exit 1
+          fi
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises'
+
+          const tag = process.env.GITHUB_REF_NAME
+          if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)) {
+            throw new Error('Release tag must be an exact stable version.')
+          }
+
+          const version = tag.slice(1)
+          const manifest = JSON.parse(await readFile('package.json', 'utf8'))
+          if (manifest.version !== version) {
+            throw new Error('Release tag and package.json version do not match.')
+          }
+
+          const changelog = await readFile('CHANGELOG.md', 'utf8')
+          if (!changelog.split(/\r?\n/).some(line => line.trim() === '## v' + version)) {
+            throw new Error('CHANGELOG.md is missing the release heading.')
+          }
+          NODE
+
+      - name: Enable pinned package managers
+        run: |
+          npm install --global --force corepack@0.35.0
+          corepack enable
+          npm install --global npm@11.17.0
+          npm --version
+          pnpm --version
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify and retain publishable artifact
+        id: artifact
+        env:
+          ARTIFACT_DIRECTORY: ${{ runner.temp }}/release-artifact
+        run: |
+          mkdir -p "$ARTIFACT_DIRECTORY"
+          node scripts/release-verification/package-artifact.mjs \
+            --profile v3-known-latest \
+            --artifact-directory "$ARTIFACT_DIRECTORY"
+
+          set -- "$ARTIFACT_DIRECTORY"/*.tgz
+          if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+            echo "Expected exactly one verified package archive." >&2
+            exit 1
+          fi
+          echo "archive=$1" >> "$GITHUB_OUTPUT"
+
+      - name: Publish verified package
+        env:
+          PACKAGE_ARCHIVE: ${{ steps.artifact.outputs.archive }}
+        run: >-
+          npm publish "$PACKAGE_ARCHIVE"
+          --access public
+          --tag latest
+          --ignore-scripts
+          --provenance
+
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: >-
-          node scripts/release-verification/release-workflow.mjs finalize
-          --version "$RELEASE_VERSION"
-          --sha "${{ github.sha }}"
+        run: pnpm changelogen gh release "${GITHUB_REF_NAME#v}"

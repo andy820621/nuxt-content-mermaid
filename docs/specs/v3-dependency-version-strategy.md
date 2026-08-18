@@ -101,41 +101,36 @@ resolution, a scheduled canary, or drift automation.
 
 ## Release Baseline Freeze
 
-The Release Baseline is the immutable tuple of the Release PR merge result,
-target version, one Publishable Package Artifact identity, and the two fixed
-Compatibility Profiles. `docs/specs/release-verification.md` defines the
-authoritative Release PR and Publish workflow gates.
+The Release Baseline is the immutable tuple of the verified `main` commit, its
+annotated stable version tag, the target version, the Publishable Package
+Artifact identity, and the two fixed Compatibility Profiles.
+`docs/specs/release-verification.md` defines the authoritative tag-driven
+Publish workflow gates.
 
-The Release PR merge result must equal the Publish workflow's `github.sha` and
-the current `main` HEAD. The workflow packs exactly one Publishable Package
-Artifact from that commit, records its npm SHA-512 integrity, and transports it
-as an immutable workflow artifact. Minimum and Known-Latest verifiers each use
-that same artifact under their exact declared Node runtime.
+Before tagging, PR CI verifies the merge candidate with both the Minimum and
+Known-Latest profiles under their exact declared Node runtimes. The maintainer
+then creates an annotated tag on the verified `main` commit. The tag workflow
+packs exactly one Publishable Package Artifact, records its SHA-256 identity,
+verifies it under the Known-Latest profile, and publishes that same local
+archive without repacking or cross-job transport.
 
 The frozen baseline includes:
 
-- the Release PR merge commit and target stable version;
-- the Publishable Package Artifact name, version, filename, and SHA-512;
+- the tagged `main` commit and target stable version;
+- the Publishable Package Artifact name, version, filename, and SHA-256;
 - the complete fixed Minimum and Known-Latest Compatibility Profiles; and
 - the artifact manifest's shallow Node, Nuxt, Nuxt Content, Kit, and Mermaid
   version contract.
 
-Both verifiers run public exports, public types, production build, and basic
-browser SVG rendering. A failure in either profile blocks npm publication.
-Every Release PR records a Release Impact Declaration across package contents,
-runtime behavior, interaction, styling, browser APIs, and runtime dependencies.
-Manual Interaction Verification is required only when interaction, styling, or
-browser APIs are marked as affected or uncertain. The other dimensions are
-handled by automated release gates and do not add manual steps. Both records
-belong to Release PR validation and are not Publish workflow prompts.
-
-After publication, Registry Smoke installs only the exact target version from
-the public registry under the fixed Known-Latest profile and verifies production
-build plus basic rendering before Git tag and GitHub Release finalization.
+Both CI profiles run public exports, public types, production build, and basic
+browser SVG rendering. A failure in either profile blocks merge. The tag
+workflow repeats only the Package User-facing verification needed to establish the
+identity and health of the actual publishable tarball. npm publication is the
+only registry mutation, and the GitHub Release is created after it succeeds.
 
 Ordinary upstream releases discovered after the freeze wait for a later package
 release. Any source, release metadata, manifest range, Version Profile, or
-artifact change requires a new Release PR baseline and a new workflow attempt.
+artifact change requires a new ordinary PR baseline and a new version tag.
 The freeze is a release-candidate cutoff, not a support ceiling or long-lived
 dependency freeze.
 
@@ -143,7 +138,12 @@ dependency freeze.
 
 General pull requests run the shared lint, unit, source type, and current fixed primary integration checks. Dependency bot pull requests update fixed versions and the lockfile for maintainer review; they are not automatically merged or published.
 
-Before publication, the actual Publishable Package Artifact must pass the Minimum and Known-Latest Compatibility Profiles. Each profile covers clean installation, public package types, production build, and basic browser SVG rendering. Every Release PR records all six Release Impact Declaration dimensions; only interaction, styling, or browser API impact marked as affected or uncertain requires Manual Interaction Verification. Package contents, runtime behavior, and runtime dependencies remain automated verification concerns. The post-publication Registry Smoke Test remains separate from pre-publication evidence.
+Before merge, the candidate commit must pass both the Minimum and Known-Latest
+Compatibility Profiles. Each profile covers clean installation, public package
+types, production build, and basic browser SVG rendering. After tagging, the
+single actual Publishable Package Artifact repeats this Package User-facing gate
+under Known-Latest before npm publication. Together, the two fixed profiles and
+the retained artifact identity form the complete automated release evidence.
 
 New dependency majors and new Mermaid minors are handled by dependency bot or
 maintainer pull requests before a later freeze, never through dynamic latest
@@ -197,6 +197,6 @@ A 3.x release is eligible for publication only when:
 - its manifest and Nuxt compatibility metadata express the approved ranges;
 - its Package-Owned Integration Behavior remains within the documented boundary;
 - the Release Baseline Freeze identifies exact Minimum and Known-Latest Compatibility Profiles;
-- the actual package artifact passes both profiles, and the Release PR records its Release Impact Declaration plus any required Manual Interaction Verification;
+- the candidate commit passes both profiles and the tagged publishable artifact passes Known-Latest verification;
 - known Contract Gaps are fixed or, for a critical security exception, explicitly disclosed with a known-working recommendation;
 - the release bump matches the highest Package User-visible contract change.

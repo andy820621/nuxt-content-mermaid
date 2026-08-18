@@ -8,7 +8,7 @@ import {
   runPackageArtifactVerification,
 } from './runner.mjs'
 
-const OPTION_NAMES = new Set(['archive', 'checksum', 'package-source', 'profile'])
+const OPTION_NAMES = new Set(['artifact-directory', 'profile'])
 
 export function parseVerificationSelection(argv) {
   const options = new Map()
@@ -32,33 +32,18 @@ export function parseVerificationSelection(argv) {
     options.set(name, value)
   }
 
-  const packageSource = options.get('package-source') ?? 'pack'
-  if (packageSource !== 'pack' && packageSource !== 'artifact') {
-    throw new Error(`Unsupported package source: ${packageSource}`)
-  }
-
-  const archivePath = options.get('archive')
-  const checksumPath = options.get('checksum')
-  if (packageSource === 'artifact') {
-    if (!archivePath || !checksumPath) {
-      throw new Error('Artifact package source requires --archive and --checksum')
-    }
-    if (!isAbsolute(archivePath) || !isAbsolute(checksumPath)) {
-      throw new Error('Artifact archive and checksum paths must be absolute')
-    }
-  }
-  else if (archivePath || checksumPath) {
-    throw new Error('--archive and --checksum are only valid with artifact package source')
-  }
-
   const profileId = options.get('profile')
   if (!profileId) {
     throw new Error('Choose one Version Profile')
   }
 
+  const artifactDirectory = options.get('artifact-directory')
+  if (artifactDirectory && !isAbsolute(artifactDirectory)) {
+    throw new Error('Artifact directory must be absolute')
+  }
+
   return {
-    packageSource,
-    ...(archivePath && checksumPath ? { archivePath, checksumPath } : {}),
+    ...(artifactDirectory ? { artifactDirectory } : {}),
     profileId,
   }
 }
@@ -75,31 +60,24 @@ export async function runReleaseVerificationCli({
       'test/release-verification/consumer-template',
     ),
   }),
-  runners = {
-    single: runPackageArtifactVerification,
-  },
+  runner = runPackageArtifactVerification,
   writeEvidence = evidence => console.log(JSON.stringify(evidence, null, 2)),
 }) {
   const selection = parseVerificationSelection(argv)
   const profile = selectVersionProfile(selection.profileId)
   let creationWorkspace
   try {
-    let artifact
-    if (selection.packageSource === 'artifact') {
-      artifact = await operations.loadArtifact({
-        archivePath: selection.archivePath,
-        checksumPath: selection.checksumPath,
-      })
-    }
-    else {
+    let artifactDirectory = selection.artifactDirectory
+    if (!artifactDirectory) {
       creationWorkspace = await operations.createWorkspace()
-      artifact = await operations.createArtifact({
-        repositoryRoot,
-        artifactDirectory: creationWorkspace.artifactDirectory,
-      })
+      artifactDirectory = creationWorkspace.artifactDirectory
     }
-    const evidence = await runners.single({
-      packageSource: { kind: 'artifact', artifact },
+    const artifact = await operations.createArtifact({
+      repositoryRoot,
+      artifactDirectory,
+    })
+    const evidence = await runner({
+      artifact,
       profile,
     }, operations)
     writeEvidence(evidence)

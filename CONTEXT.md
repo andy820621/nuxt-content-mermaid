@@ -221,11 +221,11 @@ The Built-in Renderer protocol that stages an attempt away from the live DOM and
 _Avoid_: DOM cleanup, optimistic render
 
 **Release Verification Contract**:
-The smallest repeatable body of evidence required to consider a package version safe to publish and healthy after publication. Required automated verification of the Publishable Package Artifact always blocks release; Manual Interaction Verification blocks only when the Release Impact Declaration identifies a relevant risk.
+The smallest repeatable body of evidence required before publishing a package version: immutable tag identity, one Publishable Package Artifact, archive and public-surface checks, installation in a fresh Package User application, public types, production build, and basic browser SVG rendering.
 _Avoid_: Test suite, release checklist
 
 **Release Baseline Freeze**:
-The release-candidate boundary that fixes published dependency ranges plus the exact Minimum and Known-Latest Compatibility Profiles before artifact verification begins. A later baseline or release-code change invalidates that evidence and requires a rebuilt artifact and fresh verification; unrelated upstream releases wait for a later package release.
+The release-candidate boundary that fixes the verified `main` commit, target version, published dependency ranges, and exact Minimum and Known-Latest Compatibility Profiles before the maintainer creates the annotated release tag. A later source or release-code change requires a new version and fresh evidence; unrelated upstream releases wait for a later package release.
 _Avoid_: Dependency freeze, support ceiling, release branch
 
 **Minimum Compatibility Profile**:
@@ -248,9 +248,9 @@ _Avoid_: Source tree, dist directory, npm release
 The representative Package User journey from Nuxt SSR through hydration to Mermaid rendering and fallback behavior. Release verification covers SVG rendering, theme handling, lazy rendering, and error fallback without claiming exhaustive coverage of every option, diagram type, or browser.
 _Avoid_: Full feature matrix, unit test coverage
 
-**Registry Smoke Test**:
-The intentionally small check run after a version is published as the default npm release. It installs that released version in a clean Package User context and confirms installation, production build, and basic rendering; it detects publication or registry-facing failures but does not replace pre-publication artifact verification.
-_Avoid_: Full release suite, local package test
+**Release Tag**:
+The immutable annotated `vX.Y.Z` Git tag on a verified `main` commit. It is both the stable release trigger and the durable record connecting source, npm version, and GitHub Release; it is never force-moved to repair a failed publication.
+_Avoid_: Mutable deployment pointer, workflow output, lightweight tag
 
 **Supported Nuxt Range**:
 The Nuxt versions publicly accepted by one released package line's peer dependency contract. The entire declared range is that line's Compatibility Contract; minimum and latest profile entries are representative evidence rather than the only supported versions, and a new major enters only after explicit compatibility verification.
@@ -273,13 +273,5 @@ The most recent upstream version deliberately pinned after successful compatibil
 _Avoid_: Current latest, minimum supported version
 
 **Unhealthy Release**:
-A version already published to npm that cannot reliably install, build, or complete basic rendering because of a confirmed package defect. A first Registry Smoke Test failure begins investigation; only a clean independent retry after infrastructure causes are excluded confirms the state, after which the version is deprecated and a corrective patch is prepared without unpublishing it.
+A version already published to npm that cannot reliably install, build, or complete basic rendering because of a confirmed package defect. After infrastructure causes are excluded and the defect is reproduced, the version is deprecated and a corrective patch is prepared without overwriting or unpublishing it.
 _Avoid_: Failed CI run, flaky test
-
-**Manual Interaction Verification**:
-Human evaluation reserved for fullscreen behavior, zoom, pan, drag, clipboard behavior, mobile interaction, and visual readability, with an explicit pass criterion for every check. It runs only when the Release Impact Declaration marks interaction, styling, or browser API impact as confirmed or uncertain.
-_Avoid_: General regression testing, exploratory testing
-
-**Release Impact Declaration**:
-A release-time statement of whether the diff can affect package contents, runtime behavior, interaction, styling, browser APIs, or runtime dependencies. An agent recommends the classification from the diff, and the maintainer confirms it. Manual Interaction Verification is activated only when interaction, styling, or browser API impact is confirmed or uncertain; package contents, runtime behavior, and runtime dependencies remain automated verification concerns.
-_Avoid_: Changed-file classifier, informal release judgment

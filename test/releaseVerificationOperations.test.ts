@@ -2,13 +2,12 @@ import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createReleaseVerificationOperations,
-  formatArtifactChecksum,
   runCommand,
 } from '../scripts/release-verification/operations.mjs'
 import {
@@ -51,7 +50,6 @@ function createArtifactFixture(overrides: Partial<PackageArtifact> = {}): Packag
     archivePath: '/tmp/package.tgz',
     filename: 'package.tgz',
     sha256: 'abc123',
-    integritySha512: 'sha512-Zml4dHVyZQ==',
     packlist: ['dist/module.mjs', 'dist/types.d.mts', 'package.json'],
     packageName: '@barzhsieh/nuxt-content-mermaid',
     packageVersion: '2.2.3',
@@ -160,15 +158,6 @@ async function createPackageArchive(manifest: Record<string, unknown>, files: st
   return archivePath
 }
 
-async function writeArtifactChecksum(archivePath: string, integrityOverride?: string) {
-  const archiveBytes = await readFile(archivePath)
-  const integrity = integrityOverride
-    ?? `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`
-  const checksumPath = join(dirname(archivePath), 'artifact.sha512')
-  await writeFile(checksumPath, `${integrity}  ${basename(archivePath)}\n`)
-  return checksumPath
-}
-
 function createContractManifest(overrides: Record<string, unknown> = {}) {
   return {
     name: '@barzhsieh/nuxt-content-mermaid',
@@ -203,6 +192,8 @@ describe('clean consumer installation', () => {
   it('keeps pnpm lifecycle-only config out of the consumer npm install', async () => {
     const templateDirectory = await createTemplate()
     const consumerDirectory = await createTemporaryDirectory('lifecycle-isolated-consumer')
+    const archivePath = join(await createTemporaryDirectory('artifact'), 'package.tgz')
+    await writeFile(archivePath, '')
     vi.stubEnv('npm_config_allow_scripts', 'esbuild')
     vi.stubEnv('npm_config_globalconfig', '/pnpm/lifecycle/npmrc')
     vi.stubEnv('NPM_CONFIG_REGISTRY', 'https://registry.example.test/')
@@ -225,7 +216,7 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
         cwd: invocation.cwd,
         env: invocation.env,
       })
-      await populateInstalledPackages(consumerDirectory, '3.0.0')
+      await populateInstalledPackages(consumerDirectory)
       return {}
     })
     const operations = createReleaseVerificationOperations({
@@ -234,105 +225,10 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
     })
 
     await expect(operations.installConsumer({
-      packageSource: {
-        kind: 'registry',
-        packageName: '@barzhsieh/nuxt-content-mermaid',
-        packageVersion: '3.0.0',
-      },
+      artifact: createArtifactFixture({ archivePath }),
       consumerDirectory,
       profile,
-    })).resolves.toMatchObject({ packageVersion: '3.0.0' })
-  })
-
-  it('installs only the exact registry version and reports the resolved identity', async () => {
-    const templateDirectory = await createTemplate()
-    const consumerDirectory = await createTemporaryDirectory('registry-consumer')
-    const commandRunner = vi.fn(async () => {
-      await populateInstalledPackages(consumerDirectory, '3.0.0')
-      return {}
-    })
-    const operations = createReleaseVerificationOperations({
-      templateDirectory,
-      commandRunner,
-    })
-
-    const result = await operations.installConsumer({
-      packageSource: {
-        kind: 'registry',
-        packageName: '@barzhsieh/nuxt-content-mermaid',
-        packageVersion: '3.0.0',
-      },
-      consumerDirectory,
-      profile,
-    })
-
-    const manifest = JSON.parse(await readFile(join(consumerDirectory, 'package.json'), 'utf8'))
-    expect(manifest.dependencies['@barzhsieh/nuxt-content-mermaid']).toBe('3.0.0')
-    expect(JSON.stringify(manifest)).not.toContain('workspace:')
-    expect(JSON.stringify(manifest)).not.toContain('file:')
-    expect(result).toEqual({
-      packageVersion: '3.0.0',
-      profileVersions: profile.versions,
-    })
-    expect(commandRunner).toHaveBeenCalledWith({
-      command: 'npm',
-      args: ['install', '--no-audit', '--no-fund', '--package-lock=true'],
-      cwd: consumerDirectory,
-      env: {
-        npm_config_allow_scripts: undefined,
-        npm_config_globalconfig: undefined,
-      },
-    })
-  })
-
-  it.each([
-    'latest',
-    '^3.0.0',
-    'workspace:*',
-    'file:../package.tgz',
-    '/tmp/package.tgz',
-  ])('rejects the registry fallback %s before installation', async (packageVersion) => {
-    const templateDirectory = await createTemplate()
-    const consumerDirectory = await createTemporaryDirectory('registry-consumer')
-    const commandRunner = vi.fn()
-    const operations = createReleaseVerificationOperations({
-      templateDirectory,
-      commandRunner,
-    })
-
-    await expect(operations.installConsumer({
-      packageSource: {
-        kind: 'registry',
-        packageName: '@barzhsieh/nuxt-content-mermaid',
-        packageVersion,
-      },
-      consumerDirectory,
-      profile,
-    })).rejects.toThrow('Registry smoke requires an exact package version')
-    expect(commandRunner).not.toHaveBeenCalled()
-  })
-
-  it('rejects a registry package resolved to another version', async () => {
-    const templateDirectory = await createTemplate()
-    const consumerDirectory = await createTemporaryDirectory('registry-consumer')
-    const commandRunner = vi.fn(async () => {
-      await populateInstalledPackages(consumerDirectory, '3.0.1')
-      return {}
-    })
-    const operations = createReleaseVerificationOperations({
-      templateDirectory,
-      commandRunner,
-    })
-
-    await expect(operations.installConsumer({
-      packageSource: {
-        kind: 'registry',
-        packageName: '@barzhsieh/nuxt-content-mermaid',
-        packageVersion: '3.0.0',
-      },
-      consumerDirectory,
-      profile,
-    })).rejects.toThrow('expected 3.0.0, received 3.0.1')
+    })).resolves.toMatchObject({ packageVersion: '2.2.3' })
   })
 
   it('installs the tarball with exact profile versions and reports resolved versions', async () => {
@@ -350,10 +246,7 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
     })
 
     const resolved = await operations.installConsumer({
-      packageSource: {
-        kind: 'artifact',
-        artifact: createArtifactFixture({ archivePath }),
-      },
+      artifact: createArtifactFixture({ archivePath }),
       consumerDirectory,
       profile,
     })
@@ -392,10 +285,7 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
     })
 
     const resolved = await operations.installConsumer({
-      packageSource: {
-        kind: 'artifact',
-        artifact: createArtifactFixture({ archivePath }),
-      },
+      artifact: createArtifactFixture({ archivePath }),
       consumerDirectory,
       profile: finalProfile,
     })
@@ -439,7 +329,7 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
       })
 
       await expect(operations.installConsumer({
-        packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
+        artifact: createArtifactFixture(),
         consumerDirectory,
         profile: finalProfile,
       })).rejects.toThrow(expectedMessage)
@@ -459,7 +349,7 @@ export default defineNuxtConfig({ modules: [contentMermaid] })
     })
 
     await expect(operations.installConsumer({
-      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
+      artifact: createArtifactFixture(),
       consumerDirectory,
       profile,
     })).rejects.toThrow('repository-relative module path')
@@ -485,7 +375,7 @@ export default defineNuxtConfig({
     })
 
     await expect(operations.installConsumer({
-      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
+      artifact: createArtifactFixture(),
       consumerDirectory,
       profile,
     })).rejects.toThrow('Mermaid substitution')
@@ -508,7 +398,7 @@ export default defineNuxtConfig({
     })
 
     await expect(operations.installConsumer({
-      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
+      artifact: createArtifactFixture(),
       consumerDirectory,
       profile,
     })).rejects.toThrow('Mermaid substitution')
@@ -541,7 +431,7 @@ export default defineNuxtConfig({
     })
 
     await expect(operations.installConsumer({
-      packageSource: { kind: 'artifact', artifact: createArtifactFixture() },
+      artifact: createArtifactFixture(),
       consumerDirectory,
       profile,
     })).rejects.toThrow('outside the clean consumer')
@@ -677,16 +567,9 @@ describe('package archive inspection', () => {
 })
 
 describe('package artifact creation', () => {
-  it('formats the immutable artifact checksum contract', () => {
-    expect(formatArtifactChecksum(createArtifactFixture({
-      filename: 'package-3.0.0.tgz',
-      integritySha512: 'sha512-Zml4dHVyZQ==',
-    }))).toBe('sha512-Zml4dHVyZQ==  package-3.0.0.tgz\n')
-  })
-
-  it('returns the identity of the single tarball produced by pnpm pack', async () => {
+  it('creates the target directory and returns the identity of one packed tarball', async () => {
     const repositoryRoot = await createTemporaryDirectory('package-repository')
-    const artifactDirectory = await createTemporaryDirectory('package-artifact')
+    const artifactDirectory = join(repositoryRoot, 'release-artifact')
     const archiveBytes = Buffer.from('one publishable artifact')
     const filename = 'barzhsieh-nuxt-content-mermaid-2.2.3.tgz'
     const commandRunner = vi.fn(async () => {
@@ -719,7 +602,6 @@ describe('package artifact creation', () => {
       archivePath: join(artifactDirectory, filename),
       filename,
       sha256: createHash('sha256').update(archiveBytes).digest('hex'),
-      integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
       packlist: [
         'LICENSE',
         'README.md',
@@ -736,6 +618,35 @@ describe('package artifact creation', () => {
       args: ['pack', '--json', '--pack-destination', artifactDirectory],
       cwd: repositoryRoot,
     })
+  })
+
+  it.each([
+    ['another-package', '2.2.3', 'unexpected package name'],
+    ['@barzhsieh/nuxt-content-mermaid', '2.2.3-beta.1', 'exact stable version'],
+  ])('rejects invalid package identity %s@%s', async (name, version, message) => {
+    const repositoryRoot = await createTemporaryDirectory('package-repository')
+    const artifactDirectory = await createTemporaryDirectory('package-artifact')
+    const filename = 'package.tgz'
+    const commandRunner = vi.fn(async () => {
+      await writeFile(join(artifactDirectory, filename), 'artifact')
+      return {
+        stdout: JSON.stringify({
+          name,
+          version,
+          filename,
+          files: [{ path: 'package.json' }],
+        }),
+      }
+    })
+    const operations = createReleaseVerificationOperations({
+      templateDirectory: '/unused',
+      commandRunner,
+    })
+
+    await expect(operations.createArtifact({
+      repositoryRoot,
+      artifactDirectory,
+    })).rejects.toThrow(message)
   })
 
   it('rejects a packing result that produced more than one tarball', async () => {
@@ -796,99 +707,6 @@ describe('package artifact creation', () => {
       repositoryRoot,
       artifactDirectory,
     })).rejects.toThrow(`Publishable Package Artifact contains an unexpected path: ${unexpectedPath}`)
-  })
-})
-
-describe('existing package artifact loading', () => {
-  it('reconstructs deterministic identity from one checksummed tarball', async () => {
-    const archivePath = await createPackageArchive(
-      createContractManifest(),
-      ['dist/module.mjs', 'dist/types.d.mts'],
-    )
-    const checksumPath = await writeArtifactChecksum(archivePath)
-    const commandRunner = vi.fn(runCommand)
-    const operations = createReleaseVerificationOperations({
-      templateDirectory: '/unused',
-      commandRunner,
-    })
-    const archiveBytes = await readFile(archivePath)
-
-    await expect(operations.loadArtifact({
-      archivePath,
-      checksumPath,
-    })).resolves.toEqual({
-      archivePath,
-      filename: basename(archivePath),
-      sha256: createHash('sha256').update(archiveBytes).digest('hex'),
-      integritySha512: `sha512-${createHash('sha512').update(archiveBytes).digest('base64')}`,
-      packlist: [
-        'dist/module.mjs',
-        'dist/types.d.mts',
-        'package.json',
-      ],
-      packageName: '@barzhsieh/nuxt-content-mermaid',
-      packageVersion: '2.2.3',
-      packageContract: {
-        node: '>=22.19.0',
-        nuxt: '^4.1.0',
-        nuxtContent: '>=3.5.0 <4.0.0',
-        nuxtKit: '^4.5.2',
-        mermaid: '~11.16.1',
-      },
-    })
-    expect(commandRunner.mock.calls.flatMap(([invocation]) => (
-      [invocation.command, ...invocation.args]
-    )).join(' ')).not.toMatch(/pnpm pack|prepack|prepare/)
-  })
-
-  it('checks SHA-512 before inspecting the archive', async () => {
-    const archivePath = await createPackageArchive(createContractManifest(), [])
-    const checksumPath = await writeArtifactChecksum(
-      archivePath,
-      'sha512-ZGlmZmVyZW50',
-    )
-    const commandRunner = vi.fn()
-    const operations = createReleaseVerificationOperations({
-      templateDirectory: '/unused',
-      commandRunner,
-    })
-
-    await expect(operations.loadArtifact({
-      archivePath,
-      checksumPath,
-    })).rejects.toThrow('SHA-512 mismatch')
-    expect(commandRunner).not.toHaveBeenCalled()
-  })
-
-  it('rejects a second tarball in the workflow artifact directory', async () => {
-    const archivePath = await createPackageArchive(createContractManifest(), [])
-    const checksumPath = await writeArtifactChecksum(archivePath)
-    await writeFile(join(dirname(archivePath), 'second.tgz'), 'second')
-    const operations = createReleaseVerificationOperations({
-      templateDirectory: '/unused',
-    })
-
-    await expect(operations.loadArtifact({
-      archivePath,
-      checksumPath,
-    })).rejects.toThrow('exactly one tarball; found 2')
-  })
-
-  it('rejects an unsafe archive entry while reconstructing the packlist', async () => {
-    const archivePath = await createPackageArchive(createContractManifest(), [])
-    const checksumPath = await writeArtifactChecksum(archivePath)
-    const commandRunner = vi.fn(async () => ({
-      stdout: 'package/package.json\npackage/../outside.mjs\n',
-    }))
-    const operations = createReleaseVerificationOperations({
-      templateDirectory: '/unused',
-      commandRunner,
-    })
-
-    await expect(operations.loadArtifact({
-      archivePath,
-      checksumPath,
-    })).rejects.toThrow('unsafe entry: package/../outside.mjs')
   })
 })
 
