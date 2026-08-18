@@ -7,6 +7,14 @@ const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 describe('documentation Markdown line breaks', async () => {
   await setup({ rootDir: websiteRoot, browser: true })
 
+  it('serves the localized migration page on direct navigation', async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/zh/migration/v3'), { waitUntil: 'hydration' })
+
+    expect(response?.status()).toBe(200)
+    expect(await page.locator('#main-content h1').innerText()).toBe('升級至 v3')
+  })
+
   it('renders a single authored newline as a line break', async () => {
     const page = await createPage(undefined, {
       colorScheme: 'light',

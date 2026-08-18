@@ -11,7 +11,7 @@
     "@barzhsieh/nuxt-content-mermaid": "workspace:*",
     "@nuxt/content": "catalog:integrations",
     "@nuxtjs/i18n": "^10.6.0",
-    "better-sqlite3": "12.5.0",
+    "better-sqlite3": "12.6.2",
     "nuxt": "catalog:dev",
     "reka-ui": "^2.10.3",
     "remark-breaks": "^4.0.0"
@@ -24,5 +24,8 @@
     "@nuxtjs/color-mode": "catalog:dev",
     "playwright": "catalog:test",
     "vitest": "catalog:test"
+  },
+  "volta": {
+    "node": "24.19.0"
   }
 }
