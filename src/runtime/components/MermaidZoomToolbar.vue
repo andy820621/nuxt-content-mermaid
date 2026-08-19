@@ -2,18 +2,18 @@
 import { computed } from 'vue'
 import IconMinus from './icons/IconMinus.vue'
 import IconPlus from './icons/IconPlus.vue'
+import type { MermaidToolbarLabels } from '../../types/mermaid'
 
 const props = withDefaults(defineProps<{
   scale: number
   iconSize?: number
   iconScale?: number
   variant?: 'fullscreen' | 'overlay'
-  resetLabel?: string
+  labels: Required<MermaidToolbarLabels>
 }>(), {
   iconSize: 18,
   iconScale: 1,
   variant: 'overlay',
-  resetLabel: 'Reset',
 })
 
 const emit = defineEmits<{
@@ -47,7 +47,8 @@ const handleAction = (event: MouseEvent, action: 'zoom-in' | 'zoom-out' | 'reset
     <button
       type="button"
       class="ncm-zoom-btn"
-      aria-label="Zoom Out"
+      :title="labels.zoomOut"
+      :aria-label="labels.zoomOut"
       @click.stop="handleAction($event, 'zoom-out')"
     >
       <IconMinus :size="zoomIconSize" />
@@ -56,7 +57,8 @@ const handleAction = (event: MouseEvent, action: 'zoom-in' | 'zoom-out' | 'reset
     <button
       type="button"
       class="ncm-zoom-btn"
-      aria-label="Zoom In"
+      :title="labels.zoomIn"
+      :aria-label="labels.zoomIn"
       @click.stop="handleAction($event, 'zoom-in')"
     >
       <IconPlus :size="zoomIconSize" />
@@ -65,10 +67,11 @@ const handleAction = (event: MouseEvent, action: 'zoom-in' | 'zoom-out' | 'reset
     <button
       type="button"
       class="ncm-zoom-btn ncm-zoom-reset"
-      aria-label="Reset Zoom"
+      :title="labels.resetZoom"
+      :aria-label="labels.resetZoom"
       @click.stop="handleAction($event, 'reset')"
     >
-      {{ resetLabel }}
+      {{ labels.resetZoom }}
     </button>
   </div>
 </template>

@@ -7,13 +7,27 @@ describe('module configuration resolver', () => {
       nuxtResolvedOptions: {
         enabled: false,
         debug: true,
-        toolbar: { title: 'Nuxt option', buttons: { copy: false } },
+        toolbar: {
+          title: 'Nuxt option',
+          buttons: { copy: false },
+          labels: {
+            copy: 'Copy from Nuxt option',
+            resetZoom: 'Reset from Nuxt option',
+          },
+        },
         loader: { init: { theme: 'forest' } },
         expand: false,
       },
       runtimeOverrides: {
         debug: false,
-        toolbar: { title: '', buttons: { fullscreen: false } },
+        toolbar: {
+          title: '',
+          buttons: { fullscreen: false },
+          labels: {
+            copy: '',
+            zoomIn: 'Zoom in from runtime',
+          },
+        },
         loader: { init: { unknownMermaidExtension: { values: [] } } },
         expand: { margin: 24 },
       },
@@ -25,6 +39,11 @@ describe('module configuration resolver', () => {
       toolbar: {
         title: '',
         buttons: { copy: false, fullscreen: false, expand: true },
+        labels: {
+          copy: '',
+          resetZoom: 'Reset from Nuxt option',
+          zoomIn: 'Zoom in from runtime',
+        },
       },
       loader: {
         init: {

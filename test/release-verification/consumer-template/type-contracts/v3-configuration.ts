@@ -37,6 +37,12 @@ const pageProps = {
 
 const directProps = {
   config: { sequence: { actorFont: () => ({ fontSize: 14 }) } },
+  toolbar: {
+    labels: {
+      copy: '',
+      resetZoom: 'Reset diagram view',
+    },
+  },
 } satisfies MermaidComponentProps
 
 // @ts-expect-error runtime transport cannot contain functions

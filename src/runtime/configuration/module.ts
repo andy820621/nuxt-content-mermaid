@@ -10,6 +10,7 @@ import {
   DEFAULT_EXPAND_OPTIONS,
   DEFAULT_RUNTIME_OPTIONS,
   DEFAULT_TOOLBAR_OPTIONS,
+  TOOLBAR_LABEL_KEYS,
 } from '../constants'
 import type { ExpandOptions } from '../types/expand'
 import type { JsonObject, JsonValue, RuntimeOptions } from '../../types/config'
@@ -211,7 +212,7 @@ export function validateRuntimeOptions(value: JsonObject, phase: ConfigurationVa
     }
   }
 
-  const toolbar = assertObjectProperty(value, 'toolbar', phase, [], new Set(['title', 'fontSize', 'fullscreenToolbarScale', 'buttons']))
+  const toolbar = assertObjectProperty(value, 'toolbar', phase, [], new Set(['title', 'fontSize', 'fullscreenToolbarScale', 'buttons', 'labels']))
   if (toolbar) {
     assertStringProperty(toolbar, 'title', phase, ['toolbar'])
     if (hasOwn(toolbar, 'fontSize')) {
@@ -224,6 +225,10 @@ export function validateRuntimeOptions(value: JsonObject, phase: ConfigurationVa
     const buttons = assertObjectProperty(toolbar, 'buttons', phase, ['toolbar'], new Set(['copy', 'fullscreen', 'expand']))
     if (buttons) {
       for (const key of ['copy', 'fullscreen', 'expand']) assertBooleanProperty(buttons, key, phase, ['toolbar', 'buttons'])
+    }
+    const labels = assertObjectProperty(toolbar, 'labels', phase, ['toolbar'], new Set(TOOLBAR_LABEL_KEYS))
+    if (labels) {
+      for (const key of TOOLBAR_LABEL_KEYS) assertStringProperty(labels, key, phase, ['toolbar', 'labels'])
     }
   }
 }

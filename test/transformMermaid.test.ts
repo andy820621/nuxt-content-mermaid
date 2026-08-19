@@ -371,6 +371,30 @@ describe('transformMarkdownDiagrams', () => {
     })
   })
 
+  it('merges partial toolbar labels from YAML and inline attributes by property presence', async () => {
+    const body = [
+      '```mermaid {toolbar.labels.copy="Copy inline" toolbar.labels.zoomIn="Magnify"}',
+      '---',
+      'toolbar:',
+      '  labels:',
+      '    copy: Copy from YAML',
+      '    resetZoom: ""',
+      '---',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+    ].join('\n')
+
+    expect(await extractToolbarProp(transformMarkdownDiagrams(body))).toEqual({
+      labels: {
+        copy: 'Copy inline',
+        resetZoom: '',
+        zoomIn: 'Magnify',
+      },
+    })
+  })
+
   it('returns the original fence instead of partially transforming unsafe metadata', () => {
     const body = [
       '```mermaid {title="Inline Title" toolbar.fontSize="18px" toolbar.constructor.polluted=true config=\'{"theme":"forest"}\'}',

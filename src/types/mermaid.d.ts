@@ -9,11 +9,27 @@ export type MermaidToolbarButtons = {
   expand?: boolean
 }
 
+export type MermaidToolbarLabels = {
+  copy?: string
+  copied?: string
+  copyFailed?: string
+  expand?: string
+  collapse?: string
+  minimize?: string
+  enterFullscreen?: string
+  exitFullscreen?: string
+  zoomIn?: string
+  zoomOut?: string
+  resetZoom?: string
+  downloadSvg?: string
+}
+
 export type MermaidToolbarOptions = {
   title?: string
   fontSize?: string | number
   fullscreenToolbarScale?: number
   buttons?: MermaidToolbarButtons
+  labels?: MermaidToolbarLabels
 }
 
 declare module '#app' {

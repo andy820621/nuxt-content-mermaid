@@ -11,6 +11,8 @@ describe('module configuration fixture', async () => {
     const html = await $fetch('/')
 
     expect(html).toContain('runtime-title')
+    expect(html).toContain('runtime-copy-label')
+    expect(html).toContain('nuxt-reset-label')
     expect(html).toContain('runtime-mermaid-extension')
     expect(html).toContain('data-has-module-activation="false"')
     expect(html).toContain('data-expand-enabled="false"')

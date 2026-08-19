@@ -48,7 +48,7 @@ describe('Markdown Diagram Protocol', () => {
       '---',
       '# Diagram',
       '',
-      '```mermaid {title="Inline Title" toolbar.fontSize="18px" config=\'{"theme":"forest"}\'}',
+      '```mermaid {title="Inline Title" toolbar.fontSize="18px" toolbar.labels.copy="Copy inline" config=\'{"theme":"forest"}\'}',
       '---',
       'title: YAML Title',
       'displayMode: standard',
@@ -56,6 +56,8 @@ describe('Markdown Diagram Protocol', () => {
       '  title: YAML Toolbar',
       '  buttons:',
       '    copy: false',
+      '  labels:',
+      '    resetZoom: ""',
       'config:',
       '  flowchart:',
       '    htmlLabels: false',
@@ -85,6 +87,10 @@ describe('Markdown Diagram Protocol', () => {
       buttons: {
         copy: false,
       },
+      labels: {
+        copy: 'Copy inline',
+        resetZoom: '',
+      },
     })
     expect(diagram.data).toEqual({
       title: 'Inline Title',
@@ -94,6 +100,10 @@ describe('Markdown Diagram Protocol', () => {
         fontSize: '18px',
         buttons: {
           copy: false,
+        },
+        labels: {
+          copy: 'Copy inline',
+          resetZoom: '',
         },
       },
       config: {

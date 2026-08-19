@@ -12,6 +12,9 @@ export default defineNuxtConfig({
         },
         toolbar: {
           title: 'runtime-title',
+          labels: {
+            copy: 'runtime-copy-label',
+          },
           buttons: {
             fullscreen: false,
           },
@@ -33,6 +36,9 @@ export default defineNuxtConfig({
     expand: false,
     toolbar: {
       title: 'Nuxt option title',
+      labels: {
+        resetZoom: 'nuxt-reset-label',
+      },
       buttons: {
         copy: false,
       },

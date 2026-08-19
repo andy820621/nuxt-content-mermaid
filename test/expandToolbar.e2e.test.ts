@@ -157,10 +157,76 @@ async function installFullscreenStub(page: BrowserPage) {
   })
 }
 
+async function installClipboardStub(page: BrowserPage, succeeds: boolean) {
+  await page.addInitScript((shouldSucceed) => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        async writeText() {
+          if (!shouldSucceed) throw new Error('clipboard unavailable')
+        },
+      },
+    })
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: () => false,
+    })
+  }, succeeds)
+}
+
 describe('expand/fullscreen toolbars', async () => {
   await setup({
     rootDir,
     browser: true,
+  })
+
+  it('uses one custom label for visible text, title, and accessible names', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installFullscreenStub(page)
+    await installClipboardStub(page, true)
+    await page.goto(url('/'))
+
+    const root = page.locator('#custom-label-root')
+    const copyButton = root.getByLabel('複製原始碼')
+    await copyButton.waitFor({ state: 'visible', timeout: 5000 })
+    expect(await copyButton.getAttribute('title')).toBe('複製原始碼')
+    await copyButton.click()
+    expect(await root.getByLabel('已複製').getAttribute('title')).toBe('已複製')
+
+    const expandButton = root.getByLabel('展開圖表')
+    expect(await expandButton.getAttribute('title')).toBe('展開圖表')
+    await expandButton.click()
+
+    const minimizeButton = page.getByLabel('縮小圖表')
+    expect(await minimizeButton.getAttribute('title')).toBe('縮小圖表')
+    const zoomInButton = page.getByLabel('放大縮放')
+    const zoomOutButton = page.getByLabel('縮小縮放')
+    const resetButton = page.getByLabel('重設縮放')
+    expect(await zoomInButton.getAttribute('title')).toBe('放大縮放')
+    expect(await zoomOutButton.getAttribute('title')).toBe('縮小縮放')
+    expect(await resetButton.getAttribute('title')).toBe('重設縮放')
+    expect(await resetButton.textContent()).toBe('重設縮放')
+    await minimizeButton.click()
+
+    const enterFullscreenButton = root.getByLabel('進入全螢幕')
+    expect(await enterFullscreenButton.getAttribute('title')).toBe('進入全螢幕')
+    await enterFullscreenButton.click()
+    const exitFullscreenButton = root.getByLabel('離開全螢幕')
+    expect(await exitFullscreenButton.getAttribute('title')).toBe('離開全螢幕')
+    expect(await root.getByLabel('放大縮放').getAttribute('title')).toBe('放大縮放')
+    await exitFullscreenButton.click()
+
+    expect(await root.getByLabel('下載 SVG').count()).toBe(0)
+  })
+
+  it('uses the configured copy failure label after both clipboard paths fail', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installClipboardStub(page, false)
+    await page.goto(url('/'))
+
+    const root = page.locator('#custom-label-root')
+    await root.getByLabel('複製原始碼').click()
+    expect(await root.getByLabel('複製失敗').getAttribute('title')).toBe('複製失敗')
   })
 
   it('centers a narrower SVG in the renderer viewport', async () => {
