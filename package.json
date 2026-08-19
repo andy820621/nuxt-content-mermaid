@@ -65,6 +65,7 @@
     "@nuxt/kit": "catalog:integrations",
     "defu": "catalog:dev",
     "destr": "catalog:dev",
+    "html-to-image": "1.11.11",
     "mermaid": "catalog:integrations",
     "yaml": "catalog:dev"
   },
@@ -73,6 +74,7 @@
     "nuxt": "^4.1.0"
   },
   "devDependencies": {
+    "@fontsource/noto-sans-tc": "5.3.0",
     "@nuxt/content": "catalog:integrations",
     "@nuxt/devtools": "catalog:dev",
     "@nuxt/eslint-config": "catalog:dev",

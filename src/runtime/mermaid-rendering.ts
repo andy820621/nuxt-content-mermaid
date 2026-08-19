@@ -14,7 +14,7 @@ export interface MermaidRenderData {
 export type MermaidRenderOutcome
   = | { status: 'skipped' }
     | { status: 'stale' }
-    | { status: 'success', source: string, config: MermaidConfig }
+    | { status: 'success' }
     | { status: 'failure', error: unknown }
 
 export interface MermaidRendererDependencies {
@@ -106,7 +106,7 @@ export function createMermaidRenderer(
         dependencies.beforeCommit()
         target.replaceChildren(...staging.target.childNodes)
 
-        return { status: 'success', source, config }
+        return { status: 'success' }
       }
       catch (error) {
         if (generation !== latestGeneration)
@@ -162,42 +162,6 @@ function enqueueMermaidOperation<T>(
     () => undefined,
   )
   return outcome
-}
-
-export interface MermaidDetachedRenderOptions {
-  loadMermaid: () => Promise<Mermaid>
-  source: string
-  config: MermaidConfig
-  document: Document
-}
-
-/** @internal */
-export function renderDetachedMermaidSvg(
-  options: MermaidDetachedRenderOptions,
-): Promise<SVGSVGElement> {
-  return enqueueMermaidOperation(async () => {
-    const mermaid = await options.loadMermaid()
-    mermaid.initialize(options.config)
-    const staging = createStagingTarget(options.document)
-
-    try {
-      const result = await mermaid.render(
-        'nuxt-content-mermaid-' + ++renderId,
-        options.source,
-        staging.target,
-      )
-      staging.target.innerHTML = result.svg
-      const svg = staging.target.querySelector('svg')
-      if (!svg)
-        throw new Error('Portable Mermaid render did not produce an SVG')
-
-      ensureViewBox(svg)
-      return svg.cloneNode(true) as SVGSVGElement
-    }
-    finally {
-      removeStagingRoot(staging.root)
-    }
-  })
 }
 
 function removeStagingRoot(root: HTMLDivElement) {

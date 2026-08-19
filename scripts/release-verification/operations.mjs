@@ -336,12 +336,18 @@ function assertArchiveDependencyContract(manifest) {
     '>=3.5.0 <4.0.0',
   )
   assertArchiveContractValue('dependencies.@nuxt/kit', manifest.dependencies?.['@nuxt/kit'], '^4.5.2')
+  assertArchiveContractValue(
+    'dependencies.html-to-image',
+    manifest.dependencies?.['html-to-image'],
+    '1.11.11',
+  )
   assertArchiveContractValue('dependencies.mermaid', manifest.dependencies?.mermaid, '~11.16.1')
   return {
     node: manifest.engines.node,
     nuxt: manifest.peerDependencies.nuxt,
     nuxtContent: manifest.peerDependencies['@nuxt/content'],
     nuxtKit: manifest.dependencies['@nuxt/kit'],
+    htmlToImage: manifest.dependencies['html-to-image'],
     mermaid: manifest.dependencies.mermaid,
   }
 }

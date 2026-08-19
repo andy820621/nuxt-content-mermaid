@@ -249,11 +249,7 @@ describe('createMermaidRenderer', () => {
     expect(target.childNodes).toEqual([committed])
 
     finishRender({ svg: '<svg data-staged="true"></svg>' })
-    await expect(outcome).resolves.toEqual({
-      status: 'success',
-      source: 'graph TD; A-->B',
-      config,
-    })
+    await expect(outcome).resolves.toEqual({ status: 'success' })
 
     expect(target.childNodes.map(node => node.tagName)).toEqual(['svg'])
     expect(target.childNodes[0]).not.toBe(committed)
@@ -288,11 +284,7 @@ describe('createMermaidRenderer', () => {
       debug: false,
     })
 
-    await expect(requestRender()).resolves.toEqual({
-      status: 'success',
-      source: 'source',
-      config: {},
-    })
+    await expect(requestRender()).resolves.toEqual({ status: 'success' })
     expect(target.childNodes).toEqual([boundNode])
     expect(target.childNodes[0]?.tagName).toBe(expectedTag)
   })
@@ -345,9 +337,9 @@ describe('createMermaidRenderer', () => {
 
     releaseBlocker({ svg: '<svg></svg>' })
     await expect(Promise.all([blockerOutcome, staleOutcome, latestOutcome])).resolves.toEqual([
-      { status: 'success', source: 'blocker source', config: {} },
+      { status: 'success' },
       { status: 'stale' },
-      { status: 'success', source: 'latest source', config: { theme: 'forest' } },
+      { status: 'success' },
     ])
     expect(readRenderData).toHaveBeenCalledOnce()
     expect(loadMermaid).toHaveBeenCalledOnce()
@@ -395,11 +387,7 @@ describe('createMermaidRenderer', () => {
 
     await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2))
     finishLatest({ svg: '<svg data-source="latest"></svg>' })
-    await expect(latestOutcome).resolves.toEqual({
-      status: 'success',
-      source: 'latest source',
-      config: {},
-    })
+    await expect(latestOutcome).resolves.toEqual({ status: 'success' })
     expect(beforeCommit).toHaveBeenCalledOnce()
     expect(target.childNodes[0]).not.toBe(committed)
   })
@@ -441,11 +429,7 @@ describe('createMermaidRenderer', () => {
     expect(target.childNodes).toEqual([committed])
     await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2))
     finishLatest({ svg: '<svg data-source="latest"></svg>' })
-    await expect(latestOutcome).resolves.toEqual({
-      status: 'success',
-      source: 'source',
-      config: {},
-    })
+    await expect(latestOutcome).resolves.toEqual({ status: 'success' })
     expect(beforeCommit).toHaveBeenCalledOnce()
   })
 
@@ -481,11 +465,7 @@ describe('createMermaidRenderer', () => {
       debug: false,
     })
 
-    await expect(requestRender()).resolves.toEqual({
-      status: 'success',
-      source: 'source',
-      config: {},
-    })
+    await expect(requestRender()).resolves.toEqual({ status: 'success' })
     expect(stagingRoot?.parentNode).toBeNull()
     expect(document.body.childNodes).toEqual([liveRoot])
   })
@@ -584,11 +564,7 @@ describe('createMermaidRenderer', () => {
       debug: false,
     })
 
-    await expect(recoveredRequest()).resolves.toEqual({
-      status: 'success',
-      source: 'recovered',
-      config: {},
-    })
+    await expect(recoveredRequest()).resolves.toEqual({ status: 'success' })
     expect(recoveredTarget.target.childNodes[0]).not.toBe(recoveredTarget.committed)
   })
 
