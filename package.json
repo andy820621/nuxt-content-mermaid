@@ -48,10 +48,10 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "nuxt-module-build prepare && nuxt-module-build build",
-    "dev": "npm run dev:prepare && nuxi dev playground",
+    "prepack": "pnpm nuxt-module-build prepare && pnpm nuxt-module-build build",
+    "dev": "pnpm dev:prepare && nuxi dev playground",
     "dev:build": "nuxi build playground",
-    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground",
+    "dev:prepare": "pnpm nuxt-module-build build --stub && pnpm nuxt-module-build prepare && nuxi prepare playground",
     "lint": "eslint .",
     "test": "vitest run",
     "test:package-artifact": "node scripts/release-verification/package-artifact.mjs --profile v3-known-latest",

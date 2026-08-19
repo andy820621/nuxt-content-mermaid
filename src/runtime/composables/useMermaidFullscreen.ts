@@ -11,6 +11,7 @@ interface UseMermaidFullscreenOptions extends ConfigurableDocument, Configurable
   getFullscreenTarget: () => HTMLElement | null
   getViewportTarget: () => HTMLElement | null
   getRenderTarget: () => HTMLElement | null
+  getFocusTarget: () => HTMLElement | null
 }
 
 interface SvgAspectRatioSnapshot {
@@ -45,6 +46,29 @@ export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
   let refreshRaf2: number | undefined
   // Invalidates nextTick and RAF work when an exit races queued initialization or refresh.
   let lifecycleId = 0
+  let returnFocusTarget: HTMLElement | null = null
+
+  function isUsableFocusTarget(target: HTMLElement | null) {
+    if (!target?.isConnected || target.hidden || target.getAttribute('aria-hidden') === 'true') return false
+    if ('disabled' in target && target.disabled) return false
+    const style = browserWindow?.getComputedStyle(target)
+    return style?.display !== 'none' && style?.visibility !== 'hidden' && target.getClientRects().length > 0
+  }
+
+  function focusElement(target: HTMLElement | null) {
+    if (!target || !isUsableFocusTarget(target)) return
+    target.focus({ preventScroll: true })
+  }
+
+  function restoreTriggerFocus(id: number) {
+    const target = returnFocusTarget
+    returnFocusTarget = null
+    if (!target) return
+    nextTick(() => {
+      if (id !== lifecycleId || isActive.value) return
+      focusElement(target)
+    })
+  }
 
   const targetStyle = computed<CSSProperties>(() => ({
     ...zoom.transformStyle.value,
@@ -126,6 +150,7 @@ export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
   }
 
   function stopLifecycle() {
+    if (!interactionActive.value) return
     interactionActive.value = false
     restoreTargetStyle()
     restoreFullscreenSvg()
@@ -134,6 +159,7 @@ export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
     clearScheduledViewportWork()
     zoom.cancelInteraction()
     resetPresentation()
+    restoreTriggerFocus(lifecycleId)
   }
 
   function initializeViewport(id: number) {
@@ -152,11 +178,15 @@ export function useMermaidFullscreen(options: UseMermaidFullscreenOptions) {
 
   function startLifecycle() {
     const id = ++lifecycleId
+    returnFocusTarget = options.getFocusTarget()
     interactionActive.value = true
     centerFullscreenSvg()
     hasShownZoomHint = false
     hideZoomHint()
-    nextTick(() => initializeViewport(id))
+    nextTick(() => {
+      initializeViewport(id)
+      if (id === lifecycleId && isActive.value) focusElement(returnFocusTarget)
+    })
   }
 
   watch(isActive, (active) => {

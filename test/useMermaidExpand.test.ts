@@ -61,9 +61,15 @@ function createElement(className = '') {
   let textContent = ''
   const element = createEventTarget({
     nodeType: 1,
+    isConnected: true,
+    hidden: false,
     style: {} as Record<string, string>,
     children,
     classList: { contains: (name: string) => className.split(' ').includes(name) },
+    focus: vi.fn(),
+    getAttribute: () => null,
+    getClientRects: () => [{ width: 20, height: 20 }],
+    querySelectorAll: () => [],
     appendChild(child: unknown) {
       children.push(child)
     },
@@ -151,6 +157,8 @@ function setupExpand(
     viewport?: { top: number, left: number, width: number, height: number }
     scrollLeft?: number
   } = {},
+  getInitialFocusTarget?: () => HTMLElement | null,
+  getReturnFocusTarget?: () => HTMLElement | null,
 ) {
   const svg = createSvgStub(geometry.svg ?? { top: 10, left: 20, width: 200, height: 100 })
   const viewport = createViewportStub(
@@ -165,6 +173,8 @@ function setupExpand(
     getExpandViewport: () => viewport as unknown as HTMLElement,
     expandOptions: options,
     isBlocked: blocked,
+    getInitialFocusTarget,
+    getReturnFocusTarget,
   })
   expand.setExpandTargetWrap(target as unknown as Element)
   expand.setExpandModal(modal as unknown as Element)
@@ -190,6 +200,43 @@ describe('useMermaidExpand', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     browser = createBrowser()
+  })
+
+  it('focuses the dialog when the close button is disabled', async () => {
+    const options: ExpandOptions = {
+      ...DEFAULT_EXPAND_OPTIONS,
+      invokeCloseOn: {
+        ...DEFAULT_EXPAND_OPTIONS.invokeCloseOn,
+        closeButtonClick: false,
+      },
+    }
+    const ctx = setupExpand(options, {}, () => null)
+
+    ctx.expand.toggle()
+    await nextTick()
+
+    expect(ctx.modal.focus).toHaveBeenCalledWith({ preventScroll: true })
+  })
+
+  it('restores toolbar focus after the expand overlay closes', async () => {
+    const trigger = {
+      tagName: 'BUTTON',
+      isConnected: true,
+      hidden: false,
+      disabled: false,
+      getAttribute: () => null,
+      getClientRects: () => [{ width: 20, height: 20 }],
+      focus: vi.fn(),
+    }
+    const ctx = setupExpand(DEFAULT_EXPAND_OPTIONS, {}, undefined, () => trigger as unknown as HTMLElement)
+
+    ctx.expand.toggle({ currentTarget: trigger } as unknown as Event)
+    await nextTick()
+    ctx.expand.toggle()
+    finishClose(ctx.target)
+    await nextTick()
+
+    expect(trigger.focus).toHaveBeenCalledWith({ preventScroll: true })
   })
 
   afterEach(() => {

@@ -30,7 +30,8 @@ const isFullscreen = computed(() => props.variant === 'fullscreen')
 
 const handleAction = (event: MouseEvent, action: 'zoom-in' | 'zoom-out' | 'reset') => {
   emit(action)
-  ;(event.currentTarget as HTMLButtonElement | null)?.blur()
+  if (event.detail > 0)
+    (event.currentTarget as HTMLButtonElement | null)?.blur()
 }
 </script>
 

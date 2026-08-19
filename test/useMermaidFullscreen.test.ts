@@ -68,6 +68,7 @@ function createBrowser(initialAspectRatio: string | null = 'xMinYMin meet') {
     document: documentTarget,
     requestAnimationFrame: requestFrame,
     cancelAnimationFrame: cancelFrame,
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
   })
   const fullscreenTarget = createEventTarget({
     nodeType: 1,
@@ -78,6 +79,15 @@ function createBrowser(initialAspectRatio: string | null = 'xMinYMin meet') {
     }),
   })
   const viewportTarget = createEventTarget({ nodeType: 1 })
+  const focusTarget = {
+    nodeType: 1,
+    isConnected: true,
+    hidden: false,
+    disabled: false,
+    getAttribute: () => null,
+    getClientRects: () => [{ width: 20, height: 20 }],
+    focus: vi.fn(),
+  }
   const svg = createSvgAttributeStub(initialAspectRatio ?? undefined)
   let renderRect = { top: 20, left: 30, width: 200, height: 100 }
   const renderTarget = {
@@ -98,6 +108,7 @@ function createBrowser(initialAspectRatio: string | null = 'xMinYMin meet') {
     visualViewport,
     fullscreenTarget,
     viewportTarget,
+    focusTarget,
     renderTarget,
     svg,
     rafHistory,
@@ -137,6 +148,7 @@ function mountFullscreen(browser: ReturnType<typeof createBrowser>) {
         getFullscreenTarget: () => browser.fullscreenTarget as unknown as HTMLElement,
         getViewportTarget: () => browser.viewportTarget as unknown as HTMLElement,
         getRenderTarget: () => browser.renderTarget as unknown as HTMLElement,
+        getFocusTarget: () => browser.focusTarget as unknown as HTMLElement,
         document: browser.documentTarget as unknown as Document,
         window: browser.windowTarget as unknown as Window,
       })
@@ -167,6 +179,31 @@ describe('useMermaidFullscreen', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+  })
+
+  it('focuses the fullscreen button after entering and restores it after exiting', async () => {
+    const { fullscreen } = mountFullscreen(browser)
+
+    await enterFullscreen(fullscreen)
+    expect(browser.focusTarget.focus).toHaveBeenCalledWith({ preventScroll: true })
+
+    browser.focusTarget.focus.mockClear()
+    await fullscreen.toggle()
+    await nextTick()
+
+    expect(browser.focusTarget.focus).toHaveBeenCalledWith({ preventScroll: true })
+  })
+
+  it('skips focus restoration when the fullscreen trigger is no longer connected', async () => {
+    const { fullscreen } = mountFullscreen(browser)
+    await enterFullscreen(fullscreen)
+    browser.focusTarget.focus.mockClear()
+    browser.focusTarget.isConnected = false
+
+    await fullscreen.toggle()
+    await nextTick()
+
+    expect(browser.focusTarget.focus).not.toHaveBeenCalled()
   })
 
   it('owns entry, viewport controls, interaction routing and exit cleanup', async () => {

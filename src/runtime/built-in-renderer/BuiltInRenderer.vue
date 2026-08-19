@@ -74,6 +74,10 @@ const { currentTheme: manualThemeMode } = useMermaidTheme()
 const mermaidBlock = useTemplateRef('mermaidBlock')
 const mermaidWrapper = useTemplateRef('mermaidWrapper')
 const mermaidContainer = useTemplateRef('mermaidContainer')
+const expandButton = useTemplateRef<HTMLButtonElement>('expandButton')
+const fullscreenButton = useTemplateRef<HTMLButtonElement>('fullscreenButton')
+const getExpandFocusTarget = () => expandButton.value
+const getFullscreenFocusTarget = () => fullscreenButton.value
 interface MermaidFullscreenPresentationExpose {
   toggle: () => Promise<void>
   endForDiagramReplacement: () => Promise<void>
@@ -603,6 +607,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         </button>
         <button
           v-if="showExpandToolbarButton"
+          ref="expandButton"
           type="button"
           class="mermaid-btn"
           :title="expandToolbarLabel"
@@ -620,6 +625,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         </button>
         <button
           v-if="showFullscreenButton"
+          ref="fullscreenButton"
           type="button"
           class="mermaid-btn"
           :title="fullscreenLabel"
@@ -645,6 +651,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       :render-target="mermaidContainer"
       :icon-size="iconSize"
       :labels="toolbarLabels"
+      :get-focus-target="getFullscreenFocusTarget"
       @active-change="handleFullscreenActiveChange"
       @supported-change="handleFullscreenSupportedChange"
     />
@@ -706,10 +713,12 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       :blocked="isExpandBlocked"
       :get-expand-target="getMermaidSvg"
       :get-expand-viewport="getMermaidViewport"
+      :get-return-focus-target="getExpandFocusTarget"
       :overlay-style="cursorVariables"
       :content-style="cursorVariables"
       :icon-size="iconSize"
       :labels="toolbarLabels"
+      :dialog-label="toolbarTitle || toolbarLabels.expand"
       @active-change="handleExpandActiveChange"
     />
   </div>
