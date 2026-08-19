@@ -27,6 +27,8 @@ interface ExpandMetrics {
 interface UseMermaidExpandOptions {
   getExpandTarget: () => SVGElement | null
   getExpandViewport: () => HTMLElement | null
+  getInitialFocusTarget?: () => HTMLElement | null
+  getReturnFocusTarget?: () => HTMLElement | null
   expandOptions: ExpandOptions
   isBlocked?: Ref<boolean>
 }
@@ -153,6 +155,47 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     isScaling: false,
   }
   let expandInstanceId = 0
+  let focusLifecycleId = 0
+  let returnFocusTarget: HTMLElement | null = null
+  let shouldRestoreTriggerFocus = false
+
+  function isUsableFocusTarget(target: HTMLElement | null) {
+    if (!target?.isConnected || target.hidden || target.getAttribute('aria-hidden') === 'true') return false
+    if ('disabled' in target && target.disabled) return false
+    const style = window.getComputedStyle(target)
+    return style.display !== 'none' && style.visibility !== 'hidden' && target.getClientRects().length > 0
+  }
+
+  function focusElement(target: HTMLElement | null) {
+    if (!target || !isUsableFocusTarget(target)) return false
+    target.focus({ preventScroll: true })
+    return true
+  }
+
+  function resolveToolbarTrigger(event?: Event) {
+    const target = event?.currentTarget as HTMLElement | null
+    return target?.tagName === 'BUTTON' ? target : null
+  }
+
+  function focusExpandDialog(id: number) {
+    nextTick(() => {
+      if (id !== focusLifecycleId || !isExpandActive.value) return
+      focusElement(options.getInitialFocusTarget?.() ?? expandModal.value)
+    })
+  }
+
+  function restoreTriggerFocus() {
+    const target = returnFocusTarget
+    returnFocusTarget = null
+    const shouldRestore = shouldRestoreTriggerFocus
+    shouldRestoreTriggerFocus = false
+    const id = ++focusLifecycleId
+    if (!shouldRestore) return
+    nextTick(() => {
+      if (id !== focusLifecycleId || isExpandActive.value) return
+      focusElement(options.getReturnFocusTarget?.() ?? target)
+    })
+  }
 
   function resolveExpandMargin() {
     const margin = options.expandOptions.margin
@@ -385,9 +428,10 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     showZoomHint.value = false
     expandMetrics.value = null
     enableBodyScroll()
+    restoreTriggerFocus()
   }
 
-  function openExpand(_event?: Event) {
+  function openExpand(event?: Event) {
     if (!isClient || isExpandActive.value) return
     if (options.isBlocked?.value) return
 
@@ -396,6 +440,10 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
 
     const metrics = calculateExpandMetrics(svg)
     if (!metrics) return
+
+    returnFocusTarget = resolveToolbarTrigger(event)
+    shouldRestoreTriggerFocus = returnFocusTarget !== null
+    const focusId = ++focusLifecycleId
 
     expandMetrics.value = metrics
     hasShownZoomHint = false // Reset hint flag for new expand
@@ -412,6 +460,7 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
     expandState.value = 'opening'
     isExpanded.value = false
     disableBodyScroll()
+    focusExpandDialog(focusId)
 
     nextTick(() => {
       if (expandState.value !== 'opening') return
@@ -491,6 +540,11 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
   }
 
   function handleExpandKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Tab') {
+      containDialogFocus(event)
+      return
+    }
+
     if (!allowCloseByEsc && event.key === 'Escape') return
 
     if (event.key === 'Escape') {
@@ -535,6 +589,32 @@ export function useMermaidExpand(options: UseMermaidExpandOptions) {
       case 'ArrowRight':
         zoom.translateX.value -= moveStep
         break
+    }
+  }
+
+  function containDialogFocus(event: KeyboardEvent) {
+    const modal = expandModal.value
+    if (!modal) return
+    const focusable = Array.from(modal.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )).filter(isUsableFocusTarget)
+
+    if (!focusable.length) {
+      event.preventDefault()
+      focusElement(modal)
+      return
+    }
+
+    const first = focusable[0]!
+    const last = focusable.at(-1)!
+    const active = document.activeElement
+    if (event.shiftKey && (active === first || !modal.contains(active))) {
+      event.preventDefault()
+      focusElement(last)
+    }
+    else if (!event.shiftKey && (active === last || !modal.contains(active))) {
+      event.preventDefault()
+      focusElement(first)
     }
   }
 

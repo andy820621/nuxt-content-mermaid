@@ -10,6 +10,7 @@ const props = defineProps<{
   renderTarget: HTMLElement | null
   iconSize?: number
   labels: Required<MermaidToolbarLabels>
+  getFocusTarget: () => HTMLElement | null
 }>()
 
 const emit = defineEmits<{
@@ -31,6 +32,7 @@ const {
   getFullscreenTarget: () => props.fullscreenTarget,
   getViewportTarget: () => props.viewportTarget,
   getRenderTarget: () => props.renderTarget,
+  getFocusTarget: props.getFocusTarget,
 })
 
 watch(isActive, active => emit('active-change', active), { flush: 'sync', immediate: true })

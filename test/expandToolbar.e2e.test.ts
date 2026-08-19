@@ -180,6 +180,71 @@ describe('expand/fullscreen toolbars', async () => {
     browser: true,
   })
 
+  it('manages dialog semantics, contained focus, and toolbar focus restoration', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installFullscreenStub(page)
+    await page.goto(url('/'))
+
+    const root = page.locator('#diagram-root')
+    const expandButton = root.getByLabel('Expand diagram')
+    await expandButton.click()
+
+    const dialog = page.getByRole('dialog', { name: 'mermaid' })
+    await dialog.waitFor({ state: 'visible' })
+    expect(await dialog.getAttribute('aria-modal')).toBe('true')
+    expect(await page.getByLabel('Minimize diagram').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await page.keyboard.press('Tab')
+    expect(await page.getByLabel('Zoom Out').evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Shift+Tab')
+    expect(await page.getByLabel('Minimize diagram').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await page.getByLabel('Minimize diagram').click()
+    await dialog.waitFor({ state: 'detached' })
+    expect(await expandButton.evaluate(element => document.activeElement === element)).toBe(true)
+
+    const fullscreenButton = root.getByLabel('Enter fullscreen')
+    await fullscreenButton.click()
+    const exitFullscreenButton = root.getByLabel('Exit fullscreen')
+    expect(await exitFullscreenButton.evaluate(element => document.activeElement === element)).toBe(true)
+    await exitFullscreenButton.click()
+    expect(await fullscreenButton.evaluate(element => document.activeElement === element)).toBe(true)
+  })
+
+  it('restores focus across escape, browser exit, and diagram replacement without focusing removed controls', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    const pageErrors: Error[] = []
+    page.on('pageerror', error => pageErrors.push(error))
+    await installFullscreenStub(page)
+    await page.goto(url('/'))
+
+    const root = page.locator('#diagram-root')
+    await root.getByLabel('Expand diagram').click()
+    await page.keyboard.press('Escape')
+    await page.locator('.ncm-expand-modal').waitFor({ state: 'detached' })
+    expect(await root.getByLabel('Expand diagram').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await root.getByLabel('Expand diagram').click()
+    await page.evaluate(() => document.querySelector<HTMLButtonElement>('#update-diagram')?.click())
+    await page.locator('.ncm-expand-modal').waitFor({ state: 'detached' })
+    expect(await root.getByLabel('Expand diagram').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await root.getByLabel('Enter fullscreen').click()
+    await page.evaluate(() => document.exitFullscreen())
+    expect(await root.getByLabel('Enter fullscreen').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await root.getByLabel('Enter fullscreen').click()
+    await page.evaluate(() => document.querySelector<HTMLButtonElement>('#update-diagram')?.click())
+    await page.waitForFunction(() => document.fullscreenElement === null)
+    expect(await root.getByLabel('Enter fullscreen').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await root.getByLabel('Expand diagram').click()
+    await page.evaluate(() => document.querySelector<HTMLButtonElement>('#unmount-diagram')?.click())
+    await page.locator('.ncm-expand-modal').waitFor({ state: 'detached' })
+    expect(await page.evaluate(() => document.activeElement?.isConnected ?? false)).toBe(true)
+    expect(pageErrors).toEqual([])
+  })
+
   it('uses one custom label for visible text, title, and accessible names', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installFullscreenStub(page)

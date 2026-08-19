@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, useTemplateRef, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { ExpandOptions } from '../types/expand'
 import type { MermaidToolbarLabels } from '../../types/mermaid'
@@ -11,10 +11,12 @@ const props = defineProps<{
   blocked: boolean
   getExpandTarget: () => SVGElement | null
   getExpandViewport: () => HTMLElement | null
+  getReturnFocusTarget: () => HTMLElement | null
   overlayStyle?: CSSProperties
   contentStyle?: CSSProperties
   iconSize?: number
   labels: Required<MermaidToolbarLabels>
+  dialogLabel: string
 }>()
 
 const isMac = import.meta.client ? /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) : false
@@ -26,6 +28,7 @@ const emit = defineEmits<{
 const blocked = computed(() => props.blocked)
 const allowCloseButton = computed(() => props.options.invokeCloseOn?.closeButtonClick !== false)
 const targetHasMargin = computed(() => typeof props.options.margin === 'number' && props.options.margin > 0)
+const minimizeButton = useTemplateRef<HTMLButtonElement>('minimizeButton')
 
 const {
   setExpandModal,
@@ -51,6 +54,8 @@ const {
   getExpandViewport: props.getExpandViewport,
   expandOptions: props.options,
   isBlocked: blocked,
+  getInitialFocusTarget: () => minimizeButton.value,
+  getReturnFocusTarget: props.getReturnFocusTarget,
 })
 
 watch(isExpandActive, active => emit('active-change', active), { flush: 'sync', immediate: true })
@@ -64,6 +69,10 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
       v-if="isExpandActive"
       :ref="setExpandModal"
       class="ncm-expand-modal"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="dialogLabel"
+      tabindex="-1"
       :style="{
         cursor,
       }"
@@ -118,6 +127,7 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
 
         <button
           v-if="allowCloseButton"
+          ref="minimizeButton"
           type="button"
           class="ncm-expand-btn"
           :title="labels.minimize"
