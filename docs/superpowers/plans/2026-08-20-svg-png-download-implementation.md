@@ -2,91 +2,35 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the temporary dual-SVG prototype with one accessible download disclosure that exports the last committed snapshot as SVG or browser-rasterized PNG.
+**Goal:** Replace the temporary dual-SVG prototype with one accessible download disclosure that exports the last committed snapshot as sanitized SVG or browser-rasterized PNG.
 
-**Architecture:** The built-in renderer retains one detached SVG snapshot and its committed CSS dimensions. SVG export serializes that snapshot; PNG export waits for fonts, loads the same serialized snapshot as an image, and draws it to a transparent canvas. No final export path calls Mermaid.
+**Architecture:** The built-in renderer retains one detached SVG snapshot and its committed CSS dimensions. Both formats begin with the same standalone sanitizer; SVG serializes that safe clone, while PNG passes it through a dynamically imported internal deep rasterizer module. The rasterizer owns `html-to-image@1.11.11`, font/resource validation, temporary DOM, transparent rasterization, and cleanup. The module import promise is cached at module scope, so the dependency is absent from initial requests and loaded once on the first PNG action.
 
-**Tech Stack:** Vue 3, TypeScript, Mermaid, Canvas/Image/Font Loading browser APIs, Vitest, Nuxt test-utils, Playwright CLI.
+**Tech Stack:** Vue 3, TypeScript, Mermaid, `html-to-image@1.11.11`, Font Loading/CSSOM browser APIs, Vitest, Nuxt test-utils, Playwright.
 
 ## Global Constraints
 
 - Keep the branch `codex/issue-91-safe-svg-download` and draft PR #113.
 - Do not stage or modify the three untracked `temporary-svg-label-stress.md` playground files.
-- Use only native browser APIs; add no runtime or development dependency.
-- Preserve user Mermaid settings and never re-render for download.
+- Add `html-to-image` only as the exact direct dependency `1.11.11`; do not use a semver range or `peerDependencies`.
+- Do not expose `html-to-image` types, options, functions, or subpaths through public declarations or package exports.
+- Use only the sanitized clone of the last committed SVG snapshot; never re-render Mermaid or modify Mermaid configuration for download.
 - Keep sandbox and custom renderers outside the built-in download path.
-- Use disclosure semantics with native buttons, `aria-expanded`, and `aria-controls`; do not use ARIA menu roles or a focus trap.
-- Stop and report evidence if Chromium, Firefox, or WebKit fails the `foreignObject`, loaded-font, transparency, or dimension probe.
-- Do not add a fallback, server renderer, font embedder, scale option, or browser-specific branch.
+- Use native disclosure buttons with `aria-expanded` and `aria-controls`; do not use ARIA menu roles or a focus trap.
+- Same-origin and anonymous-CORS webfonts must be embedded; an unreadable stylesheet or unembedded font URL must fail before download.
+- Do not add retry, delay, browser-specific handling, server rendering, a custom font embedder, alternate SVG output, fallback PNG, or a scale option.
+- PNG dimensions equal the committed CSS-pixel dimensions with `pixelRatio: 1`; the canvas remains transparent unless the snapshot contains a background.
 
 ---
 
-### Task 1: Prove the native rasterization primitive in all target engines
+### Task 1: Lock the dependency contract and remove the second SVG render path
 
 **Files:**
-- Create temporarily, never stage: `output/playwright/svg-png-probe.html`
-- Preserve: `playground/content/mermaid/**/temporary-svg-label-stress.md`
-
-**Interfaces:**
-- Consumes: Blob URL, `Image.decode()`, canvas, `document.fonts.ready`, `XMLSerializer`.
-- Produces: one result object per engine with `foreignObject`, `font`, `transparent`, and `dimensions` booleans.
-
-- [ ] **Step 1: Create the disposable probe**
-
-Create the probe through `apply_patch`. It must:
-
-1. load `node_modules/.pnpm/katex@0.16.47/node_modules/katex/dist/fonts/KaTeX_Typewriter-Regular.woff2` from the local static server with `@font-face`;
-2. render a 240×120 SVG containing XHTML `foreignObject` labels `MMMM` and `iiii` in different colors using that font;
-3. await `document.fonts.load('24px NcmProbeFont')` and `document.fonts.ready`;
-4. clone and XML-serialize the SVG, load it through a Blob URL, and draw it to an unfilled 240×120 canvas;
-5. compare colored glyph bounds so `MMMM` and `iiii` remain approximately equal-width in the monospaced web font;
-6. verify colored label pixels exist, the top-left alpha is zero, and the canvas dimensions are 240×120;
-7. publish only this literal contract:
-
-```js
-window.__ncmProbe = {
-  foreignObject: redPixels > 0 && bluePixels > 0,
-  font: Math.abs(redBounds.width - blueBounds.width) <= 4,
-  transparent: pixels[3] === 0,
-  dimensions: canvas.width === 240 && canvas.height === 120,
-}
-```
-
-- [ ] **Step 2: Serve the probe and run Playwright CLI**
-
-Run a local static server from the repository root, then run separate sessions:
-
-```bash
-command -v npx
-python3 -m http.server 4178 --bind 127.0.0.1
-PWCLI=/Users/Andy/.codex/skills/playwright/scripts/playwright_cli.sh
-"$PWCLI" -s=ncm-png-chrome open http://127.0.0.1:4178/output/playwright/svg-png-probe.html --browser=chrome
-"$PWCLI" -s=ncm-png-firefox open http://127.0.0.1:4178/output/playwright/svg-png-probe.html --browser=firefox
-"$PWCLI" -s=ncm-png-webkit open http://127.0.0.1:4178/output/playwright/svg-png-probe.html --browser=webkit
-"$PWCLI" -s=ncm-png-chrome eval '() => window.__ncmProbe'
-"$PWCLI" -s=ncm-png-firefox eval '() => window.__ncmProbe'
-"$PWCLI" -s=ncm-png-webkit eval '() => window.__ncmProbe'
-```
-
-Expected from every engine:
-
-```json
-{"foreignObject":true,"font":true,"transparent":true,"dimensions":true}
-```
-
-If any value is false or decoding/drawing throws, take a Playwright screenshot for that engine, retain the probe under `output/playwright/`, report the exact result/error, and stop before Task 2.
-
-- [ ] **Step 3: Clean up a passing probe**
-
-Close the three Playwright sessions, stop the server, and delete the temporary probe with `apply_patch`. Confirm `git status --short` still shows only the user's three untracked playground files.
-
-No commit is created for this gate.
-
----
-
-### Task 2: Remove the portable render path and restore a snapshot-only renderer contract
-
-**Files:**
+- Modify: `package.json`
+- Modify: `pnpm-lock.yaml`
+- Modify: `test/packageContract.test.ts`
+- Modify: `scripts/release-verification/operations.mjs`
+- Modify: `test/releaseVerificationOperations.test.ts`
 - Modify: `src/runtime/mermaid-rendering.ts`
 - Modify: `src/runtime/built-in-renderer/BuiltInRenderer.vue`
 - Modify: `test/mermaidRendering.test.ts`
@@ -95,43 +39,74 @@ No commit is created for this gate.
 - Modify: `test/fixtures/built-in-renderer/types.ts`
 
 **Interfaces:**
+- Produces: exact direct dependency contract `html-to-image: "1.11.11"`.
 - Produces: `CommittedExportSnapshot { svg: SVGSVGElement, width: number, height: number }`.
-- Removes: `MermaidDetachedRenderOptions`, `renderDetachedMermaidSvg`, portable download state, forced `htmlLabels: false`, and success-result `source/config` metadata.
+- Removes: detached Mermaid download rendering, forced `htmlLabels: false`, source/config export metadata, and the two temporary SVG controls.
 
-- [ ] **Step 1: Write the failing contract tests**
+- [ ] **Step 1: Write failing package and archive contract tests**
 
-Change renderer unit expectations back to exact success outcomes:
+Extend `test/packageContract.test.ts` with exact ownership assertions:
+
+```ts
+expect(packageJson.dependencies['html-to-image']).toBe('1.11.11')
+expect(packageJson.peerDependencies).not.toHaveProperty('html-to-image')
+expect(packageJson.exports).not.toHaveProperty('./png-rasterizer')
+```
+
+Extend `assertArchiveDependencyContract()` and its fixtures so the packed
+manifest must contain `dependencies.html-to-image === '1.11.11'`. Add one
+negative table case using `^1.11.11`; it must fail with
+`Archive dependency contract mismatch: dependencies.html-to-image`.
+
+- [ ] **Step 2: Write failing snapshot-only renderer tests**
+
+Restore exact successful render outcomes:
 
 ```ts
 await expect(requestRender()).resolves.toEqual({ status: 'success' })
 ```
 
-Change built-in E2E expectations so the toolbar has no `Download faithful SVG` or `Download portable SVG` controls and no download action increases the Mermaid stub run count.
+In built-in E2E coverage, assert that neither temporary SVG control exists and
+that no download operation increments the Mermaid stub run count. Keep the
+pending, stale, failed, skipped, sandbox, and conflict snapshot assertions.
 
-The production mutations caught are: retaining source/config solely for export, leaving detached Mermaid render callable, or keeping either temporary control.
-
-- [ ] **Step 2: Run RED**
+- [ ] **Step 3: Run RED**
 
 ```bash
-python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/mermaidRendering.test.ts test/builtInRenderer.e2e.test.ts
+python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/packageContract.test.ts test/releaseVerificationOperations.test.ts test/mermaidRendering.test.ts test/builtInRenderer.e2e.test.ts
 ```
 
-Expected: failures show the expanded success result and temporary portable/faithful controls still exist.
+Expected: dependency assertions fail; renderer tests expose the expanded
+success result and the two temporary controls.
 
-- [ ] **Step 3: Remove portable implementation**
+- [ ] **Step 4: Add exact dependencies**
 
-Make the success type and return value snapshot-agnostic:
+```bash
+pnpm add --save-exact html-to-image@1.11.11
+pnpm add --save-dev --save-exact @fontsource/noto-sans-tc@5.3.0
+```
+
+Confirm `package.json` contains `"html-to-image": "1.11.11"` under
+`dependencies`, contains exact `@fontsource/noto-sans-tc` only under
+`devDependencies`, and contains neither package under `peerDependencies`.
+
+- [ ] **Step 5: Remove download-time Mermaid rendering**
+
+Change the render outcome to:
 
 ```ts
 export type MermaidRenderOutcome =
-  | { status: 'success' }
+  | { status: 'skipped' }
   | { status: 'stale' }
+  | { status: 'success' }
   | { status: 'failure', error: unknown }
 ```
 
-Delete `renderDetachedMermaidSvg` and its exported options. Keep the single global Mermaid queue used by visible renders.
+Delete `MermaidDetachedRenderOptions`, `renderDetachedMermaidSvg`, and the
+download-only source/config return values. Keep the existing global Mermaid
+queue for visible renders.
 
-In `BuiltInRenderer.vue`, reduce the snapshot to:
+Reduce the renderer-owned snapshot to:
 
 ```ts
 interface CommittedExportSnapshot {
@@ -141,44 +116,169 @@ interface CommittedExportSnapshot {
 }
 ```
 
-After a successful commit, read the committed SVG rectangle and store a detached clone plus its positive CSS dimensions. Delete `isPortableDownloadPending`, `downloadPortableSvg`, the residual-`foreignObject` warning, and both experimental buttons.
+After a successful visible commit, capture a detached SVG clone and positive
+`getBoundingClientRect()` width/height. Delete the second SVG handler, its
+pending state, warning, filenames, buttons, and stub behavior that existed only
+for the removed render path.
 
-Simplify the stub by removing `htmlLabels` export-run tracking that only served the prototype, while retaining unsafe-label fixtures needed by standalone SVG tests.
-
-- [ ] **Step 4: Run GREEN and commit**
+- [ ] **Step 6: Run GREEN and commit**
 
 ```bash
-python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/mermaidRendering.test.ts test/builtInRenderer.e2e.test.ts
-git add src/runtime/mermaid-rendering.ts src/runtime/built-in-renderer/BuiltInRenderer.vue test/mermaidRendering.test.ts test/builtInRenderer.e2e.test.ts test/fixtures/built-in-renderer/mermaid-stub.ts test/fixtures/built-in-renderer/types.ts
-git commit -m "refactor: remove portable SVG rendering"
+python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/packageContract.test.ts test/releaseVerificationOperations.test.ts test/mermaidRendering.test.ts test/builtInRenderer.e2e.test.ts
+git add package.json pnpm-lock.yaml test/packageContract.test.ts scripts/release-verification/operations.mjs test/releaseVerificationOperations.test.ts src/runtime/mermaid-rendering.ts src/runtime/built-in-renderer/BuiltInRenderer.vue test/mermaidRendering.test.ts test/builtInRenderer.e2e.test.ts test/fixtures/built-in-renderer/mermaid-stub.ts test/fixtures/built-in-renderer/types.ts
+git commit -m "refactor: remove alternate SVG rendering"
 ```
 
-Expected: focused tests pass and no Mermaid download re-render remains.
+Expected: focused tests pass, the dependency is exact and package-owned, and no
+download path can invoke Mermaid.
 
 ---
 
-### Task 3: Add the download disclosure and snapshot PNG encoder with TDD
+### Task 2: Implement the internal PNG rasterizer with fail-closed fonts
 
 **Files:**
-- Create: `src/runtime/png-download.ts`
+- Create: `src/runtime/png-rasterizer.ts`
+- Create: `test/pngRasterizer.test.ts`
 - Modify: `src/runtime/svg-download.ts`
+- Modify: `test/svgDownload.test.ts`
+
+**Interfaces:**
+- Consumes: a sanitized clone of the committed SVG and positive CSS-pixel dimensions.
+- Produces: `rasterizePngSnapshot(input): Promise<Blob>` from one internal module.
+- Keeps: all `html-to-image` imports and types inside `png-rasterizer.ts`.
+
+- [ ] **Step 1: Write failing rasterizer interface tests**
+
+Use `vi.mock('html-to-image')` and assert only observable module behavior:
+
+```ts
+export interface PngRasterizationInput {
+  svg: SVGSVGElement
+  width: number
+  height: number
+}
+
+export function rasterizePngSnapshot(
+  input: PngRasterizationInput,
+): Promise<Blob>
+```
+
+Cover these cases separately:
+
+- invalid, zero, infinite, or `NaN` dimensions reject before library calls;
+- `document.fonts.ready` settles before `getFontEmbedCSS()`;
+- an inaccessible `CSSStyleSheet.cssRules` getter rejects before `toBlob()`;
+- a font CSS result containing any non-`data:` `url(...)` rejects before
+  `toBlob()` instead of allowing fallback;
+- the host passed to `getFontEmbedCSS()` retains the sanitized input's safe
+  `foreignObject` content without mutating that input;
+- `toBlob()` receives exact width/height/canvasWidth/canvasHeight,
+  `pixelRatio: 1`, and the precomputed `fontEmbedCSS`;
+- null or non-PNG output rejects;
+- temporary host cleanup runs after success and every failure.
+
+- [ ] **Step 2: Write failing shared-download tests**
+
+Extract project-owned helpers from `svg-download.ts`:
+
+```ts
+export function createSafeStandaloneSvgClone(
+  source: SVGSVGElement,
+): SVGSVGElement
+
+export function downloadBlob(blob: Blob, filename: string): void
+```
+
+Make `serializeSafeStandaloneSvg()` call `createSafeStandaloneSvgClone()` so
+SVG and PNG share exactly one sanitizer and namespace-normalization path.
+Assert that it creates one hidden anchor, uses the supplied filename, clicks
+once, removes the anchor, and revokes the object URL on the next task. Keep all
+existing SVG sanitizer and namespace assertions unchanged.
+
+- [ ] **Step 3: Run RED**
+
+```bash
+python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/pngRasterizer.test.ts test/svgDownload.test.ts
+```
+
+Expected: imports and functions are missing.
+
+- [ ] **Step 4: Implement the deep rasterizer module**
+
+`png-rasterizer.ts` statically imports only inside the async module:
+
+```ts
+import { getFontEmbedCSS, toBlob } from 'html-to-image'
+```
+
+Implement these internal phases in order:
+
+1. Validate dimensions.
+2. Await `input.svg.ownerDocument.fonts?.ready`.
+3. Read every `document.styleSheets[*].cssRules`; wrap a thrown
+   `SecurityError` in a package-prefixed rasterization error containing the
+   stylesheet URL.
+4. Clone the already sanitized input so rasterization cannot mutate the caller's
+   safe snapshot.
+5. Append the clone to a fixed off-screen host with explicit pixel width/height,
+   zero margin/padding, transparent background, and no user interaction.
+6. Call `getFontEmbedCSS(host, captureOptions)` once. Parse every `url(...)` in
+   the returned font CSS and require `data:` URLs; `local()` without a URL is
+   allowed.
+7. Call `toBlob(host, { ...captureOptions, fontEmbedCSS })`, where:
+
+```ts
+const captureOptions = {
+  width,
+  height,
+  canvasWidth: width,
+  canvasHeight: height,
+  pixelRatio: 1,
+}
+```
+
+8. Require a non-null blob with `type === 'image/png'`.
+9. Remove the off-screen host in `finally` and never mutate the source SVG.
+
+Do not patch `console`, set `backgroundColor`, call Mermaid, catch-and-return a
+fallback blob, or branch by browser.
+
+- [ ] **Step 5: Run GREEN and commit**
+
+```bash
+python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/pngRasterizer.test.ts test/svgDownload.test.ts
+git add src/runtime/png-rasterizer.ts src/runtime/svg-download.ts test/pngRasterizer.test.ts test/svgDownload.test.ts
+git commit -m "feat: rasterize committed SVG snapshots"
+```
+
+Expected: all unit contracts pass through the project-owned interface without
+exposing package types.
+
+---
+
+### Task 3: Add the disclosure, cached dynamic import, and pending state
+
+**Files:**
 - Modify: `src/runtime/built-in-renderer/BuiltInRenderer.vue`
 - Modify: `src/runtime/constants.ts`
 - Modify: `src/types/mermaid.d.ts`
-- Modify: `test/svgDownload.test.ts`
 - Modify: `test/builtInRenderer.e2e.test.ts`
 - Modify: `test/expandToolbar.e2e.test.ts`
 - Modify: `test/runtimeOptions.test.ts`
+- Modify: `test/fixtures/built-in-renderer/nuxt.config.ts`
+- Create: `test/fixtures/built-in-renderer/html-to-image-stub.ts`
 - Modify: `test/fixtures/expand-toolbar/app.vue`
 - Modify: `test/release-verification/consumer-template/type-contracts/package-user.ts`
 
 **Interfaces:**
-- Produces: `createPngBlobFromSvgSnapshot(source, size): Promise<Blob>` and `downloadStandalonePng(source, size): Promise<void>` as internal runtime utilities.
-- Extends: `MermaidToolbarLabels` with `download` and `downloadPng`; keeps `downloadSvg` as the SVG choice.
+- Extends: `MermaidToolbarLabels` with `download` and `downloadPng`; retains
+  `downloadSvg` for the SVG choice.
+- Produces: one module-scope cached `Promise<typeof import('../png-rasterizer')>`.
+- Preserves: trigger → SVG → PNG → next toolbar control DOM order.
 
-- [ ] **Step 1: Write failing label and disclosure tests**
+- [ ] **Step 1: Write failing labels and disclosure tests**
 
-Add literal label expectations:
+Add literal defaults and type-contract coverage:
 
 ```ts
 expect(DEFAULT_TOOLBAR_LABELS).toMatchObject({
@@ -188,21 +288,13 @@ expect(DEFAULT_TOOLBAR_LABELS).toMatchObject({
 })
 ```
 
-Add E2E assertions for one trigger and disclosure content:
-
-```ts
-const trigger = root.getByLabel('Download diagram')
-expect(await trigger.getAttribute('aria-expanded')).toBe('false')
-const controls = await trigger.getAttribute('aria-controls')
-expect(controls).toBeTruthy()
-expect(await page.locator(`#${controls}`).count()).toBe(0)
-```
-
-Open it and assert the controlled element contains two native buttons, visible text, no `role="menu"`, and no `role="menuitem"`.
+Assert one native trigger with `aria-expanded="false"`, a valid
+`aria-controls`, two native choice buttons after opening, visible choice text,
+and no `menu`/`menuitem` roles.
 
 - [ ] **Step 2: Write failing keyboard tests**
 
-Cover the approved contract as separate behaviors:
+Cover the accepted contract with separate tests:
 
 ```ts
 await trigger.focus()
@@ -215,153 +307,279 @@ expect(await activeLabel(page)).toBe('Expand diagram')
 expect(await trigger.getAttribute('aria-expanded')).toBe('false')
 ```
 
-Also assert:
+Also assert Space opening, PNG → SVG → trigger Shift+Tab behavior, Escape focus
+restoration, outside pointer closure without focus movement, and focus return
+after either format completes.
 
-- Space opens and focuses SVG;
-- Shift+Tab moves PNG → SVG → trigger and closes;
-- Escape closes and focuses trigger;
-- outside pointer click closes without moving focus;
-- SVG and PNG selection close and focus trigger after the download event.
+- [ ] **Step 3: Write failing lazy-load and loading-state tests**
 
-The production mutations caught are wrong DOM order, a focus trap, forced trigger restoration on Tab, missing Escape restoration, or ARIA menu semantics.
+Alias `html-to-image` in the built-in fixture to a controllable ESM stub. Its
+top level increments `window.__htmlToImageModuleEvaluations__`; `toBlob()` waits
+on a test-controlled promise and then returns a real `image/png` blob.
 
-- [ ] **Step 3: Write failing SVG/PNG behavior tests**
+Assert:
 
-For SVG, assert filename `mermaid-diagram.svg`, preserved `foreignObject` text, safe standalone XML, and no extra Mermaid run.
-
-For PNG, use the real browser download and assert:
-
-- filename `mermaid-diagram.png`;
-- PNG magic bytes `89504e470d0a1a0a`;
-- IHDR width and height equal `Math.ceil(committedDimension * devicePixelRatio)`;
-- decoding the downloaded bytes back into an image produces transparent corner pixels and non-transparent diagram/label pixels;
-- Mermaid run count and visible SVG identity do not change.
-
-Retain the existing pending/stale/failure snapshot tests and make both choices export the same last committed run.
+- initial render and SVG download leave the evaluation count at zero;
+- the first PNG click immediately leaves the disclosure open, sets
+  `aria-busy="true"`, disables PNG, and shows `.ncm-download-spinner`;
+- a second click while pending does nothing;
+- releasing the stub creates one download, closes the disclosure, and focuses
+  the trigger;
+- a later PNG download succeeds with the evaluation count still equal to one;
+- a rejected import or rasterization logs one package-prefixed error and creates
+  no download.
 
 - [ ] **Step 4: Run RED**
 
 ```bash
-python .agents/skills/vitest/scripts/run_vitest.py --root . --test-name "download disclosure|Download as|PNG snapshot|keyboard" -- test/builtInRenderer.e2e.test.ts test/expandToolbar.e2e.test.ts test/runtimeOptions.test.ts test/svgDownload.test.ts
+python .agents/skills/vitest/scripts/run_vitest.py --root . --test-name "download disclosure|Download as|PNG loading|download keyboard" -- test/builtInRenderer.e2e.test.ts test/expandToolbar.e2e.test.ts test/runtimeOptions.test.ts
 ```
 
-Expected: failures identify missing labels, trigger/disclosure, PNG helper, filenames, and keyboard behavior.
+Expected: missing labels, disclosure, lazy import, and pending-state assertions
+fail.
 
-- [ ] **Step 5: Implement the PNG utility**
+- [ ] **Step 5: Implement the module-scope loader and PNG handler**
 
-In `png-download.ts`, implement this exact internal shape:
+Outside component instance state in `BuiltInRenderer.vue`, define:
 
 ```ts
-export interface SvgSnapshotSize {
-  width: number
-  height: number
+type PngRasterizerModule = typeof import('../png-rasterizer')
+
+let pngRasterizerModulePromise: Promise<PngRasterizerModule> | undefined
+
+function loadPngRasterizer(): Promise<PngRasterizerModule> {
+  return pngRasterizerModulePromise
+    ??= import('../png-rasterizer')
 }
-
-export async function createPngBlobFromSvgSnapshot(
-  source: SVGSVGElement,
-  size: SvgSnapshotSize,
-): Promise<Blob>
-
-export async function downloadStandalonePng(
-  source: SVGSVGElement,
-  size: SvgSnapshotSize,
-): Promise<void>
 ```
 
-Validate finite positive dimensions, await `source.ownerDocument.fonts?.ready`, clone the source with explicit pixel `width` and `height`, serialize it through `serializeSafeStandaloneSvg`, decode a Blob URL with the owner window's `Image`, and draw it to an unfilled canvas. Use a finite positive `devicePixelRatio` or `1`, reject a missing 2D context or null `toBlob`, and revoke the SVG URL in `finally`.
+Do not reset the promise after rejection and do not add preload/prefetch hints.
+The component must not have a static runtime import of `png-rasterizer` or
+`html-to-image`.
 
-Extract one internal Blob download helper from `svg-download.ts` so SVG and PNG share anchor creation, filename assignment, removal, and delayed URL revocation. Keep SVG sanitization and `foreignObject` normalization unchanged.
+On PNG activation:
 
-- [ ] **Step 6: Implement labels and disclosure**
+1. capture the current `CommittedExportSnapshot`;
+2. keep the disclosure open and set `isPngDownloadPending = true` before
+   sanitizing or awaiting `loadPngRasterizer()`;
+3. create the safe clone with `createSafeStandaloneSvgClone(snapshot.svg)` and
+   call `rasterizePngSnapshot()` with that clone and the captured dimensions;
+4. pass the blob to `downloadBlob(blob, 'mermaid-diagram.png')`;
+5. on error, log one `[nuxt-content-mermaid] Failed to download PNG:` error;
+6. in `finally`, clear pending, close, and focus the trigger if still connected.
 
-Add defaults:
+- [ ] **Step 6: Implement disclosure markup and styling**
 
-```ts
-download: 'Download diagram',
-downloadSvg: 'Download as SVG',
-downloadPng: 'Download as PNG',
+Add the trigger directly after Copy and before Expand. Use `useId()`, native
+buttons, natural DOM order, `v-if` disclosure content, focusout closure, Escape,
+and outside `pointerdown` cleanup.
+
+The pending PNG button uses:
+
+```vue
+<button
+  type="button"
+  :disabled="isPngDownloadPending"
+  :aria-busy="isPngDownloadPending || undefined"
+>
+  <span
+    v-if="isPngDownloadPending"
+    class="ncm-download-spinner"
+    aria-hidden="true"
+  />
+  {{ downloadPngLabel }}
+</button>
 ```
 
-In `BuiltInRenderer.vue`, add one relative disclosure wrapper directly after Copy and before Expand. Use `useId()` for the controlled ID, native buttons in trigger → SVG → PNG DOM order, and `v-if` for the disclosure content.
-
-Implement:
-
-- trigger toggle with `aria-expanded`/`aria-controls`;
-- keyboard-origin open (`MouseEvent.detail === 0`) followed by `nextTick()` focus on SVG;
-- disclosure `focusout` closure when `relatedTarget` leaves the disclosure;
-- Escape closure plus trigger focus;
-- document `pointerdown` outside closure without focus;
-- SVG and awaited PNG handlers that capture the snapshot, close, and focus trigger after completion or error;
-- one PNG-in-flight guard and one package-prefixed PNG error;
-- automatic closure when export eligibility is lost and listener cleanup on unmount.
-
-Style only a small absolute popover and its visible text buttons using existing `--ncm-*` variables. Do not add animation, a selector component, or new CSS variables.
+Style only the small disclosure and spinner with existing color/size variables.
+Do not add animation beyond the spinner rotation or introduce a new public
+option.
 
 - [ ] **Step 7: Run GREEN and commit**
 
 ```bash
 python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/builtInRenderer.e2e.test.ts test/expandToolbar.e2e.test.ts test/runtimeOptions.test.ts test/svgDownload.test.ts
-git add src/runtime/png-download.ts src/runtime/svg-download.ts src/runtime/built-in-renderer/BuiltInRenderer.vue src/runtime/constants.ts src/types/mermaid.d.ts test/svgDownload.test.ts test/builtInRenderer.e2e.test.ts test/expandToolbar.e2e.test.ts test/runtimeOptions.test.ts test/fixtures/expand-toolbar/app.vue test/release-verification/consumer-template/type-contracts/package-user.ts
+git add src/runtime/built-in-renderer/BuiltInRenderer.vue src/runtime/constants.ts src/types/mermaid.d.ts test/builtInRenderer.e2e.test.ts test/expandToolbar.e2e.test.ts test/runtimeOptions.test.ts test/fixtures/built-in-renderer/nuxt.config.ts test/fixtures/built-in-renderer/html-to-image-stub.ts test/fixtures/expand-toolbar/app.vue test/release-verification/consumer-template/type-contracts/package-user.ts
 git commit -m "feat: download diagrams as SVG or PNG"
 ```
 
-Expected: disclosure, keyboard, SVG, PNG, labels, and snapshot tests pass.
+Expected: disclosure, keyboard, labels, lazy loading, pending state, snapshot
+coherence, and download behavior pass.
 
 ---
 
-### Task 4: Preserve renderer boundaries and verify the production encoder
+### Task 4: Add the three-engine visual regression gate
 
 **Files:**
-- Modify: `test/customRenderer.e2e.test.ts`
-- Modify: `test/migrationPlayground.e2e.test.ts`
-- Reuse temporarily: `output/playwright/svg-png-probe.html`
+- Create: `test/fixtures/png-rasterizer/nuxt.config.ts`
+- Create: `test/fixtures/png-rasterizer/app.vue`
+- Create: `test/fixtures/png-rasterizer/committed-mermaid-snapshot.svg`
+- Create: `test/fixtures/png-rasterizer/server/routes/fixture-fonts.css.ts`
+- Create: `test/fixtures/png-rasterizer/server/routes/files/[font].ts`
+- Create: `test/helpers/fontFixtureServer.ts`
+- Create: `test/pngRasterizer.browser.test.ts`
 
 **Interfaces:**
-- Consumes: final built-in disclosure and `dist/runtime/png-download.js`.
-- Produces: boundary coverage plus three-engine evidence for the production implementation.
+- Consumes: the real `rasterizePngSnapshot()` and fixed sanitized Mermaid SVG
+  SHA-256 `c717f5d969335af8dccf16ff8cc011491f3317137f054597a438e6adfffea493`.
+- Produces: one result per engine/resource mode with semantic gates, hashes, and
+  adjacent perceptual pixel differences.
 
-- [ ] **Step 1: Add failing boundary assertions**
+- [ ] **Step 1: Commit the fixed regression fixture**
 
-Assert custom renderers expose no `Download diagram` trigger. Assert sandbox diagrams keep the trigger disabled and cannot open the disclosure. Update the real Mermaid finance-ledger test to download SVG and PNG from one visible `foreignObject` diagram and assert no second Mermaid render or visible replacement.
+Add the already sanitized committed SVG used by the bounded spike. Verify its
+SHA-256 before staging and keep these exact feature counts in the test:
 
-- [ ] **Step 2: Run RED, make only boundary corrections, and run GREEN**
-
-```bash
-python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/customRenderer.e2e.test.ts test/builtInRenderer.e2e.test.ts test/migrationPlayground.e2e.test.ts
+```ts
+expect(features).toEqual({
+  foreignObjectCount: 11,
+  chineseForeignObjects: 9,
+  multilineForeignObjects: 8,
+  boldForeignObjects: 8,
+})
 ```
 
-If production code already satisfies the assertions, no production change is needed. Otherwise correct only visibility/disabled guards and rerun the same command.
+The same-origin Nuxt routes serve Noto Sans TC 400/700 Traditional Chinese and
+Latin WOFF2 files from `@fontsource/noto-sans-tc@5.3.0`. The helper server
+provides two cross-origin modes: anonymous CORS with
+`Access-Control-Allow-Origin: *`, and an opaque stylesheet whose font URLs point
+to the CORS-enabled server so the live page can render the font while the
+rasterizer must reject unreadable CSSOM.
 
-- [ ] **Step 3: Build and exercise the actual encoder in three engines**
+- [ ] **Step 2: Implement the deterministic browser harness**
 
-Run `pnpm prepack`. Recreate the probe so it imports `createPngBlobFromSvgSnapshot` from `/dist/runtime/png-download.js`, then repeat the Task 1 Chrome, Firefox, and WebKit sessions and exact result assertions.
+The fixture app imports the internal rasterizer, mounts only the parsed fixed
+snapshot, and runs three sequential rasterizations. It records PNG pixels,
+dimensions, corner alpha, feature regions, font metrics, and diagnostic SHA-256
+hashes without invoking Mermaid.
 
-Expected: all four booleans are true in all engines. On failure, stop, retain artifacts, and report evidence without adding a fallback.
+Use this exact pixel predicate:
 
-- [ ] **Step 4: Commit boundary tests**
+```ts
+const CHANNEL_DELTA = 8
+const MAX_DIFFERING_PIXEL_RATIO = 0.0001
 
-Delete the passing temporary probe, confirm it is not staged, then:
+const differs =
+  Math.abs(a.r - b.r) > CHANNEL_DELTA
+  || Math.abs(a.g - b.g) > CHANNEL_DELTA
+  || Math.abs(a.b - b.b) > CHANNEL_DELTA
+  || Math.abs(a.a - b.a) > CHANNEL_DELTA
+
+expect(differentPixels / comparedPixels)
+  .toBeLessThan(MAX_DIFFERING_PIXEL_RATIO)
+```
+
+Compare run 1 → 2 and run 2 → 3. Store hashes only in failure diagnostics; do
+not assert hash equality.
+
+- [ ] **Step 3: Run Chromium, Firefox, and WebKit from Vitest**
+
+Use `setup({ browser: false, build: true, dev: false, server: true })` once, then
+launch `chromium`, `firefox`, and `webkit` directly from `playwright`. For each
+engine, run same-origin and anonymous-CORS modes and assert:
+
+- exact 1445×477 dimensions on all three outputs;
+- four transparent corner alpha values;
+- nonblank `foreignObject`, Chinese, multiline, and bold feature regions;
+- loaded Noto Sans TC metrics differ from the fallback control;
+- no console/resource error or warning;
+- both adjacent perceptual ratios are below 0.0001.
+
+Run the blocked mode in every engine and assert `success: false`, a stylesheet
+readability error, and no PNG blob/download.
+
+- [ ] **Step 4: Run the browser gate and commit**
 
 ```bash
-git add test/customRenderer.e2e.test.ts test/migrationPlayground.e2e.test.ts test/builtInRenderer.e2e.test.ts
-git commit -m "test: verify snapshot downloads across renderer boundaries"
+python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/pngRasterizer.browser.test.ts
+git add test/fixtures/png-rasterizer test/helpers/fontFixtureServer.ts test/pngRasterizer.browser.test.ts
+git commit -m "test: verify PNG fidelity across browser engines"
 ```
+
+Expected: six positive engine/mode cases pass and all three blocked cases fail
+explicitly without fallback output.
 
 ---
 
-### Task 5: Replace prototype documentation, verify, and update the draft PR
+### Task 5: Prove production async-chunk loading
+
+**Files:**
+- Create: `test/fixtures/png-download-build/nuxt.config.ts`
+- Create: `test/fixtures/png-download-build/app.vue`
+- Create: `test/pngAsyncChunk.e2e.test.ts`
+
+**Interfaces:**
+- Consumes: a production Nuxt build using the real built-in renderer and real
+  `html-to-image@1.11.11`.
+- Produces: static asset inspection plus request-timeline evidence for first and
+  repeated PNG actions.
+
+- [ ] **Step 1: Create the production fixture and failing build test**
+
+Build the fixture through:
+
+```ts
+await setup({
+  rootDir,
+  browser: false,
+  build: true,
+  dev: false,
+  server: true,
+  setupTimeout: 180_000,
+})
+```
+
+The fixture renders one built-in SVG diagram with SVG/PNG disclosure enabled.
+After build, scan `.output/public/_nuxt/*.js` and identify the asset containing
+the `html-to-image@1.11.11` diagnostic string `Error inlining remote css file`.
+Assert exactly one asynchronous asset contains it and no initial HTML or public
+declaration contains `html-to-image`.
+
+- [ ] **Step 2: Assert the production request timeline**
+
+Launch Chromium and register `page.on('request')` before navigation. Assert:
+
+1. initial navigation, hydration, and diagram render do not request the
+   identified asset;
+2. no `preload` or `modulepreload` link references it;
+3. opening the disclosure does not request it;
+4. choosing SVG downloads `mermaid-diagram.svg` without requesting it;
+5. the first PNG click shows `aria-busy="true"` and disabled state, requests
+   the asset, and downloads `mermaid-diagram.png`;
+6. a second PNG download succeeds while the asset request count remains one.
+
+Also run `pnpm prepack`, read `dist/types.d.mts`, and assert it contains no
+`html-to-image` string and exposes no PNG rasterizer subpath.
+
+- [ ] **Step 3: Run the production gate and commit**
+
+```bash
+python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/pngAsyncChunk.e2e.test.ts
+pnpm prepack
+git add test/fixtures/png-download-build test/pngAsyncChunk.e2e.test.ts
+git commit -m "test: verify lazy PNG production chunk"
+```
+
+Expected: the library is absent from the initial request graph and fetched once
+on the first PNG action.
+
+---
+
+### Task 6: Update user documentation, verify, and refresh the draft PR
 
 **Files:**
 - Modify: `website/content/4.configuration.md`
 - Modify: `website/content/5.advanced/3.interactions.md`
 - Modify: `website/content/zh/4.configuration.md`
 - Modify: `website/content/zh/5.advanced/3.interactions.md`
-- Delete: `docs/superpowers/plans/2026-08-19-svg-download-strategy-prototype.md`
-- Delete: `docs/superpowers/specs/2026-08-19-svg-download-strategy-prototype-design.md`
+- Modify: draft PR #113 title and body after all local gates pass
 
-- [ ] **Step 1: Update final user documentation**
+- [ ] **Step 1: Update English and Chinese documentation**
 
-Document the three label keys, disclosure behavior, snapshot-based SVG/PNG distinction, PNG transparency, and the keyboard contract. State that `htmlLabels: false` is the user-controlled way to obtain native SVG text and keeps visible/downloaded SVG structure aligned. Remove all faithful/portable terminology and forced-re-render claims.
+Document the three label keys, disclosure/keyboard behavior, committed-snapshot
+SVG/PNG distinction, transparent PNG behavior, first-use loading state, exact
+failure behavior for blocked webfonts, and lazy dependency loading. State that
+`htmlLabels: false` is the user-controlled way to obtain native SVG text.
 
 Use this Chinese example:
 
@@ -373,16 +591,7 @@ labels: {
 }
 ```
 
-- [ ] **Step 2: Remove obsolete prototype documents and commit**
-
-Delete only the two 2026-08-19 prototype documents listed above; retain the approved final design and this plan.
-
-```bash
-git add website/content/4.configuration.md website/content/5.advanced/3.interactions.md website/content/zh/4.configuration.md website/content/zh/5.advanced/3.interactions.md docs/superpowers/plans/2026-08-19-svg-download-strategy-prototype.md docs/superpowers/specs/2026-08-19-svg-download-strategy-prototype-design.md
-git commit -m "docs: explain SVG and PNG downloads"
-```
-
-- [ ] **Step 3: Run complete verification**
+- [ ] **Step 2: Run complete verification**
 
 ```bash
 pnpm lint --fix
@@ -392,11 +601,31 @@ pnpm test:package-contract
 pnpm dev:build
 pnpm --dir website test
 git diff --check
+if rg -n "Download faithful SVG|Download portable SVG|mermaid-diagram-faithful|mermaid-diagram-portable|renderDetachedMermaidSvg|downloadPortableSvg" src test website; then exit 1; fi
 git status --short
 ```
 
-Expected: every command exits 0; `git status --short` contains only the user's three untracked stress-test files; generated `dist` is not staged.
+Expected: every command exits 0; the final `rg` returns no obsolete
+implementation or user-facing terminology; `git status --short` retains the
+user's three untracked stress fixtures and does not stage generated `dist`.
 
-- [ ] **Step 4: Inspect scope and publish**
+- [ ] **Step 3: Commit documentation**
 
-Confirm the branch diff contains no dependency, server renderer, scale option, fallback, or unrelated playground change. Push `codex/issue-91-safe-svg-download`, keep PR #113 draft, and update its title/body to the final SVG/PNG contract, exact validation evidence, browser matrix, and `Closes #91` only after all gates pass.
+```bash
+git add website/content/4.configuration.md website/content/5.advanced/3.interactions.md website/content/zh/4.configuration.md website/content/zh/5.advanced/3.interactions.md
+git commit -m "docs: explain SVG and PNG downloads"
+```
+
+- [ ] **Step 4: Update the draft PR**
+
+Confirm the branch diff contains only the approved SVG/PNG feature, exact
+dependency, internal rasterizer, tests, and documentation. Push
+`codex/issue-91-safe-svg-download`, keep PR #113 draft, and replace its prototype
+title/body with:
+
+- the one-trigger SVG/PNG contract;
+- exact `html-to-image@1.11.11` ownership and lazy-loading behavior;
+- browser perceptual-diff and CORS evidence;
+- production async-chunk evidence;
+- complete verification commands;
+- `Closes #91` only after every gate passes.
