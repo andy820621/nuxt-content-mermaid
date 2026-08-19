@@ -8,6 +8,7 @@ import {
   addImports,
 } from '@nuxt/kit'
 import type { FileBeforeParseHook } from '@nuxt/content'
+import { relative } from 'node:path'
 import { ContentMermaidConfigurationError } from './runtime/configuration/core'
 import { resolveModuleConfiguration } from './runtime/configuration/module'
 import { transformMarkdownDiagrams } from './markdown-diagram-transform'
@@ -113,7 +114,19 @@ export default defineNuxtModule<ModuleOptions>({
 
     const resolver = createResolver(import.meta.url)
     const runtimeDir = resolver.resolve('./runtime')
+    const pngRasterizerPath = resolver.resolve(runtimeDir, 'png-rasterizer')
     const baseMermaidComponentName = 'Mermaid'
+
+    nuxt.hook('build:manifest', async (manifest) => {
+      const resolvedPngRasterizerPath = await resolver.resolvePath(pngRasterizerPath)
+      const manifestKey = relative(nuxt.options.rootDir, resolvedPngRasterizerPath)
+        .replaceAll('\\', '/')
+      const pngRasterizerEntry = manifest[manifestKey]
+
+      if (pngRasterizerEntry?.src === manifestKey && pngRasterizerEntry.isDynamicEntry) {
+        pngRasterizerEntry.prefetch = false
+      }
+    })
 
     nuxt.options.css ||= []
     nuxt.options.css.push(resolver.resolve('./runtime/styles.css'))
