@@ -79,6 +79,19 @@ describe('committed Mermaid SVG snapshot PNG browser contract', async () => {
         ['cors', corsFonts.origin],
       ] as const) {
         const page = await browser.newPage()
+        const unexpectedPageFailures: string[] = []
+        page.on('console', (message) => {
+          if (message.type() === 'warning' || message.type() === 'error')
+            unexpectedPageFailures.push(`console.${message.type()}: ${message.text()}`)
+        })
+        page.on('pageerror', (error) => {
+          unexpectedPageFailures.push(`pageerror: ${error.message}`)
+        })
+        page.on('requestfailed', (request) => {
+          unexpectedPageFailures.push(
+            `requestfailed: ${request.url()} (${request.failure()?.errorText ?? 'unknown error'})`,
+          )
+        })
         try {
           const target = new URL(url('/'))
           target.searchParams.set('font', mode)
@@ -123,6 +136,7 @@ describe('committed Mermaid SVG snapshot PNG browser contract', async () => {
               webfontReady: true,
               webfontApplied: true,
               repeatedOutputConsistent: true,
+              sourceSnapshotUnchanged: true,
             },
           })
           expect(result.features!.boldWeight).toBeGreaterThanOrEqual(600)
@@ -131,10 +145,50 @@ describe('committed Mermaid SVG snapshot PNG browser contract', async () => {
           for (const difference of result.repeatedOutputDifferences!) {
             expect(difference.ratio).toBeLessThan(MAX_REPEAT_DIFF_RATIO)
           }
+          expect(unexpectedPageFailures).toEqual([])
         }
         finally {
           await page.close()
         }
+      }
+
+      const importedStylesheetPage = await browser.newPage()
+      try {
+        const target = new URL(url('/'))
+        target.searchParams.set('font', 'readable-import')
+        await importedStylesheetPage.goto(target.href)
+        await importedStylesheetPage.waitForFunction(() => {
+          return document.querySelector('[data-testid="status"]')?.textContent?.trim() !== 'loading'
+        })
+        expect(await importedStylesheetPage.locator('[data-testid="status"]').textContent()).toContain('ready')
+
+        const readVisibleStyleState = () => importedStylesheetPage.evaluate(() => {
+          const host = document.querySelector<HTMLElement>('#snapshot-host')!
+          const stylesheet = Array.from(document.styleSheets)
+            .find(sheet => sheet.href?.endsWith('/fixture-import.css'))!
+          return {
+            cssRules: Array.from(stylesheet.cssRules, rule => rule.cssText),
+            guard: getComputedStyle(host).getPropertyValue('--ncm-import-guard').trim(),
+            svg: host.querySelector('svg')?.outerHTML,
+          }
+        })
+        const before = await readVisibleStyleState()
+        expect(before.guard).toBe('local')
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const result = await importedStylesheetPage.evaluate(async () => {
+            return window.__pngRasterizerFixture__!.run()
+          }) as GateResult
+          expect(result).toMatchObject({ success: false, outputCount: 0 })
+          expect(result.error).toContain(
+            '[nuxt-content-mermaid] CSS @import is not supported for PNG rasterization:',
+          )
+        }
+
+        expect(await readVisibleStyleState()).toEqual(before)
+      }
+      finally {
+        await importedStylesheetPage.close()
       }
 
       const blockedPage = await browser.newPage()

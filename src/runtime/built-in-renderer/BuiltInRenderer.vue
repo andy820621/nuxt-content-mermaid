@@ -127,6 +127,7 @@ const isLoading = ref(false)
 const hasError = ref(false)
 const errorContent = shallowRef<unknown | null>(null)
 const committedExportSnapshot = shallowRef<CommittedExportSnapshot | null>(null)
+const isCommittedOutputSvg = ref(false)
 const downloadDisclosureId = `ncm-download-${useId()}`
 const isDownloadDisclosureOpen = ref(false)
 const isPngDownloadPending = ref(false)
@@ -171,7 +172,9 @@ const toolbarFontSize = computed(() => {
 })
 const showCopyButton = computed(() => toolbarButtons.value.copy !== false)
 const canDownloadSvg = computed(() => {
-  return committedExportSnapshot.value !== null && componentSource.value.kind !== 'conflict'
+  return isCommittedOutputSvg.value
+    && committedExportSnapshot.value !== null
+    && componentSource.value.kind !== 'conflict'
 })
 const copySource = computed(() => decodedCode.value || mermaidDefinition.value || '')
 const hasCopySource = computed(() => !!copySource.value)
@@ -491,6 +494,7 @@ function handleDownloadEscape() {
 function handleDocumentPointerDown(event: PointerEvent) {
   const target = event.target
   if (isDownloadDisclosureOpen.value
+    && !isPngDownloadPending.value
     && target instanceof Node
     && !downloadRoot.value?.contains(target)) {
     closeDownloadDisclosure()
@@ -567,19 +571,20 @@ async function renderMermaid() {
     hasRenderedOnce.value = true
     const committedSvg = getMermaidSvg()
     const bounds = committedSvg?.getBoundingClientRect()
-    committedExportSnapshot.value
-      = committedSvg
-        && bounds
-        && Number.isFinite(bounds.width)
-        && bounds.width > 0
-        && Number.isFinite(bounds.height)
-        && bounds.height > 0
-        ? {
-            svg: committedSvg.cloneNode(true) as SVGSVGElement,
-            width: bounds.width,
-            height: bounds.height,
-          }
-        : null
+    const isValidSvgSnapshot = committedSvg
+      && bounds
+      && Number.isFinite(bounds.width)
+      && bounds.width > 0
+      && Number.isFinite(bounds.height)
+      && bounds.height > 0
+    isCommittedOutputSvg.value = Boolean(isValidSvgSnapshot)
+    if (isValidSvgSnapshot) {
+      committedExportSnapshot.value = {
+        svg: committedSvg.cloneNode(true) as SVGSVGElement,
+        width: bounds.width,
+        height: bounds.height,
+      }
+    }
   }
   else if (outcome.status === 'failure') {
     console.error('[nuxt-content-mermaid]', outcome.error)

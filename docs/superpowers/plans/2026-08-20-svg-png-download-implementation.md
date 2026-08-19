@@ -167,7 +167,10 @@ Cover these cases separately:
 
 - invalid, zero, infinite, or `NaN` dimensions reject before library calls;
 - `document.fonts.ready` settles before `getFontEmbedCSS()`;
-- an inaccessible `CSSStyleSheet.cssRules` getter rejects before `toBlob()`;
+- an inaccessible top-level or CSS-imported `CSSStyleSheet.cssRules` getter
+  rejects before `toBlob()`;
+- a readable CSS `@import` rejects before `getFontEmbedCSS()` can write imported
+  rules into the live stylesheet;
 - a font CSS result containing any non-`data:` `url(...)` rejects before
   `toBlob()` instead of allowing fallback;
 - the host passed to `getFontEmbedCSS()` retains the sanitized input's safe
@@ -193,7 +196,8 @@ Make `serializeSafeStandaloneSvg()` call `createSafeStandaloneSvgClone()` so
 SVG and PNG share exactly one sanitizer and namespace-normalization path.
 Assert that it creates one hidden anchor, uses the supplied filename, clicks
 once, removes the anchor, and revokes the object URL on the next task. Keep all
-existing SVG sanitizer and namespace assertions unchanged.
+existing SVG sanitizer and namespace assertions, and cover `srcset` and
+`xml:base` as URL-bearing attributes that must be removed.
 
 - [ ] **Step 3: Run RED**
 
@@ -215,9 +219,10 @@ Implement these internal phases in order:
 
 1. Validate dimensions.
 2. Await `input.svg.ownerDocument.fonts?.ready`.
-3. Read every `document.styleSheets[*].cssRules`; wrap a thrown
-   `SecurityError` in a package-prefixed rasterization error containing the
-   stylesheet URL.
+3. Read every `document.styleSheets[*].cssRules`; recursively validate an
+   imported stylesheet only to preserve a precise unreadable-stylesheet error,
+   then reject every CSS import before `getFontEmbedCSS()` can mutate live
+   CSSOM. Include the relevant stylesheet URL in either package-prefixed error.
 4. Clone the already sanitized input so rasterization cannot mutate the caller's
    safe snapshot.
 5. Append an inner capture node to a fixed off-screen staging host. Keep the
@@ -310,8 +315,9 @@ expect(await trigger.getAttribute('aria-expanded')).toBe('false')
 ```
 
 Also assert Space opening, PNG → SVG → trigger Shift+Tab behavior, Escape focus
-restoration, outside pointer closure without focus movement, and focus return
-after either format completes.
+restoration, outside pointer closure without focus movement, preservation of an
+open disclosure when PNG is pending, and focus return after either format
+completes.
 
 - [ ] **Step 3: Write failing lazy-load and loading-state tests**
 
@@ -423,14 +429,20 @@ coherence, and download behavior pass.
 
 **Interfaces:**
 - Consumes: the real `rasterizePngSnapshot()` and fixed sanitized Mermaid SVG
-  SHA-256 `c717f5d969335af8dccf16ff8cc011491f3317137f054597a438e6adfffea493`.
+  regression fixture SHA-256
+  `089c945440a4fe47776db4055ff344172f29b630b9f633036233f0865aa7e24c`.
 - Produces: one result per engine/resource mode with semantic gates, hashes, and
   adjacent perceptual pixel differences.
 
+The disposable bounded spike source remains independently pinned as
+`c717f5d969335af8dccf16ff8cc011491f3317137f054597a438e6adfffea493`
+in the research record. The checked-in production regression fixture is a
+separate pinned artifact with the same approved Mermaid feature inventory.
+
 - [ ] **Step 1: Commit the fixed regression fixture**
 
-Add the already sanitized committed SVG used by the bounded spike. Verify its
-SHA-256 before staging and keep these exact feature counts in the test:
+Add the fixed sanitized production regression fixture. Verify its SHA-256
+before staging and keep these exact feature counts in the test:
 
 ```ts
 expect(features).toEqual({
@@ -489,6 +501,10 @@ engine, run same-origin and anonymous-CORS modes and assert:
 
 Run the blocked mode in every engine and assert `success: false`, a stylesheet
 readability error, and no PNG blob/download.
+
+Run a readable same-origin `@import` mode in every engine and assert two
+consecutive attempts fail explicitly before output while stylesheet rules,
+computed style, and visible SVG markup remain exactly unchanged.
 
 - [ ] **Step 4: Run the browser gate and commit**
 

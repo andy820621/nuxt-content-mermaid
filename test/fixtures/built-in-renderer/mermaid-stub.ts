@@ -19,10 +19,17 @@ const control: MermaidControl = {
   },
 }
 
-function createLabelMarkup() {
-  return `<foreignObject>
+function createLabelMarkup(includeUnsafeResources = false) {
+  const foreignObjectAttributes = includeUnsafeResources
+    ? ' xml:base="https://example.invalid/assets/"'
+    : ''
+  const image = includeUnsafeResources
+    ? '<img srcset="label.png 1x, label@2x.png 2x" />'
+    : ''
+
+  return `<foreignObject${foreignObjectAttributes}>
     <div xmlns="http://www.w3.org/1999/xhtml">
-      <strong>foreign content</strong>
+      <strong>foreign content</strong>${image}
     </div>
   </foreignObject>`
 }
@@ -46,7 +53,7 @@ function createStrictSvg(id: number, source: string) {
     <use id="unsafe-use" href="data:image/svg+xml,unsafe"></use>
     <image id="external-image" href="https://example.invalid/image.svg"></image>
     <script>window.__unsafeSvgScript__ = true</script>
-    ${createLabelMarkup()}
+    ${createLabelMarkup(true)}
     <iframe src="javascript:alert(1)"></iframe>
     <object data="data:text/html,unsafe"></object>
     <embed src="https://example.invalid/plugin"></embed>

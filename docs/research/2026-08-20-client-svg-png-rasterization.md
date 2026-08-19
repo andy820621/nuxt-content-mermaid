@@ -7,7 +7,7 @@
 
 公開資料無法保證任何純前端套件在所有 Safari/WebKit 情境都可靠；但本專案針對固定 `html-to-image@1.11.11` 建立的 bounded spike，已在 Chromium、Firefox、WebKit 通過目前明確定義的產品輸入契約：只點陣化同一份 sanitized Mermaid SVG snapshot、不重新執行 Mermaid、不修改 Mermaid 設定，並保留 `foreignObject`、中文、多行、粗體、non-system webfont、透明背景與精確尺寸。
 
-這是**對已測 snapshot 與 gate 的實證**，不是對套件所有輸入的普遍保證。正式實作若採用，仍應固定精確版本、沿用相同失敗邊界，並把無法讀取的跨來源 stylesheet 視為明確錯誤，不能靜默輸出 fallback font。
+這是**對已測 snapshot 與 gate 的實證**，不是對套件所有輸入的普遍保證。正式實作若採用，仍應固定精確版本、沿用相同失敗邊界，並把無法讀取的跨來源 stylesheet 或 CSS `@import` 視為明確錯誤，不能靜默輸出 fallback font 或改寫 live CSSOM。
 
 `html-to-image@1.11.13` 仍不適用：同一最小 fixture 的既有 `foreignObject` 內容會消失，與上游 issue #520 的版本回報一致。因此本次證據只支持精確版本 `1.11.11`，不支持 semver range 或最新版。[issue #520](https://github.com/bubkoo/html-to-image/issues/520)、[latest release v1.11.13](https://github.com/bubkoo/html-to-image/releases/tag/v1.11.13)
 
@@ -22,6 +22,7 @@
 - same-origin 與 anonymous CORS 兩種字型情境都在 Chromium、Firefox、WebKit 各連續三次通過；每次都是精確 1445×477、四角 alpha 皆為 0，並成功內嵌四個 Noto Sans TC font data URL。
 - WebKit 第 1 次與後兩次的診斷 hash 不同，但兩組相鄰比較在 689,265 pixels 中都沒有任何像素的 channel delta 超過 8，因此符合 perceptual repeatability 契約。
 - blocked stylesheet 在三引擎都於載入階段明確回報失敗，且沒有建立 PNG output source；沒有靜默使用 fallback font。
+- Production correction 另確認 `html-to-image@1.11.11` 會以 `insertRule()` 將 `@import` 展開結果寫入 live stylesheet；因此正式 rasterizer 會在 library call 前明確拒絕 CSS `@import`。Chromium、Firefox、WebKit 的 readable same-origin import regression 都連續拒絕兩次，stylesheet rules、computed style 與 visible SVG markup 完全不變。[exact-version source](https://github.com/bubkoo/html-to-image/blob/v1.11.11/src/embed-webfonts.ts#L111-L143)
 - 沒有加入 retry、delay、browser branch、Mermaid rerender、設定修改或 fallback output。
 
 上述固定輸入、語意 gate、逐引擎結果與停止條件是本次 bounded spike 的持久研究紀錄。依此證據，production spec/plan 已決定精確採用 `1.11.11`；bounded spike 本身沒有修改 production code 或正式依賴。
@@ -151,7 +152,7 @@ PNG canvas 應保持未填色；只有 SVG snapshot 自己存在背景形狀時�
 1. 精確固定 `html-to-image@1.11.11`，輸入既有 sanitized SVG snapshot；不改 Mermaid 設定、不呼叫 Mermaid、不接受 semver range。
 2. hash 僅供診斷；repeated-output 使用目前核准的 perceptual pixel diff 契約。
 3. 保留尺寸、透明度、內容、`foreignObject` 與 webfont gate；無法讀取或內嵌必要字型時必須中止下載並回報錯誤。
-4. 跨來源 stylesheet/font 只接受 anonymous CORS；blocked resource 不可靜默 fallback。
+4. 跨來源 stylesheet/font 只接受 anonymous CORS；blocked resource 不可靜默 fallback。CSS `@import` 一律在 library call 前明確中止，以避免 pinned 版本改寫 live CSSOM。
 5. 不加入 browser-specific retry、delay、重畫、魔術 timeout 或替代輸出。
 
 本次仍未驗證站點 CSP、任意外部圖片、script-created `FontFace`、system/local font bytes 或所有 Mermaid diagram 類型；除非另立需求，不應把這些擴入目前 PR。

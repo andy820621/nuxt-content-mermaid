@@ -107,7 +107,9 @@ work.
 
 Both export paths sanitize a fresh clone through the existing standalone SVG
 sanitizer. Sanitization must not mutate either the stored snapshot or the
-visible diagram.
+visible diagram. URL-bearing attributes include `srcset` and `xml:base`; they
+must not preserve an external fetch or change the base of an otherwise local
+fragment reference.
 
 ## SVG export
 
@@ -127,7 +129,9 @@ and performs no Mermaid call:
 2. Await `document.fonts.ready` when the Font Loading API is available.
 3. Fail closed if a stylesheet needed by the document cannot expose `cssRules`.
    Same-origin stylesheets and cross-origin stylesheets loaded with anonymous
-   CORS are accepted; an opaque or blocked stylesheet aborts PNG export.
+   CORS are accepted; an opaque or blocked stylesheet aborts PNG export. A CSS
+   `@import` also aborts before `html-to-image`, even when readable, because the
+   pinned version expands imports by inserting rules into the live stylesheet.
 4. Mount an inner capture node inside a fixed, off-screen staging host. The
    staging host owns the off-screen position and negative z-index; the capture
    node stays at its local origin, owns the exact committed width and height,
@@ -143,9 +147,9 @@ and performs no Mermaid call:
    in `finally` paths.
 
 Only one PNG conversion runs per diagram at a time. An inaccessible stylesheet,
-font embedding failure, null blob, invalid size, or rasterization error must
-produce one package-prefixed error and no download. It must never emit a PNG
-that silently substitutes fallback fonts.
+CSS `@import`, font embedding failure, null blob, invalid size, or rasterization
+error must produce one package-prefixed error and no download. It must never
+emit a PNG that silently substitutes fallback fonts or mutate the live CSSOM.
 
 ## Lazy-loading and pending state
 
@@ -187,7 +191,8 @@ content in natural DOM order; the implementation must not use `role="menu"` or
   trigger.
 - Activating PNG shows its pending state; completion or explicit failure closes
   the disclosure and focuses the trigger.
-- A pointer click outside closes the disclosure without forcing focus.
+- A pointer click outside closes the disclosure without forcing focus, except
+  while PNG work is pending and the disclosure must remain open.
 
 The disclosure remains closed and the trigger remains disabled until a valid
 built-in SVG snapshot exists. Losing export eligibility closes an open
@@ -217,6 +222,11 @@ be strictly less than `0.0001` (0.01%).
 The negative fixture uses an unreadable cross-origin stylesheet. Chromium,
 Firefox, and WebKit must all reject it explicitly before producing a PNG, and
 the test must prove that no output blob or download was created.
+
+A second negative fixture uses a readable same-origin CSS `@import`. Every
+engine must reject two consecutive attempts before calling the rasterizer
+library, while preserving the exact live stylesheet rules, computed style, and
+visible SVG markup.
 
 ## Production build contract
 

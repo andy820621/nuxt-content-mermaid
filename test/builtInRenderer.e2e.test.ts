@@ -133,7 +133,7 @@ async function readLatestSvgDownload(page: BrowserPage) {
       unsafeResourceAttributes: elements.flatMap(element => Array.from(element.attributes))
         .filter((attribute) => {
           const name = attribute.name.toLowerCase()
-          if (!['href', 'xlink:href', 'src', 'data'].includes(name)) return false
+          if (!['href', 'xlink:href', 'src', 'srcset', 'data', 'xml:base'].includes(name)) return false
           return !attribute.value.trim().startsWith('#')
         }).length,
       safeStyleCount: Array.from(document.querySelectorAll('style'))
@@ -303,6 +303,9 @@ describe('built-in renderer integration', async () => {
     expect(await pngButton.isDisabled()).toBe(true)
     expect(await pngButton.getAttribute('aria-busy')).toBe('true')
     expect(await pngButton.locator('.ncm-download-spinner').count()).toBe(1)
+    await page.locator('#primary-queue').dispatchEvent('pointerdown')
+    expect(await trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(await pngButton.getAttribute('aria-busy')).toBe('true')
     await pngButton.evaluate((button: HTMLButtonElement) => button.click())
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__htmlToImageControl__?.calls
@@ -383,6 +386,23 @@ describe('built-in renderer integration', async () => {
     expect(await readFile(downloadPath!, 'utf8')).toMatch(
       /^<svg[^>]*data-run-id="1"[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/,
     )
+  })
+
+  it('keeps the last SVG snapshot while a sandbox commit becomes ineligible', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    const downloadButton = page.locator('#primary [aria-label="Download diagram"]')
+    expect(await downloadButton.isEnabled()).toBe(true)
+
+    await page.locator('#primary-sandbox').click()
+    await waitForRuns(page, 2)
+    expect(await downloadButton.isEnabled()).toBe(true)
+
+    await releaseNext(page)
+    await page.locator('#primary .mermaid > iframe[data-run-id="2"]')
+      .waitFor({ state: 'visible', timeout: 5000 })
+    expect(await downloadButton.isDisabled()).toBe(true)
   })
 
   it('sanitizes a detached clone without changing the visible diagram', { timeout: 20000 }, async () => {

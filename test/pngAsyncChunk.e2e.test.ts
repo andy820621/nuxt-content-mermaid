@@ -14,6 +14,11 @@ const fixtureDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/pn
 const HTML_TO_IMAGE_MARKER = 'Error inlining remote css file'
 const CONTROL_PREFETCH_MARKER = 'nuxt-content-mermaid-control-prefetch'
 
+function findResourceHint(html: string, asset: string) {
+  return html.match(/<link\b[^>]*>/g)
+    ?.find(tag => tag.includes(asset))
+}
+
 describe('PNG production async chunk', async () => {
   await setup({
     rootDir: fixtureDir,
@@ -41,7 +46,9 @@ describe('PNG production async chunk', async () => {
     const controlAsset = controlAssets[0]!
     const initialHtml = await $fetch<string>('/')
     expect(initialHtml).not.toContain(htmlToImageAsset)
-    expect(initialHtml).toContain(controlAsset)
+    expect(findResourceHint(initialHtml, controlAsset)).toMatch(
+      /\brel=(?:"prefetch"|'prefetch')/,
+    )
 
     const requestedAssets: string[] = []
     const page = await createPage()

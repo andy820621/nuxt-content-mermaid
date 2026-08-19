@@ -15,18 +15,41 @@ function validateDimensions(width: number, height: number) {
   }
 }
 
-function assertStylesheetsReadable(document: Document) {
-  for (const stylesheet of Array.from(document.styleSheets)) {
-    try {
-      void stylesheet.cssRules
-    }
-    catch (cause) {
-      throw new Error(
-        `${ERROR_PREFIX} Cannot read stylesheet for PNG rasterization: ${stylesheet.href ?? '<inline stylesheet>'}`,
-        { cause },
-      )
-    }
+function readStylesheetRules(stylesheet: CSSStyleSheet) {
+  try {
+    return stylesheet.cssRules
   }
+  catch (cause) {
+    throw new Error(
+      `${ERROR_PREFIX} Cannot read stylesheet for PNG rasterization: ${stylesheet.href ?? '<inline stylesheet>'}`,
+      { cause },
+    )
+  }
+}
+
+function assertStylesheetReadable(
+  stylesheet: CSSStyleSheet,
+  visited: Set<CSSStyleSheet>,
+) {
+  if (visited.has(stylesheet)) return
+  visited.add(stylesheet)
+
+  for (const rule of Array.from(readStylesheetRules(stylesheet))) {
+    if (!('styleSheet' in rule)) continue
+    const importRule = rule as CSSImportRule
+    const importedStylesheet = importRule.styleSheet
+    if (importedStylesheet)
+      assertStylesheetReadable(importedStylesheet, visited)
+    throw new Error(
+      `${ERROR_PREFIX} CSS @import is not supported for PNG rasterization: ${importRule.href || importedStylesheet?.href || stylesheet.href || '<inline stylesheet>'}`,
+    )
+  }
+}
+
+function assertStylesheetsReadable(document: Document) {
+  const visited = new Set<CSSStyleSheet>()
+  for (const stylesheet of Array.from(document.styleSheets))
+    assertStylesheetReadable(stylesheet, visited)
 }
 
 function extractCssUrls(css: string): string[] | null {

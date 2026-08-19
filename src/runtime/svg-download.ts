@@ -7,10 +7,12 @@ const RESOURCE_ATTRIBUTES = new Set([
   'href',
   'xlink:href',
   'src',
+  'srcset',
   'data',
   'poster',
   'action',
   'formaction',
+  'xml:base',
 ])
 
 export const SVG_DOWNLOAD_FILENAME = 'mermaid-diagram.svg'

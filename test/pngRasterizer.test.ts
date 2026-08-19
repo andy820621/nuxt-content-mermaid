@@ -153,6 +153,51 @@ describe('PNG snapshot rasterizer', () => {
     expect(htmlToImage.toBlob).not.toHaveBeenCalled()
   })
 
+  it('fails before rasterization when an imported stylesheet is not readable', async () => {
+    const blockedImport = {
+      href: 'https://fonts.example.test/imported-fonts.css',
+      get cssRules() {
+        throw new DOMException('Blocked', 'SecurityError')
+      },
+    } as unknown as CSSStyleSheet
+    const readableParent = {
+      href: 'https://app.example.test/fonts.css',
+      cssRules: [{ styleSheet: blockedImport }],
+    } as unknown as CSSStyleSheet
+    const document = createDocument({ styleSheets: [readableParent] })
+    const { source } = createSvg(document)
+
+    await expect(rasterizePngSnapshot({ svg: source, width: 1445, height: 477 }))
+      .rejects.toThrow(
+        '[nuxt-content-mermaid] Cannot read stylesheet for PNG rasterization: https://fonts.example.test/imported-fonts.css',
+      )
+    expect(htmlToImage.getFontEmbedCSS).not.toHaveBeenCalled()
+    expect(htmlToImage.toBlob).not.toHaveBeenCalled()
+  })
+
+  it('fails before html-to-image can mutate a readable imported stylesheet', async () => {
+    const readableImport = {
+      href: 'https://app.example.test/imported-fonts.css',
+      cssRules: [],
+    } as unknown as CSSStyleSheet
+    const readableParent = {
+      href: 'https://app.example.test/fonts.css',
+      cssRules: [{
+        href: readableImport.href,
+        styleSheet: readableImport,
+      }],
+    } as unknown as CSSStyleSheet
+    const document = createDocument({ styleSheets: [readableParent] })
+    const { source } = createSvg(document)
+
+    await expect(rasterizePngSnapshot({ svg: source, width: 1445, height: 477 }))
+      .rejects.toThrow(
+        '[nuxt-content-mermaid] CSS @import is not supported for PNG rasterization: https://app.example.test/imported-fonts.css',
+      )
+    expect(htmlToImage.getFontEmbedCSS).not.toHaveBeenCalled()
+    expect(htmlToImage.toBlob).not.toHaveBeenCalled()
+  })
+
   it('fails before rasterization when font CSS retains a non-data URL', async () => {
     const document = createDocument()
     const { source } = createSvg(document)

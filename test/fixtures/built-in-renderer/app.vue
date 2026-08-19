@@ -20,6 +20,7 @@ declare const queryCollection: (collection: 'content') => {
 
 const primaryVersion = ref(0)
 const primaryCode = ref('graph TD;INITIAL-->DONE')
+const primaryConfig = shallowRef<MermaidConfig>()
 const blockerVersion = ref(0)
 const showBlocker = ref(false)
 const skippedCode = ref('graph TD;SKIPPED-->DONE')
@@ -111,6 +112,10 @@ function recoverPrimary() {
 
 function renderUnsafePrimary() {
   primaryCode.value = 'graph TD;__UNSAFE__-->DONE'
+}
+
+function renderSandboxPrimary() {
+  primaryConfig.value = { securityLevel: 'sandbox' }
 }
 
 function queuePrimary() {
@@ -245,6 +250,13 @@ function reenterReactiveConflict() {
         @click="renderUnsafePrimary"
       >
         Render unsafe primary
+      </button>
+      <button
+        id="primary-sandbox"
+        type="button"
+        @click="renderSandboxPrimary"
+      >
+        Render sandbox primary
       </button>
       <button
         id="primary-queue"
@@ -403,7 +415,10 @@ function reenterReactiveConflict() {
     </div>
 
     <section id="primary">
-      <Mermaid :code="encodedPrimary" />
+      <Mermaid
+        :code="encodedPrimary"
+        :config="primaryConfig"
+      />
     </section>
 
     <section

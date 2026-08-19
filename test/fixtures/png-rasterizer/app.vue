@@ -52,6 +52,7 @@ interface RasterizationResult {
     webfontReady: boolean
     webfontApplied: boolean
     repeatedOutputConsistent: boolean
+    sourceSnapshotUnchanged: boolean
   }
   diagnostics?: {
     opaqueRatio: number
@@ -77,6 +78,7 @@ const MAX_REPEAT_DIFF_RATIO = 0.0001
 
 function stylesheetUrl(mode: string, fontBase: string) {
   if (mode === 'same-origin') return '/fixture-fonts.css'
+  if (mode === 'readable-import') return '/fixture-import.css'
   if (mode === 'cors' || mode === 'blocked-stylesheet') {
     return `${fontBase}/fixture-fonts.css`
   }
@@ -297,6 +299,7 @@ onMounted(async () => {
       async run() {
         let outputCount = 0
         try {
+          const sourceSnapshot = svg.outerHTML
           const hostRect = host.getBoundingClientRect()
           const featureRegions = features.featureIndices.map((index) => {
             const rect = features.foreignObjects[index]!.getBoundingClientRect()
@@ -367,6 +370,7 @@ onMounted(async () => {
             webfontApplied: fontDifference.ratio > 0.001,
             repeatedOutputConsistent: repeatedOutputDifferences
               .every(difference => difference.ratio < MAX_REPEAT_DIFF_RATIO),
+            sourceSnapshotUnchanged: svg.outerHTML === sourceSnapshot,
           }
 
           return {
