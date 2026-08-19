@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createPage, setup, url } from '@nuxt/test-utils/e2e'
@@ -9,6 +10,10 @@ import type { DiagnosticWindow } from './helpers/diagnosticCapture'
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/built-in-renderer')
 
 type BrowserPage = Awaited<ReturnType<typeof createPage>>
+
+interface SvgDownloadCaptureWindow extends Window {
+  __svgDownloads__?: Array<{ type: string, text: string }>
+}
 
 async function waitForPending(page: BrowserPage, expected: number) {
   await page.waitForFunction((count: number) => {
@@ -66,6 +71,71 @@ async function installFullscreenStub(page: BrowserPage) {
   })
 }
 
+async function installSvgDownloadCapture(page: BrowserPage) {
+  await page.addInitScript(() => {
+    const captureWindow = window as SvgDownloadCaptureWindow
+    captureWindow.__svgDownloads__ = []
+    const createObjectUrl = URL.createObjectURL.bind(URL)
+    URL.createObjectURL = (object: Blob | MediaSource) => {
+      if (object instanceof Blob) {
+        void object.text().then((text) => {
+          captureWindow.__svgDownloads__?.push({ type: object.type, text })
+        })
+      }
+      return createObjectUrl(object)
+    }
+  })
+}
+
+async function waitForSvgDownloadCount(page: BrowserPage, expected: number) {
+  await page.waitForFunction((count: number) => {
+    return (window as SvgDownloadCaptureWindow).__svgDownloads__?.length === count
+  }, expected, { timeout: 5000 })
+}
+
+async function readLatestSvgDownload(page: BrowserPage) {
+  await waitForSvgDownloadCount(page, 1)
+
+  return page.evaluate(() => {
+    const capture = (window as SvgDownloadCaptureWindow).__svgDownloads__?.[0]
+    if (!capture) return null
+
+    const document = new DOMParser().parseFromString(capture.text, 'image/svg+xml')
+    const elements = Array.from(document.querySelectorAll('*'))
+    return {
+      type: capture.type,
+      text: capture.text,
+      namespace: document.documentElement.namespaceURI,
+      blockedElements: document.querySelectorAll('script, foreignObject, iframe, object, embed').length,
+      anchors: document.querySelectorAll('a').length,
+      eventAttributes: elements.flatMap(element => Array.from(element.attributes))
+        .filter(attribute => attribute.name.toLowerCase().startsWith('on')).length,
+      unsafeResourceAttributes: elements.flatMap(element => Array.from(element.attributes))
+        .filter((attribute) => {
+          const name = attribute.name.toLowerCase()
+          if (!['href', 'xlink:href', 'src', 'data'].includes(name)) return false
+          return !attribute.value.trim().startsWith('#')
+        }).length,
+      safeStyleCount: Array.from(document.querySelectorAll('style'))
+        .filter(element => element.textContent?.includes('.safe')).length,
+      unsafeStyleCount: Array.from(document.querySelectorAll('style'))
+        .filter(element => element.textContent?.includes('@import')).length,
+      linkLabelPreserved: document.querySelector('#link-label')?.textContent,
+      safePaint: document.querySelector('#safe-paint')?.getAttribute('fill'),
+      safeUse: document.querySelector('#safe-use')?.getAttribute('href'),
+    }
+  })
+}
+
+async function downloadSvgText(page: BrowserPage, selector: string) {
+  const downloadPromise = page.waitForEvent('download')
+  await page.locator(selector).click()
+  const download = await downloadPromise
+  const downloadPath = await download.path()
+  if (!downloadPath) throw new Error('Expected the SVG download to have a local path')
+  return readFile(downloadPath, 'utf8')
+}
+
 async function renderInitialDiagram(page: BrowserPage) {
   await page.goto(url('/'))
   await page.getByTestId('built-in-spinner').waitFor({ state: 'visible', timeout: 5000 })
@@ -102,6 +172,119 @@ describe('built-in renderer integration', async () => {
       'attempt:duration',
       'queue:finish',
     ]))
+  })
+
+  it('downloads the latest committed strict SVG and stays disabled before the first commit', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await page.goto(url('/'))
+
+    const downloadButton = page.locator('#primary [aria-label="Download SVG"]')
+    expect(await downloadButton.count()).toBe(1)
+    expect(await downloadButton.isDisabled()).toBe(true)
+
+    await waitForPending(page, 1)
+    await releaseNext(page)
+    await page.locator('#primary svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await downloadButton.isEnabled()).toBe(true)
+
+    const downloadPromise = page.waitForEvent('download')
+    await downloadButton.click()
+    const download = await downloadPromise
+    const downloadPath = await download.path()
+
+    expect(download.suggestedFilename()).toBe('mermaid-diagram.svg')
+    expect(downloadPath).not.toBeNull()
+    expect(await readFile(downloadPath!, 'utf8')).toMatch(
+      /^<svg[^>]*data-run-id="1"[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/,
+    )
+  })
+
+  it('sanitizes a detached clone without changing the visible diagram', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installSvgDownloadCapture(page)
+    await renderInitialDiagram(page)
+
+    await page.locator('#primary-unsafe').click()
+    await waitForRuns(page, 2)
+    await releaseNext(page)
+    const visibleSvg = page.locator('#primary svg[data-run-id="2"]')
+    await visibleSvg.waitFor({ state: 'visible', timeout: 5000 })
+
+    expect(await visibleSvg.locator('script, foreignObject, iframe, object, embed').count()).toBe(4)
+    expect(await visibleSvg.getAttribute('onclick')).toBe('alert(1)')
+
+    await page.locator('#primary [aria-label="Download SVG"]').click()
+    const capture = await readLatestSvgDownload(page)
+
+    expect(capture).toMatchObject({
+      type: 'image/svg+xml;charset=utf-8',
+      namespace: 'http://www.w3.org/2000/svg',
+      blockedElements: 0,
+      anchors: 0,
+      eventAttributes: 0,
+      unsafeResourceAttributes: 0,
+      safeStyleCount: 1,
+      unsafeStyleCount: 0,
+      linkLabelPreserved: 'Link label',
+      safePaint: 'url(#paint)',
+      safeUse: '#safe-shape',
+    })
+    expect(capture?.text).toContain('data-run-id="2"')
+
+    expect(await visibleSvg.locator('script, foreignObject, iframe, object, embed').count()).toBe(4)
+    expect(await visibleSvg.getAttribute('onclick')).toBe('alert(1)')
+  })
+
+  it('does not change copy, expand, fullscreen, or zoom state while downloading', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installSvgDownloadCapture(page)
+    await installFullscreenStub(page)
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async () => undefined },
+      })
+    })
+    await renderInitialDiagram(page)
+
+    await page.locator('#primary [aria-label="Copy"]').click()
+    const copiedButton = page.locator('#primary [aria-label="Copied"]')
+    await copiedButton.waitFor({ state: 'visible', timeout: 5000 })
+
+    await page.locator('#primary [aria-label="Expand diagram"]').click()
+    const expandModal = page.locator('.ncm-expand-modal')
+    await expandModal.waitFor({ state: 'visible', timeout: 5000 })
+    const overlayZoomInfo = page.locator('.ncm-zoom-toolbar--overlay .ncm-zoom-info')
+    const initialOverlayZoom = await overlayZoomInfo.textContent()
+    await page.locator('.ncm-zoom-toolbar--overlay [aria-label="Zoom In"]').click()
+    await page.waitForFunction((initial: string | null) => {
+      return document.querySelector('.ncm-zoom-toolbar--overlay .ncm-zoom-info')?.textContent !== initial
+    }, initialOverlayZoom, { timeout: 5000 })
+    const zoomedOverlayValue = await overlayZoomInfo.textContent()
+
+    await page.locator('#primary [aria-label="Download SVG"]').evaluate((button: HTMLButtonElement) => button.click())
+    await waitForSvgDownloadCount(page, 1)
+    await expandModal.waitFor({ state: 'visible', timeout: 5000 })
+    expect(await overlayZoomInfo.textContent()).toBe(zoomedOverlayValue)
+    expect(await copiedButton.count()).toBe(1)
+
+    await page.getByLabel('Minimize diagram').click()
+    await expandModal.waitFor({ state: 'detached', timeout: 5000 })
+    await page.locator('#primary [aria-label="Enter fullscreen"]').click()
+    const fullscreenZoomInfo = page.locator('#primary .ncm-zoom-toolbar--fullscreen .ncm-zoom-info')
+    await fullscreenZoomInfo.waitFor({ state: 'visible', timeout: 5000 })
+    const initialFullscreenZoom = await fullscreenZoomInfo.textContent()
+    await page.locator('#primary .ncm-zoom-toolbar--fullscreen [aria-label="Zoom In"]').click()
+    await page.waitForFunction((initial: string | null) => {
+      return document.querySelector('#primary .ncm-zoom-toolbar--fullscreen .ncm-zoom-info')?.textContent !== initial
+    }, initialFullscreenZoom, { timeout: 5000 })
+    const zoomedFullscreenValue = await fullscreenZoomInfo.textContent()
+
+    await page.locator('#primary [aria-label="Download SVG"]').evaluate((button: HTMLButtonElement) => button.click())
+    await waitForSvgDownloadCount(page, 2)
+    expect(await fullscreenZoomInfo.textContent()).toBe(zoomedFullscreenValue)
+    expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
+    expect(await copiedButton.count()).toBe(1)
   })
 
   it('materializes a fresh Mermaid configuration for every render attempt', { timeout: 20000 }, async () => {
@@ -290,9 +473,12 @@ describe('built-in renderer integration', async () => {
   it('reports once per reactive conflict episode and recovers exactly once with the latest state', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialReactiveConflictDiagram(page)
+    const downloadButton = page.locator('#reactive-conflict [aria-label="Download SVG"]')
+    expect(await downloadButton.isEnabled()).toBe(true)
 
     await page.locator('#reactive-conflict-enter').click()
     await waitForComponentErrors(page, 1)
+    expect(await downloadButton.isDisabled()).toBe(true)
     const fingerprint = page.locator('#component-error')
     expect(await fingerprint.getAttribute('data-name')).toBe('MermaidComponentConfigurationError')
     expect(await fingerprint.getAttribute('data-code')).toBe('CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR')
@@ -308,6 +494,7 @@ describe('built-in renderer integration', async () => {
 
     await page.locator('#reactive-conflict-recover').click()
     await waitForRuns(page, 3)
+    expect(await downloadButton.isEnabled()).toBe(true)
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
     })).toEqual(expect.objectContaining({
@@ -322,6 +509,7 @@ describe('built-in renderer integration', async () => {
 
     await page.locator('#reactive-conflict-reenter').click()
     await waitForComponentErrors(page, 2)
+    expect(await downloadButton.isDisabled()).toBe(true)
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs.length
     })).toBe(3)
@@ -391,6 +579,8 @@ describe('built-in renderer integration', async () => {
     const page = await createPage()
     await installDiagnosticCapture(page)
     await renderInitialDiagram(page)
+    const downloadSelector = '#primary [aria-label="Download SVG"]'
+    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="1"')
 
     await page.locator('#primary-fail').click()
     await waitForRuns(page, 2)
@@ -401,6 +591,7 @@ describe('built-in renderer integration', async () => {
     expect(await error.getAttribute('data-same-error')).toBe('true')
     expect(await page.getByTestId('built-in-error-message').textContent()).toBe('Broken diagram')
     expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
+    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="1"')
 
     await page.locator('#primary-recover').click()
     await waitForRuns(page, 3)
@@ -412,10 +603,12 @@ describe('built-in renderer integration', async () => {
     await waitForPending(page, 1)
     expect(await error.isVisible()).toBe(true)
     expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
+    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="1"')
 
     await releaseNext(page)
     await error.waitFor({ state: 'detached', timeout: 5000 })
     await page.locator('#primary svg[data-run-id="4"]').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="4"')
   })
 
   it('skips a queued request whose latest source is empty', { timeout: 20000 }, async () => {
@@ -446,17 +639,30 @@ describe('built-in renderer integration', async () => {
 
   it('commits strict SVG and sandbox iframe output from cleaned staging hosts', { timeout: 20000 }, async () => {
     const page = await createPage()
+    await installSvgDownloadCapture(page)
     await renderInitialDiagram(page)
 
     await page.locator('#strict-mount').click()
     await waitForRuns(page, 2)
     await releaseNext(page)
     await page.locator('#strict .mermaid > svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+    const strictDownloadButton = page.locator('#strict [aria-label="Download SVG"]')
+    expect(await strictDownloadButton.isEnabled()).toBe(true)
+    await strictDownloadButton.click()
+    await readLatestSvgDownload(page)
 
     await page.locator('#sandbox-mount').click()
     await waitForRuns(page, 3)
+    const sandboxDownloadButton = page.locator('#sandbox [aria-label="Download SVG"]')
+    expect(await sandboxDownloadButton.isDisabled()).toBe(true)
     await releaseNext(page)
     await page.locator('#sandbox .mermaid > iframe[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await sandboxDownloadButton.isDisabled()).toBe(true)
+    await sandboxDownloadButton.evaluate((button: HTMLButtonElement) => button.click())
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0)))
+    expect(await page.evaluate(() => {
+      return (window as SvgDownloadCaptureWindow).__svgDownloads__?.length
+    })).toBe(1)
 
     const staging = await page.evaluate(() => {
       const control = (window as MermaidTestWindow).__mermaidControl__

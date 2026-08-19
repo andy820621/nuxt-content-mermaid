@@ -18,6 +18,7 @@ import type { MermaidComponentSource } from '../component-configuration'
 import { materializeMermaidConfigForInvocation, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
+import { downloadStandaloneSvg } from '../svg-download'
 import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
@@ -32,6 +33,7 @@ import type { MermaidToolbarLabels, MermaidToolbarOptions } from '../../types/me
 import type { MermaidComponentProps } from '../../types/config'
 import IconExpand from '../components/icons/IconExpand.vue'
 import IconCollapse from '../components/icons/IconCollapse.vue'
+import IconDownload from '../components/icons/IconDownload.vue'
 import MermaidFullscreenPresentation from '../components/MermaidFullscreenPresentation.vue'
 import { DEFAULT_TOOLBAR_LABELS } from '../constants'
 
@@ -100,6 +102,7 @@ const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
 const hasError = ref(false)
 const errorContent = shallowRef<unknown | null>(null)
+const downloadableSvg = shallowRef<SVGSVGElement | null>(null)
 
 const decodedCode = computed(() => props.code ? decodeURIComponent(props.code) : '')
 // Holds the mermaid definition - defaults to decoded prop, falls back to DOM extraction for direct component usage
@@ -140,6 +143,9 @@ const toolbarFontSize = computed(() => {
   return defaultToolbarFontSize
 })
 const showCopyButton = computed(() => toolbarButtons.value.copy !== false)
+const canDownloadSvg = computed(() => {
+  return downloadableSvg.value !== null && componentSource.value.kind !== 'conflict'
+})
 const copySource = computed(() => decodedCode.value || mermaidDefinition.value || '')
 const hasCopySource = computed(() => !!copySource.value)
 
@@ -415,6 +421,11 @@ function getMermaidSvg(): SVGSVGElement | null {
   return svg instanceof SVGSVGElement ? svg : null
 }
 
+function downloadLatestSvg() {
+  if (!canDownloadSvg.value || !downloadableSvg.value) return
+  downloadStandaloneSvg(downloadableSvg.value)
+}
+
 function getMermaidViewport(): HTMLDivElement | null {
   return mermaidWrapper.value
 }
@@ -442,6 +453,10 @@ async function renderMermaid() {
 
   if (outcome.status === 'success') {
     hasRenderedOnce.value = true
+    const committedSvg = getMermaidSvg()
+    downloadableSvg.value = committedSvg
+      ? committedSvg.cloneNode(true) as SVGSVGElement
+      : null
   }
   else if (outcome.status === 'failure') {
     console.error('[nuxt-content-mermaid]', outcome.error)
@@ -604,6 +619,16 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
             :is="copyIcon"
             :size="iconSize"
           />
+        </button>
+        <button
+          type="button"
+          class="mermaid-btn"
+          :title="toolbarLabels.downloadSvg"
+          :aria-label="toolbarLabels.downloadSvg"
+          :disabled="!canDownloadSvg"
+          @click="downloadLatestSvg"
+        >
+          <IconDownload :size="iconSize" />
         </button>
         <button
           v-if="showExpandToolbarButton"

@@ -109,6 +109,10 @@ function recoverPrimary() {
   primaryCode.value = 'graph TD;RECOVERED-->DONE'
 }
 
+function renderUnsafePrimary() {
+  primaryCode.value = 'graph TD;__UNSAFE__-->DONE'
+}
+
 function queuePrimary() {
   primaryVersion.value++
   primaryCode.value = `graph TD;QUEUED_${primaryVersion.value}-->DONE`
@@ -234,6 +238,13 @@ function reenterReactiveConflict() {
         @click="recoverPrimary"
       >
         Recover primary
+      </button>
+      <button
+        id="primary-unsafe"
+        type="button"
+        @click="renderUnsafePrimary"
+      >
+        Render unsafe primary
       </button>
       <button
         id="primary-queue"
