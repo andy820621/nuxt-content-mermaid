@@ -2,12 +2,14 @@
 import { watch } from 'vue'
 import { useMermaidFullscreen } from '../composables/useMermaidFullscreen'
 import MermaidZoomToolbar from './MermaidZoomToolbar.vue'
+import type { MermaidToolbarLabels } from '../../types/mermaid'
 
 const props = defineProps<{
   fullscreenTarget: HTMLElement | null
   viewportTarget: HTMLElement | null
   renderTarget: HTMLElement | null
   iconSize?: number
+  labels: Required<MermaidToolbarLabels>
 }>()
 
 const emit = defineEmits<{
@@ -43,6 +45,7 @@ defineExpose({ toggle, endForDiagramReplacement })
     variant="fullscreen"
     :scale="scale"
     :icon-size="iconSize"
+    :labels="labels"
     @zoom-out="zoomOut"
     @zoom-in="zoomIn"
     @reset="resetZoom"

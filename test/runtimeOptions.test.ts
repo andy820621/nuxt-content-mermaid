@@ -17,13 +17,30 @@ describe('runtime options snapshot resolver', () => {
         },
       },
       expand: { enabled: true },
-      toolbar: { title: 'mermaid' },
+      toolbar: {
+        title: 'mermaid',
+        labels: {
+          copy: 'Copy',
+          copied: 'Copied',
+          copyFailed: 'Copy failed',
+          expand: 'Expand diagram',
+          collapse: 'Collapse diagram',
+          minimize: 'Minimize diagram',
+          enterFullscreen: 'Enter fullscreen',
+          exitFullscreen: 'Exit fullscreen',
+          zoomIn: 'Zoom In',
+          zoomOut: 'Zoom Out',
+          resetZoom: 'Reset Zoom',
+          downloadSvg: 'Download SVG',
+        },
+      },
     })
     expect(Object.isFrozen(snapshot)).toBe(true)
     expect(Object.isFrozen(snapshot.loader)).toBe(true)
     expect(Object.isFrozen(snapshot.loader?.init)).toBe(true)
     expect(Object.isFrozen(snapshot.expand)).toBe(true)
     expect(Object.isFrozen(snapshot.toolbar)).toBe(true)
+    expect(Object.isFrozen(snapshot.toolbar?.labels)).toBe(true)
   })
 
   it('preserves explicit Mermaid debug values and derives only absent values', () => {
@@ -79,6 +96,10 @@ describe('runtime options snapshot resolver', () => {
         title: '',
         fontSize: 0,
         buttons: { copy: false },
+        labels: {
+          copy: '',
+          zoomIn: 'Magnify',
+        },
       },
     }
 
@@ -96,12 +117,31 @@ describe('runtime options snapshot resolver', () => {
       title: '',
       fontSize: 0,
       buttons: { copy: false, fullscreen: true, expand: true },
+      labels: {
+        copy: '',
+        zoomIn: 'Magnify',
+        zoomOut: 'Zoom Out',
+      },
     })
     expect(init.extension).not.toBe(shared)
     expect(init.secondExtension).not.toBe(shared)
     expect(init.extension).not.toBe(init.secondExtension)
     expect(Object.isFrozen(shared)).toBe(false)
     expect(Object.isFrozen(payload)).toBe(false)
+  })
+
+  it.each([
+    ['false', false],
+    ['zero', 0],
+    ['null', null],
+  ])('rejects the non-string %s label at its owned path', (_name, value) => {
+    expect(() => resolveRuntimeOptionsSnapshot({
+      toolbar: {
+        labels: { copy: value },
+      },
+    })).toThrowError(expect.objectContaining({
+      message: expect.stringContaining('runtimeConfig.public.contentMermaid.toolbar.labels.copy'),
+    }))
   })
 
   it.each([

@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { ExpandOptions } from '../types/expand'
+import type { MermaidToolbarLabels } from '../../types/mermaid'
 import { useMermaidExpand } from '../composables/useMermaidExpand'
 import MermaidZoomToolbar from './MermaidZoomToolbar.vue'
 
@@ -13,6 +14,7 @@ const props = defineProps<{
   overlayStyle?: CSSProperties
   contentStyle?: CSSProperties
   iconSize?: number
+  labels: Required<MermaidToolbarLabels>
 }>()
 
 const isMac = import.meta.client ? /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) : false
@@ -97,6 +99,7 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
         <MermaidZoomToolbar
           :scale="scale"
           :icon-size="iconSize"
+          :labels="labels"
           :icon-scale="0.75"
           @zoom-out="zoomOut"
           @zoom-in="zoomIn"
@@ -117,7 +120,8 @@ defineExpose({ toggle, openFromDiagram, endForDiagramReplacement })
           v-if="allowCloseButton"
           type="button"
           class="ncm-expand-btn"
-          aria-label="Minimize diagram"
+          :title="labels.minimize"
+          :aria-label="labels.minimize"
           @click="closeFromButton"
           @mousedown.stop
           @touchstart.stop

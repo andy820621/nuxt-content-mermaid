@@ -15,7 +15,9 @@ const mermaidStub = {
   render: async (_renderId: string, source: string) => {
     runs.push({ source })
 
-    const id = source.includes('SECONDARY') ? 'mock-svg-secondary' : 'mock-svg'
+    const id = source.includes('CUSTOM_LABELS')
+      ? 'mock-svg-custom-labels'
+      : source.includes('SECONDARY') ? 'mock-svg-secondary' : 'mock-svg'
     const preserveAspectRatio = id === 'mock-svg' ? ' preserveAspectRatio="xMinYMin meet"' : ''
     const width = id === 'mock-svg' ? 1600 : 600
     return {

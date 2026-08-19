@@ -7,6 +7,7 @@ import {
 } from '../runtime/configuration/core'
 import type { JsonObject, JsonValue } from '../types/config'
 import type { MermaidToolbarOptions } from '../types/mermaid'
+import { TOOLBAR_LABEL_KEYS } from '../runtime/constants'
 
 const MARKDOWN_METADATA_PHASE = {
   name: 'Markdown Mermaid Metadata',
@@ -15,7 +16,7 @@ const MARKDOWN_METADATA_PHASE = {
 
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 const INLINE_ATTRIBUTE_KEYS = new Set(['title', 'config', 'toolbar'])
-const TOOLBAR_KEYS = new Set(['title', 'fontSize', 'fullscreenToolbarScale', 'buttons'])
+const TOOLBAR_KEYS = new Set(['title', 'fontSize', 'fullscreenToolbarScale', 'buttons', 'labels'])
 const TOOLBAR_BUTTON_KEYS = new Set(['copy', 'fullscreen', 'expand'])
 
 function hasOwn(value: JsonObject, key: string) {
@@ -90,6 +91,15 @@ function normalizeToolbar(value: unknown): MermaidToolbarOptions | null {
     for (const key of TOOLBAR_BUTTON_KEYS) {
       const button = valueAt(buttons, key)
       if (button !== undefined && typeof button !== 'boolean') return null
+    }
+  }
+
+  const labels = valueAt(toolbar, 'labels')
+  if (labels !== undefined) {
+    if (!isPlainRecord(labels) || !hasOnlyKeys(labels, new Set(TOOLBAR_LABEL_KEYS))) return null
+    for (const key of TOOLBAR_LABEL_KEYS) {
+      const label = valueAt(labels, key)
+      if (label !== undefined && typeof label !== 'string') return null
     }
   }
 

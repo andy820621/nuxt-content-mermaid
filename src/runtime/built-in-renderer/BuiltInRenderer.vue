@@ -28,11 +28,12 @@ import IconClipboardSuccess from '../components/icons/IconClipboardSuccess.vue'
 import IconFullScreen from '../components/icons/iconFullScreen.vue'
 import IconFullScreenExit from '../components/icons/iconFullScreenExit.vue'
 import MermaidExpandOverlay from '../components/MermaidExpandOverlay.vue'
-import type { MermaidToolbarOptions } from '../../types/mermaid'
+import type { MermaidToolbarLabels, MermaidToolbarOptions } from '../../types/mermaid'
 import type { MermaidComponentProps } from '../../types/config'
 import IconExpand from '../components/icons/IconExpand.vue'
 import IconCollapse from '../components/icons/IconCollapse.vue'
 import MermaidFullscreenPresentation from '../components/MermaidFullscreenPresentation.vue'
+import { DEFAULT_TOOLBAR_LABELS } from '../constants'
 
 type BuiltInRendererProps = MermaidComponentProps & {
   componentSource: MermaidComponentSource
@@ -109,6 +110,9 @@ const defaultFullscreenToolbarScale = runtimeToolbarDefaults?.fullscreenToolbarS
 const resolvedToolbar = computed<MermaidToolbarOptions>(() => {
   return defu({}, props.toolbar ?? {}, runtimeToolbarDefaults ?? {})
 })
+const toolbarLabels = computed<Required<MermaidToolbarLabels>>(() => {
+  return defu({}, resolvedToolbar.value.labels ?? {}, DEFAULT_TOOLBAR_LABELS)
+})
 
 const toolbarButtons = computed<NonNullable<MermaidToolbarOptions['buttons']>>(() => {
   const buttons = resolvedToolbar.value.buttons
@@ -138,9 +142,9 @@ const hasCopySource = computed(() => !!copySource.value)
 type CopyState = 'idle' | 'copied' | 'error'
 const copyState = ref<CopyState>('idle')
 const copyLabel = computed(() => {
-  if (copyState.value === 'copied') return 'Copied'
-  if (copyState.value === 'error') return 'Copy failed'
-  return 'Copy'
+  if (copyState.value === 'copied') return toolbarLabels.value.copied
+  if (copyState.value === 'error') return toolbarLabels.value.copyFailed
+  return toolbarLabels.value.copy
 })
 let copyResetTimer: ReturnType<typeof setTimeout> | null = null
 const isCopyHovered = ref(false)
@@ -150,7 +154,9 @@ const copyIcon = computed(() => {
   return IconClipboard
 })
 const showFullscreenButton = computed(() => toolbarButtons.value.fullscreen !== false && isFullscreenSupported.value)
-const fullscreenLabel = computed(() => isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen')
+const fullscreenLabel = computed(() => isFullscreen.value
+  ? toolbarLabels.value.exitFullscreen
+  : toolbarLabels.value.enterFullscreen)
 const fullscreenToolbarScale = computed(() => {
   const raw = resolvedToolbar.value.fullscreenToolbarScale ?? defaultFullscreenToolbarScale
   if (typeof raw === 'number' && Number.isFinite(raw))
@@ -224,6 +230,9 @@ interface MermaidExpandOverlayExpose {
 
 const expandOverlay = useTemplateRef<MermaidExpandOverlayExpose>('expandOverlay')
 const isExpandActive = ref(false)
+const expandToolbarLabel = computed(() => isExpandActive.value
+  ? toolbarLabels.value.collapse
+  : toolbarLabels.value.expand)
 const handleExpandActiveChange = (active: boolean) => {
   isExpandActive.value = active
 }
@@ -596,8 +605,8 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
           v-if="showExpandToolbarButton"
           type="button"
           class="mermaid-btn"
-          :title="isExpandActive ? 'Collapse' : 'Expand'"
-          :aria-label="isExpandActive ? 'Collapse diagram' : 'Expand diagram'"
+          :title="expandToolbarLabel"
+          :aria-label="expandToolbarLabel"
           @click="toggleExpand"
         >
           <IconExpand
@@ -635,6 +644,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       :viewport-target="mermaidWrapper"
       :render-target="mermaidContainer"
       :icon-size="iconSize"
+      :labels="toolbarLabels"
       @active-change="handleFullscreenActiveChange"
       @supported-change="handleFullscreenSupportedChange"
     />
@@ -699,6 +709,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       :overlay-style="cursorVariables"
       :content-style="cursorVariables"
       :icon-size="iconSize"
+      :labels="toolbarLabels"
       @active-change="handleExpandActiveChange"
     />
   </div>

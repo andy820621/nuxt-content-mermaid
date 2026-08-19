@@ -5,6 +5,20 @@ const options = {
   enabled: true,
   toolbar: {
     title: 'Diagram',
+    labels: {
+      copy: 'Copy source',
+      copied: 'Source copied',
+      copyFailed: 'Copy failed',
+      expand: 'Expand diagram',
+      collapse: 'Collapse diagram',
+      minimize: 'Minimize diagram',
+      enterFullscreen: 'Enter fullscreen',
+      exitFullscreen: 'Exit fullscreen',
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
+      resetZoom: 'Reset zoom',
+      downloadSvg: 'Download SVG',
+    },
     buttons: {
       copy: true,
     },

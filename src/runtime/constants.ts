@@ -1,5 +1,5 @@
 import type { MermaidConfig } from 'mermaid'
-import type { MermaidToolbarOptions } from '../types/mermaid'
+import type { MermaidToolbarLabels, MermaidToolbarOptions } from '../types/mermaid'
 import type { RuntimeMermaidConfig, RuntimeOptions } from '../types/config'
 import type { ExpandOptions } from './types/expand'
 
@@ -17,6 +17,34 @@ export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
   fontFamily: 'Arial, sans-serif, 微軟正黑體',
   securityLevel: 'strict',
 }
+export const TOOLBAR_LABEL_KEYS = [
+  'copy',
+  'copied',
+  'copyFailed',
+  'expand',
+  'collapse',
+  'minimize',
+  'enterFullscreen',
+  'exitFullscreen',
+  'zoomIn',
+  'zoomOut',
+  'resetZoom',
+  'downloadSvg',
+] as const satisfies readonly (keyof MermaidToolbarLabels)[]
+export const DEFAULT_TOOLBAR_LABELS = {
+  copy: 'Copy',
+  copied: 'Copied',
+  copyFailed: 'Copy failed',
+  expand: 'Expand diagram',
+  collapse: 'Collapse diagram',
+  minimize: 'Minimize diagram',
+  enterFullscreen: 'Enter fullscreen',
+  exitFullscreen: 'Exit fullscreen',
+  zoomIn: 'Zoom In',
+  zoomOut: 'Zoom Out',
+  resetZoom: 'Reset Zoom',
+  downloadSvg: 'Download SVG',
+} satisfies Required<MermaidToolbarLabels>
 export const DEFAULT_TOOLBAR_OPTIONS: MermaidToolbarOptions = {
   title: 'mermaid',
   fontSize: '14px',
@@ -26,6 +54,7 @@ export const DEFAULT_TOOLBAR_OPTIONS: MermaidToolbarOptions = {
     fullscreen: true,
     expand: true,
   },
+  labels: DEFAULT_TOOLBAR_LABELS,
 }
 export const DEFAULT_EXPAND_OPTIONS: ExpandOptions = {
   enabled: true,
