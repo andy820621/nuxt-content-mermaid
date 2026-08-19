@@ -1,7 +1,7 @@
 # SVG download strategy prototype
 
 Date: 2026-08-19
-Status: Design approved; written specification awaiting review
+Status: Approved
 
 ## Context
 
