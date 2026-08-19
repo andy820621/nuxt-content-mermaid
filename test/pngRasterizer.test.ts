@@ -14,11 +14,13 @@ interface FakeNode {
   cloneNode: ReturnType<typeof vi.fn>
 }
 
+type FakeChild = FakeNode | FakeHost
+
 interface FakeHost {
   style: Record<string, string>
-  children: FakeNode[]
+  children: FakeChild[]
   isConnected: boolean
-  appendChild: (node: FakeNode) => FakeNode
+  appendChild: <T extends FakeChild>(node: T) => T
   remove: ReturnType<typeof vi.fn>
 }
 
@@ -164,7 +166,7 @@ describe('PNG snapshot rasterizer', () => {
     expect(document.hosts[0]?.remove).toHaveBeenCalledOnce()
   })
 
-  it('rasterizes a cloned safe snapshot with exact transparent CSS-pixel options', async () => {
+  it('keeps the captured node at local origin inside an offscreen staging host', async () => {
     const document = createDocument()
     const { clone, source, sourceNode } = createSvg(document)
     const blob = pngBlob()
@@ -173,29 +175,40 @@ describe('PNG snapshot rasterizer', () => {
     await expect(rasterizePngSnapshot({ svg: source, width: 1445, height: 477 }))
       .resolves.toBe(blob)
 
-    const host = document.hosts[0]
-    expect(host).toBeDefined()
+    const [stagingHost, captureNode] = document.hosts
+    expect(stagingHost).toBeDefined()
+    expect(captureNode).toBeDefined()
+    expect(document.hosts).toHaveLength(2)
     expect(source.cloneNode).toHaveBeenCalledWith(true)
-    expect(host?.children).toEqual([clone])
-    expect(host?.style).toMatchObject({
+    expect(stagingHost?.children).toEqual([captureNode])
+    expect(captureNode?.children).toEqual([clone])
+    expect(stagingHost?.style).toMatchObject({
       position: 'fixed',
       left: '-100000px',
       top: '0',
+      pointerEvents: 'none',
+      zIndex: '-1',
+    })
+    expect(captureNode?.style).toMatchObject({
       width: '1445px',
       height: '477px',
       margin: '0px',
       padding: '0px',
       background: 'transparent',
-      pointerEvents: 'none',
+      overflow: 'hidden',
     })
-    expect(htmlToImage.getFontEmbedCSS).toHaveBeenCalledWith(host, {
+    expect(captureNode?.style).not.toHaveProperty('position')
+    expect(captureNode?.style).not.toHaveProperty('left')
+    expect(captureNode?.style).not.toHaveProperty('top')
+    expect(captureNode?.style).not.toHaveProperty('zIndex')
+    expect(htmlToImage.getFontEmbedCSS).toHaveBeenCalledWith(captureNode, {
       width: 1445,
       height: 477,
       canvasWidth: 1445,
       canvasHeight: 477,
       pixelRatio: 1,
     })
-    expect(htmlToImage.toBlob).toHaveBeenCalledWith(host, {
+    expect(htmlToImage.toBlob).toHaveBeenCalledWith(captureNode, {
       width: 1445,
       height: 477,
       canvasWidth: 1445,
@@ -203,8 +216,8 @@ describe('PNG snapshot rasterizer', () => {
       pixelRatio: 1,
       fontEmbedCSS: '@font-face { src: url(data:font/woff2;base64,AA==) format("woff2"); }',
     })
-    expect(host?.remove).toHaveBeenCalledOnce()
-    expect(host?.isConnected).toBe(false)
+    expect(stagingHost?.remove).toHaveBeenCalledOnce()
+    expect(stagingHost?.isConnected).toBe(false)
     expect(sourceNode.marker).toBe('safe foreignObject')
   })
 

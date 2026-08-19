@@ -88,14 +88,14 @@ function assertFontsEmbedded(fontCss: string) {
   }
 }
 
-function createRasterizationHost(
+function createRasterizationStage(
   document: Document,
   svg: SVGSVGElement,
   width: number,
   height: number,
 ) {
-  const host = document.createElement('div')
-  Object.assign(host.style, {
+  const stagingHost = document.createElement('div')
+  Object.assign(stagingHost.style, {
     position: 'fixed',
     left: '-100000px',
     top: '0',
@@ -108,9 +108,20 @@ function createRasterizationHost(
     pointerEvents: 'none',
     zIndex: '-1',
   })
-  host.appendChild(svg.cloneNode(true))
-  document.body.appendChild(host)
-  return host
+
+  const captureNode = document.createElement('div')
+  Object.assign(captureNode.style, {
+    width: `${width}px`,
+    height: `${height}px`,
+    margin: '0px',
+    padding: '0px',
+    background: 'transparent',
+    overflow: 'hidden',
+  })
+  captureNode.appendChild(svg.cloneNode(true))
+  stagingHost.appendChild(captureNode)
+  document.body.appendChild(stagingHost)
+  return { stagingHost, captureNode }
 }
 
 /** @internal */
@@ -130,7 +141,7 @@ export async function rasterizePngSnapshot(
     canvasHeight: input.height,
     pixelRatio: 1,
   }
-  const host = createRasterizationHost(
+  const { stagingHost, captureNode } = createRasterizationStage(
     document,
     input.svg,
     input.width,
@@ -138,9 +149,9 @@ export async function rasterizePngSnapshot(
   )
 
   try {
-    const fontEmbedCSS = await getFontEmbedCSS(host, captureOptions)
+    const fontEmbedCSS = await getFontEmbedCSS(captureNode, captureOptions)
     assertFontsEmbedded(fontEmbedCSS)
-    const blob = await toBlob(host, {
+    const blob = await toBlob(captureNode, {
       ...captureOptions,
       fontEmbedCSS,
     })
@@ -154,6 +165,6 @@ export async function rasterizePngSnapshot(
     return blob
   }
   finally {
-    host.remove()
+    stagingHost.remove()
   }
 }
