@@ -20,9 +20,16 @@ const control: MermaidControl = {
   },
 }
 
-function createLabelMarkup() {
-  if (currentHtmlLabels === false)
+function createLabelMarkup(source: string) {
+  if (currentHtmlLabels === false) {
+    const residualForeignObject = source.includes('__UNSAFE__')
+      ? `<foreignObject id="residual-portable-label">
+          <div xmlns="http://www.w3.org/1999/xhtml">residual foreign content</div>
+        </foreignObject>`
+      : ''
     return '<text id="portable-label"><tspan>foreign content</tspan></text>'
+      + residualForeignObject
+  }
 
   return `<foreignObject>
     <div xmlns="http://www.w3.org/1999/xhtml">
@@ -34,7 +41,7 @@ function createLabelMarkup() {
 function createStrictSvg(id: number, source: string) {
   if (!source.includes('__UNSAFE__'))
     return `<svg data-run-id="${id}" data-source="${source}" width="600" height="400">
-      ${createLabelMarkup()}
+      ${createLabelMarkup(source)}
     </svg>`
 
   return `<svg data-run-id="${id}" data-source="${source}" width="600" height="400" onclick="alert(1)">
@@ -50,7 +57,7 @@ function createStrictSvg(id: number, source: string) {
     <use id="unsafe-use" href="data:image/svg+xml,unsafe"></use>
     <image id="external-image" href="https://example.invalid/image.svg"></image>
     <script>window.__unsafeSvgScript__ = true</script>
-    ${createLabelMarkup()}
+    ${createLabelMarkup(source)}
     <iframe src="javascript:alert(1)"></iframe>
     <object data="data:text/html,unsafe"></object>
     <embed src="https://example.invalid/plugin"></embed>

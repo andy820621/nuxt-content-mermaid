@@ -1,9 +1,23 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { createPage, setup, url } from '@nuxt/test-utils/e2e'
 import { describe, expect, it } from 'vitest'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '../playground')
+type BrowserPage = Awaited<ReturnType<typeof createPage>>
+
+async function downloadSvg(page: BrowserPage, selector: string) {
+  const downloadPromise = page.waitForEvent('download')
+  await page.locator(selector).click()
+  const download = await downloadPromise
+  const downloadPath = await download.path()
+  if (!downloadPath) throw new Error('Expected the SVG download to have a local path')
+  return {
+    filename: download.suggestedFilename(),
+    text: await readFile(downloadPath, 'utf8'),
+  }
+}
 
 describe('v3 migration playground', async () => {
   await setup({
@@ -135,5 +149,63 @@ describe('v3 migration playground', async () => {
     expect(result.closing.length).toBeGreaterThan(2)
     expect(Math.max(...result.opening.map(center => Math.abs(center - result.sourceCenter)))).toBeLessThanOrEqual(0.25)
     expect(Math.max(...result.closing.map(center => Math.abs(center - result.sourceCenter)))).toBeLessThanOrEqual(0.25)
+  })
+
+  it('downloads faithful HTML labels and portable native text from the same class diagram', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid/classdiagram/finance-ledger'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    const visibleSvg = block.locator('.mermaid > svg')
+    await block.scrollIntoViewIfNeeded()
+    await visibleSvg.waitFor({ state: 'visible', timeout: 15000 })
+    expect(await visibleSvg.locator('foreignObject').count()).toBeGreaterThan(0)
+
+    const faithfulDownload = await downloadSvg(
+      page,
+      '.mermaid-block [aria-label="Download faithful SVG"]',
+    )
+    const portableDownload = await downloadSvg(
+      page,
+      '.mermaid-block [aria-label="Download portable SVG"]',
+    )
+
+    const inspectSvg = (text: string) => page.evaluate((svgText) => {
+      const document = new DOMParser().parseFromString(svgText, 'image/svg+xml')
+      return {
+        parserErrors: document.querySelectorAll('parsererror').length,
+        rootNamespace: document.documentElement.namespaceURI,
+        foreignObjects: document.querySelectorAll('foreignObject').length,
+        nativeText: document.querySelectorAll('text, tspan').length,
+        textContent: document.documentElement.textContent ?? '',
+        xhtmlNamespace: document.querySelector('foreignObject > *')?.namespaceURI,
+      }
+    }, text)
+
+    const faithful = await inspectSvg(faithfulDownload.text)
+    const portable = await inspectSvg(portableDownload.text)
+
+    expect(faithfulDownload.filename).toBe('mermaid-diagram-faithful.svg')
+    expect(faithful).toMatchObject({
+      parserErrors: 0,
+      rootNamespace: 'http://www.w3.org/2000/svg',
+      xhtmlNamespace: 'http://www.w3.org/1999/xhtml',
+    })
+    expect(faithful.foreignObjects).toBeGreaterThan(0)
+    expect(faithful.textContent).toContain('User')
+    expect(faithful.textContent).toContain('Transaction')
+
+    expect(portableDownload.filename).toBe('mermaid-diagram-portable.svg')
+    expect(portable).toMatchObject({
+      parserErrors: 0,
+      rootNamespace: 'http://www.w3.org/2000/svg',
+      foreignObjects: 0,
+    })
+    expect(portable.nativeText).toBeGreaterThan(0)
+    expect(portable.textContent).toContain('User')
+    expect(portable.textContent).toContain('Transaction')
+    expect(portable.textContent).toContain('Budget')
+    expect(await visibleSvg.locator('foreignObject').count()).toBeGreaterThan(0)
   })
 })

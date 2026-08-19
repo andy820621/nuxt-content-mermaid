@@ -332,6 +332,42 @@ describe('built-in renderer integration', async () => {
     expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('3')
   })
 
+  it('warns without deleting residual foreignObject evidence from a portable SVG', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    const warnings: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'warning')
+        warnings.push(message.text())
+    })
+    await renderInitialDiagram(page)
+
+    await page.locator('#primary-unsafe').click()
+    await waitForRuns(page, 2)
+    await releaseNext(page)
+    await page.locator('#primary svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.locator('#primary [aria-label="Download portable SVG"]').click()
+    await waitForRuns(page, 3)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
+    })).toEqual(expect.objectContaining({
+      htmlLabels: false,
+      source: expect.stringContaining('__UNSAFE__'),
+    }))
+    await releaseNext(page)
+
+    const download = await downloadPromise
+    const downloadPath = await download.path()
+    expect(downloadPath).not.toBeNull()
+    const text = await readFile(downloadPath!, 'utf8')
+    expect(text).toContain('<foreignObject')
+    expect(text).toContain('residual foreign content')
+    await expect.poll(() => warnings).toContainEqual(expect.stringContaining(
+      'Portable SVG still contains 1 foreignObject element',
+    ))
+  })
+
   it('does not change copy, expand, fullscreen, or zoom state while downloading', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installSvgDownloadCapture(page)

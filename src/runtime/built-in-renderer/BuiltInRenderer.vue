@@ -452,6 +452,18 @@ async function downloadPortableSvg() {
       },
       document: snapshot.svg.ownerDocument,
     })
+    const foreignObjectCount
+      = portableSvg.querySelectorAll('foreignObject').length
+    if (foreignObjectCount > 0) {
+      const elementLabel = foreignObjectCount === 1 ? 'element' : 'elements'
+      console.warn(
+        '[nuxt-content-mermaid] Portable SVG still contains '
+        + foreignObjectCount
+        + ' foreignObject '
+        + elementLabel
+        + '.',
+      )
+    }
     downloadStandaloneSvg(portableSvg, {
       filename: 'mermaid-diagram-portable.svg',
     })
