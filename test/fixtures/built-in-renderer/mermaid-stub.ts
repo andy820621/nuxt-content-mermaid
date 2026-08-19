@@ -36,7 +36,11 @@ function createStrictSvg(id: number, source: string) {
     <use id="unsafe-use" href="data:image/svg+xml,unsafe"></use>
     <image id="external-image" href="https://example.invalid/image.svg"></image>
     <script>window.__unsafeSvgScript__ = true</script>
-    <foreignObject><div>foreign content</div></foreignObject>
+    <foreignObject>
+      <div xmlns="http://www.w3.org/1999/xhtml" onclick="alert(1)">
+        <strong>foreign content</strong>
+      </div>
+    </foreignObject>
     <iframe src="javascript:alert(1)"></iframe>
     <object data="data:text/html,unsafe"></object>
     <embed src="https://example.invalid/plugin"></embed>

@@ -1,7 +1,8 @@
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
+const XHTML_NAMESPACE = 'http://www.w3.org/1999/xhtml'
 const XLINK_NAMESPACE = 'http://www.w3.org/1999/xlink'
 const XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/'
-const BLOCKED_ELEMENTS = 'script, foreignObject, iframe, object, embed'
+const BLOCKED_ELEMENTS = 'script, iframe, object, embed'
 const RESOURCE_ATTRIBUTES = new Set([
   'href',
   'xlink:href',
@@ -124,18 +125,33 @@ function sanitizeSvgClone(svg: SVGSVGElement) {
   }
 }
 
+function normalizeForeignObjectLabels(svg: SVGSVGElement) {
+  for (const foreignObject of svg.querySelectorAll('foreignObject')) {
+    foreignObject.setAttribute('overflow', 'visible')
+    foreignObject.firstElementChild?.setAttribute('xmlns', XHTML_NAMESPACE)
+  }
+}
+
 /** @internal */
 export function serializeSafeStandaloneSvg(source: SVGSVGElement): string {
   const clone = source.cloneNode(true) as SVGSVGElement
   sanitizeSvgClone(clone)
+  normalizeForeignObjectLabels(clone)
   clone.setAttribute('xmlns', SVG_NAMESPACE)
   if (clone.querySelector('[xlink\\:href]'))
     clone.setAttributeNS(XMLNS_NAMESPACE, 'xmlns:xlink', XLINK_NAMESPACE)
   return new XMLSerializer().serializeToString(clone)
 }
 
+interface SvgDownloadOptions {
+  filename?: string
+}
+
 /** @internal */
-export function downloadStandaloneSvg(source: SVGSVGElement): void {
+export function downloadStandaloneSvg(
+  source: SVGSVGElement,
+  options: SvgDownloadOptions = {},
+): void {
   const blob = new Blob(
     [serializeSafeStandaloneSvg(source)],
     { type: SVG_DOWNLOAD_MIME_TYPE },
@@ -143,7 +159,7 @@ export function downloadStandaloneSvg(source: SVGSVGElement): void {
   const objectUrl = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = objectUrl
-  anchor.download = SVG_DOWNLOAD_FILENAME
+  anchor.download = options.filename ?? SVG_DOWNLOAD_FILENAME
   anchor.hidden = true
   document.body.appendChild(anchor)
   anchor.click()

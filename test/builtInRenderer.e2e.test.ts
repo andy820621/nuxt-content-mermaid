@@ -106,7 +106,11 @@ async function readLatestSvgDownload(page: BrowserPage) {
       type: capture.type,
       text: capture.text,
       namespace: document.documentElement.namespaceURI,
-      blockedElements: document.querySelectorAll('script, foreignObject, iframe, object, embed').length,
+      activeElements: document.querySelectorAll('script, iframe, object, embed').length,
+      foreignObjects: document.querySelectorAll('foreignObject').length,
+      foreignObjectText: document.querySelector('foreignObject')?.textContent?.trim(),
+      foreignObjectOverflow: document.querySelector('foreignObject')?.getAttribute('overflow'),
+      xhtmlNamespace: document.querySelector('foreignObject > *')?.namespaceURI,
       anchors: document.querySelectorAll('a').length,
       eventAttributes: elements.flatMap(element => Array.from(element.attributes))
         .filter(attribute => attribute.name.toLowerCase().startsWith('on')).length,
@@ -178,7 +182,7 @@ describe('built-in renderer integration', async () => {
     const page = await createPage()
     await page.goto(url('/'))
 
-    const downloadButton = page.locator('#primary [aria-label="Download SVG"]')
+    const downloadButton = page.locator('#primary [aria-label="Download faithful SVG"]')
     expect(await downloadButton.count()).toBe(1)
     expect(await downloadButton.isDisabled()).toBe(true)
 
@@ -192,7 +196,7 @@ describe('built-in renderer integration', async () => {
     const download = await downloadPromise
     const downloadPath = await download.path()
 
-    expect(download.suggestedFilename()).toBe('mermaid-diagram.svg')
+    expect(download.suggestedFilename()).toBe('mermaid-diagram-faithful.svg')
     expect(downloadPath).not.toBeNull()
     expect(await readFile(downloadPath!, 'utf8')).toMatch(
       /^<svg[^>]*data-run-id="1"[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/,
@@ -213,13 +217,17 @@ describe('built-in renderer integration', async () => {
     expect(await visibleSvg.locator('script, foreignObject, iframe, object, embed').count()).toBe(4)
     expect(await visibleSvg.getAttribute('onclick')).toBe('alert(1)')
 
-    await page.locator('#primary [aria-label="Download SVG"]').click()
+    await page.locator('#primary [aria-label="Download faithful SVG"]').click()
     const capture = await readLatestSvgDownload(page)
 
     expect(capture).toMatchObject({
       type: 'image/svg+xml;charset=utf-8',
       namespace: 'http://www.w3.org/2000/svg',
-      blockedElements: 0,
+      activeElements: 0,
+      foreignObjects: 1,
+      foreignObjectText: 'foreign content',
+      foreignObjectOverflow: 'visible',
+      xhtmlNamespace: 'http://www.w3.org/1999/xhtml',
       anchors: 0,
       eventAttributes: 0,
       unsafeResourceAttributes: 0,
@@ -230,6 +238,9 @@ describe('built-in renderer integration', async () => {
       safeUse: '#safe-shape',
     })
     expect(capture?.text).toContain('data-run-id="2"')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs.length
+    })).toBe(2)
 
     expect(await visibleSvg.locator('script, foreignObject, iframe, object, embed').count()).toBe(4)
     expect(await visibleSvg.getAttribute('onclick')).toBe('alert(1)')

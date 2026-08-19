@@ -421,9 +421,11 @@ function getMermaidSvg(): SVGSVGElement | null {
   return svg instanceof SVGSVGElement ? svg : null
 }
 
-function downloadLatestSvg() {
+function downloadFaithfulSvg() {
   if (!canDownloadSvg.value || !downloadableSvg.value) return
-  downloadStandaloneSvg(downloadableSvg.value)
+  downloadStandaloneSvg(downloadableSvg.value, {
+    filename: 'mermaid-diagram-faithful.svg',
+  })
 }
 
 function getMermaidViewport(): HTMLDivElement | null {
@@ -623,10 +625,10 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
         <button
           type="button"
           class="mermaid-btn"
-          :title="toolbarLabels.downloadSvg"
-          :aria-label="toolbarLabels.downloadSvg"
+          title="Download faithful SVG"
+          aria-label="Download faithful SVG"
           :disabled="!canDownloadSvg"
-          @click="downloadLatestSvg"
+          @click="downloadFaithfulSvg"
         >
           <IconDownload :size="iconSize" />
         </button>
