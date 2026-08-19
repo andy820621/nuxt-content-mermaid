@@ -16,7 +16,7 @@ import type { Component } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { MermaidComponentSource } from '../component-configuration'
 import { materializeMermaidConfigForInvocation, resolveMermaidTheme } from '../mermaid-config'
-import { createMermaidRenderer } from '../mermaid-rendering'
+import { createMermaidRenderer, renderDetachedMermaidSvg } from '../mermaid-rendering'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
 import { downloadStandaloneSvg } from '../svg-download'
 import { parseSizeToPx, isRecord } from '../utils'
@@ -40,6 +40,12 @@ import { DEFAULT_TOOLBAR_LABELS } from '../constants'
 type BuiltInRendererProps = MermaidComponentProps & {
   componentSource: MermaidComponentSource
   spinnerComponent: Component | string
+}
+
+interface CommittedExportSnapshot {
+  source: string
+  config: MermaidConfig
+  svg: SVGSVGElement
 }
 
 const props = defineProps<BuiltInRendererProps>()
@@ -102,7 +108,8 @@ const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
 const hasError = ref(false)
 const errorContent = shallowRef<unknown | null>(null)
-const downloadableSvg = shallowRef<SVGSVGElement | null>(null)
+const committedExportSnapshot = shallowRef<CommittedExportSnapshot | null>(null)
+const isPortableDownloadPending = ref(false)
 
 const decodedCode = computed(() => props.code ? decodeURIComponent(props.code) : '')
 // Holds the mermaid definition - defaults to decoded prop, falls back to DOM extraction for direct component usage
@@ -144,7 +151,7 @@ const toolbarFontSize = computed(() => {
 })
 const showCopyButton = computed(() => toolbarButtons.value.copy !== false)
 const canDownloadSvg = computed(() => {
-  return downloadableSvg.value !== null && componentSource.value.kind !== 'conflict'
+  return committedExportSnapshot.value !== null && componentSource.value.kind !== 'conflict'
 })
 const copySource = computed(() => decodedCode.value || mermaidDefinition.value || '')
 const hasCopySource = computed(() => !!copySource.value)
@@ -422,10 +429,42 @@ function getMermaidSvg(): SVGSVGElement | null {
 }
 
 function downloadFaithfulSvg() {
-  if (!canDownloadSvg.value || !downloadableSvg.value) return
-  downloadStandaloneSvg(downloadableSvg.value, {
+  const snapshot = committedExportSnapshot.value
+  if (!canDownloadSvg.value || !snapshot) return
+  downloadStandaloneSvg(snapshot.svg, {
     filename: 'mermaid-diagram-faithful.svg',
   })
+}
+
+async function downloadPortableSvg() {
+  const snapshot = committedExportSnapshot.value
+  if (!canDownloadSvg.value || !snapshot || isPortableDownloadPending.value)
+    return
+
+  isPortableDownloadPending.value = true
+  try {
+    const portableSvg = await renderDetachedMermaidSvg({
+      loadMermaid: $mermaid,
+      source: snapshot.source,
+      config: {
+        ...snapshot.config,
+        htmlLabels: false,
+      },
+      document: snapshot.svg.ownerDocument,
+    })
+    downloadStandaloneSvg(portableSvg, {
+      filename: 'mermaid-diagram-portable.svg',
+    })
+  }
+  catch (error) {
+    console.error(
+      '[nuxt-content-mermaid] Failed to create portable SVG:',
+      error,
+    )
+  }
+  finally {
+    isPortableDownloadPending.value = false
+  }
 }
 
 function getMermaidViewport(): HTMLDivElement | null {
@@ -456,8 +495,12 @@ async function renderMermaid() {
   if (outcome.status === 'success') {
     hasRenderedOnce.value = true
     const committedSvg = getMermaidSvg()
-    downloadableSvg.value = committedSvg
-      ? committedSvg.cloneNode(true) as SVGSVGElement
+    committedExportSnapshot.value = committedSvg
+      ? {
+          source: outcome.source,
+          config: outcome.config,
+          svg: committedSvg.cloneNode(true) as SVGSVGElement,
+        }
       : null
   }
   else if (outcome.status === 'failure') {
@@ -629,6 +672,16 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
           aria-label="Download faithful SVG"
           :disabled="!canDownloadSvg"
           @click="downloadFaithfulSvg"
+        >
+          <IconDownload :size="iconSize" />
+        </button>
+        <button
+          type="button"
+          class="mermaid-btn"
+          title="Download portable SVG"
+          aria-label="Download portable SVG"
+          :disabled="!canDownloadSvg || isPortableDownloadPending"
+          @click="downloadPortableSvg"
         >
           <IconDownload :size="iconSize" />
         </button>

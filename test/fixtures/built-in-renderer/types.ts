@@ -5,6 +5,7 @@ export interface MermaidRun {
   id: number
   theme: MermaidConfig['theme']
   securityLevel: MermaidConfig['securityLevel']
+  htmlLabels: MermaidConfig['htmlLabels']
   unknownMermaidExtensionEnabled: boolean
   directCapabilityFontSize?: number
   directOpenValue?: string

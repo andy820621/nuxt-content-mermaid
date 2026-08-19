@@ -14,7 +14,7 @@ export interface MermaidRenderData {
 export type MermaidRenderOutcome
   = | { status: 'skipped' }
     | { status: 'stale' }
-    | { status: 'success' }
+    | { status: 'success', source: string, config: MermaidConfig }
     | { status: 'failure', error: unknown }
 
 export interface MermaidRendererDependencies {
@@ -80,7 +80,7 @@ export function createMermaidRenderer(
         const mermaid = await dependencies.loadMermaid()
         mermaid.initialize(config)
 
-        const staging = createStagingTarget(target)
+        const staging = createStagingTarget(target.ownerDocument)
         stagingRoot = staging.root
         const result = await mermaid.render(
           `nuxt-content-mermaid-${++renderId}`,
@@ -106,7 +106,7 @@ export function createMermaidRenderer(
         dependencies.beforeCommit()
         target.replaceChildren(...staging.target.childNodes)
 
-        return { status: 'success' }
+        return { status: 'success', source, config }
       }
       catch (error) {
         if (generation !== latestGeneration)
@@ -143,12 +143,7 @@ export function createMermaidRenderer(
       }
     }
 
-    const outcome = renderQueue.then(render)
-    renderQueue = outcome.then(
-      () => undefined,
-      () => undefined,
-    )
-    return outcome
+    return enqueueMermaidOperation(render)
   }
 
   request.invalidate = () => {
@@ -156,6 +151,53 @@ export function createMermaidRenderer(
   }
 
   return request
+}
+
+function enqueueMermaidOperation<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const outcome = renderQueue.then(operation)
+  renderQueue = outcome.then(
+    () => undefined,
+    () => undefined,
+  )
+  return outcome
+}
+
+export interface MermaidDetachedRenderOptions {
+  loadMermaid: () => Promise<Mermaid>
+  source: string
+  config: MermaidConfig
+  document: Document
+}
+
+/** @internal */
+export function renderDetachedMermaidSvg(
+  options: MermaidDetachedRenderOptions,
+): Promise<SVGSVGElement> {
+  return enqueueMermaidOperation(async () => {
+    const mermaid = await options.loadMermaid()
+    mermaid.initialize(options.config)
+    const staging = createStagingTarget(options.document)
+
+    try {
+      const result = await mermaid.render(
+        'nuxt-content-mermaid-' + ++renderId,
+        options.source,
+        staging.target,
+      )
+      staging.target.innerHTML = result.svg
+      const svg = staging.target.querySelector('svg')
+      if (!svg)
+        throw new Error('Portable Mermaid render did not produce an SVG')
+
+      ensureViewBox(svg)
+      return svg.cloneNode(true) as SVGSVGElement
+    }
+    finally {
+      removeStagingRoot(staging.root)
+    }
+  })
 }
 
 function removeStagingRoot(root: HTMLDivElement) {
@@ -173,8 +215,7 @@ function removeStagingRoot(root: HTMLDivElement) {
   }
 }
 
-function createStagingTarget(target: HTMLDivElement) {
-  const document = target.ownerDocument
+function createStagingTarget(document: Document) {
   const root = document.createElement('div')
   const stagingTarget = document.createElement('div')
 

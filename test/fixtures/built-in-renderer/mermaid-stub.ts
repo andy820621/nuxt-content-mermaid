@@ -5,6 +5,7 @@ const pendingResolvers: Array<() => void> = []
 const initializedConfigs = new WeakSet<object>()
 let currentSecurityLevel: MermaidConfig['securityLevel']
 let currentTheme: MermaidConfig['theme']
+let currentHtmlLabels: MermaidConfig['htmlLabels']
 let currentUnknownMermaidExtensionEnabled = false
 let currentDirectCapabilityFontSize: number | undefined
 let currentDirectOpenValue: string | undefined
@@ -19,9 +20,22 @@ const control: MermaidControl = {
   },
 }
 
+function createLabelMarkup() {
+  if (currentHtmlLabels === false)
+    return '<text id="portable-label"><tspan>foreign content</tspan></text>'
+
+  return `<foreignObject>
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <strong>foreign content</strong>
+    </div>
+  </foreignObject>`
+}
+
 function createStrictSvg(id: number, source: string) {
   if (!source.includes('__UNSAFE__'))
-    return `<svg data-run-id="${id}" data-source="${source}" width="600" height="400"></svg>`
+    return `<svg data-run-id="${id}" data-source="${source}" width="600" height="400">
+      ${createLabelMarkup()}
+    </svg>`
 
   return `<svg data-run-id="${id}" data-source="${source}" width="600" height="400" onclick="alert(1)">
     <style>.safe { fill: url(#paint); }</style>
@@ -36,11 +50,7 @@ function createStrictSvg(id: number, source: string) {
     <use id="unsafe-use" href="data:image/svg+xml,unsafe"></use>
     <image id="external-image" href="https://example.invalid/image.svg"></image>
     <script>window.__unsafeSvgScript__ = true</script>
-    <foreignObject>
-      <div xmlns="http://www.w3.org/1999/xhtml" onclick="alert(1)">
-        <strong>foreign content</strong>
-      </div>
-    </foreignObject>
+    ${createLabelMarkup()}
     <iframe src="javascript:alert(1)"></iframe>
     <object data="data:text/html,unsafe"></object>
     <embed src="https://example.invalid/plugin"></embed>
@@ -57,6 +67,7 @@ const mermaidStub = {
     initializedConfigs.add(config)
     currentSecurityLevel = config.securityLevel
     currentTheme = config.theme
+    currentHtmlLabels = config.htmlLabels
     currentUnknownMermaidExtensionEnabled
       = (config as MermaidConfig & { unknownMermaidExtension?: { enabled?: boolean } })
         .unknownMermaidExtension?.enabled === true
@@ -82,6 +93,7 @@ const mermaidStub = {
       id,
       theme: currentTheme,
       securityLevel: currentSecurityLevel,
+      htmlLabels: currentHtmlLabels,
       unknownMermaidExtensionEnabled: currentUnknownMermaidExtensionEnabled,
       directCapabilityFontSize: currentDirectCapabilityFontSize,
       directOpenValue: currentDirectOpenValue,

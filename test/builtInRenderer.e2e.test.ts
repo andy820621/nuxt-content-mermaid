@@ -246,6 +246,39 @@ describe('built-in renderer integration', async () => {
     expect(await visibleSvg.getAttribute('onclick')).toBe('alert(1)')
   })
 
+  it('downloads a portable SVG from the committed source without changing the visible diagram', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    const visibleSvg = page.locator('#primary svg[data-run-id="1"]')
+    const portableButton = page.locator('#primary [aria-label="Download portable SVG"]')
+    expect(await portableButton.count()).toBe(1)
+
+    const downloadPromise = page.waitForEvent('download')
+    await portableButton.click()
+    await waitForRuns(page, 2)
+
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[1]
+    })).toEqual(expect.objectContaining({
+      source: 'graph TD;INITIAL-->DONE',
+      htmlLabels: false,
+    }))
+    expect(await visibleSvg.count()).toBe(1)
+
+    await releaseNext(page)
+    const download = await downloadPromise
+    const downloadPath = await download.path()
+
+    expect(download.suggestedFilename()).toBe('mermaid-diagram-portable.svg')
+    expect(downloadPath).not.toBeNull()
+    const text = await readFile(downloadPath!, 'utf8')
+    expect(text).toContain('<text')
+    expect(text).toContain('<tspan>foreign content</tspan>')
+    expect(text).not.toContain('<foreignObject')
+    expect(await visibleSvg.count()).toBe(1)
+  })
+
   it('does not change copy, expand, fullscreen, or zoom state while downloading', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installSvgDownloadCapture(page)
