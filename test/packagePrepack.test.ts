@@ -13,12 +13,19 @@ async function createCleanTrackedWorkspace() {
   const workspace = await mkdtemp(join(tmpdir(), 'nuxt-content-mermaid-prepack-'))
   temporaryDirectories.push(workspace)
 
-  const { stdout } = await execFileAsync('git', ['ls-files', '-z'], {
-    cwd: repositoryRoot,
-    encoding: 'utf8',
-  })
+  const [{ stdout }, { stdout: deletedStdout }] = await Promise.all([
+    execFileAsync('git', ['ls-files', '-z'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+    }),
+    execFileAsync('git', ['ls-files', '--deleted', '-z'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+    }),
+  ])
+  const deletedPaths = new Set(deletedStdout.split('\0').filter(Boolean))
 
-  for (const relativePath of stdout.split('\0').filter(Boolean)) {
+  for (const relativePath of stdout.split('\0').filter(path => path && !deletedPaths.has(path))) {
     const source = resolve(repositoryRoot, relativePath)
     const destination = resolve(workspace, relativePath)
     const sourceStats = await lstat(source)

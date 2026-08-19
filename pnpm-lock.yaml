@@ -103,9 +103,6 @@ importers:
         specifier: catalog:dev
         version: 2.9.0
     devDependencies:
-      '@fontsource/noto-sans-tc':
-        specifier: 5.3.0
-        version: 5.3.0
       '@nuxt/content':
         specifier: catalog:integrations
         version: 3.15.2(@oxc-project/types@0.143.0)(better-sqlite3@12.6.2)(esbuild@0.28.2)(magic-string@1.1.0)(magicast@0.5.4)(oxc-parser@0.139.0)(rolldown@1.2.3)(rollup@4.62.4)(vite@8.2.1(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))
@@ -839,9 +836,6 @@ packages:
 
   '@floating-ui/vue@1.1.11':
     resolution: {integrity: sha512-HzHKCNVxnGS35r9fCHBc3+uCnjw9IWIlCPL683cGgM9Kgj2BiAl8x1mS7vtvP6F9S/e/q4O6MApwSHj8hNLGfw==}
-
-  '@fontsource/noto-sans-tc@5.3.0':
-    resolution: {integrity: sha512-+0MguVH2vIxkVJLiaMHVKHk+yJZmZvMU9d8z88JdUx8C2CgMLOtm7WNloi3HYlvCNy7TpuvjIUvh5iiGp6INxQ==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -7172,8 +7166,6 @@ snapshots:
     transitivePeerDependencies:
       - '@vue/composition-api'
       - vue
-
-  '@fontsource/noto-sans-tc@5.3.0': {}
 
   '@humanfs/core@0.19.1': {}
 
