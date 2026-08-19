@@ -128,8 +128,11 @@ and performs no Mermaid call:
 3. Fail closed if a stylesheet needed by the document cannot expose `cssRules`.
    Same-origin stylesheets and cross-origin stylesheets loaded with anonymous
    CORS are accepted; an opaque or blocked stylesheet aborts PNG export.
-4. Mount only the sanitized snapshot in a fixed, off-screen temporary host.
-5. Call `getFontEmbedCSS()` and pass the resulting CSS to `toBlob()` from
+4. Mount an inner capture node inside a fixed, off-screen staging host. The
+   staging host owns the off-screen position and negative z-index; the capture
+   node stays at its local origin, owns the exact committed width and height,
+   and contains only the sanitized snapshot.
+5. Pass the inner capture node to `getFontEmbedCSS()` and `toBlob()` from
    `html-to-image@1.11.11`.
 6. Use the committed width and height for `width`, `height`, `canvasWidth`, and
    `canvasHeight`, with `pixelRatio: 1`, so PNG dimensions equal the committed
@@ -149,7 +152,14 @@ that silently substitutes fallback fonts.
 The built-in renderer dynamically imports `src/runtime/png-rasterizer.ts` only
 after the PNG choice is activated. A module-scope promise caches that import and
 is reused by every later PNG request and every built-in diagram instance. The
-promise is not eagerly created, prefetched, reset, or retried.
+promise is not eagerly created, reset, or retried.
+
+The Nuxt module uses the official `build:manifest` hook before dependency hints
+are precomputed. It resolves its own PNG rasterizer source file, derives the
+exact manifest key relative to the Nuxt root, and sets `prefetch = false` only
+when that entry's `src` equals the same module-owned path and the entry remains
+dynamic. It does not inspect hashed asset filenames, remove `dynamicImports`,
+change any other resource hint, or post-process generated HTML.
 
 The PNG choice enters a visible loading state before awaiting the first dynamic
 import. While import or rasterization is pending, it is disabled and exposes
@@ -216,6 +226,7 @@ rasterizer:
 
 - no initial HTML, preload, modulepreload, or initial client request includes
   that asset;
+- unrelated dynamic assets retain their existing prefetch hints;
 - opening the disclosure or choosing SVG does not request it;
 - the first PNG activation requests it and shows the pending/disabled state;
 - later PNG activations reuse the cached import promise and do not request the

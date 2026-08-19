@@ -220,12 +220,14 @@ Implement these internal phases in order:
    stylesheet URL.
 4. Clone the already sanitized input so rasterization cannot mutate the caller's
    safe snapshot.
-5. Append the clone to a fixed off-screen host with explicit pixel width/height,
-   zero margin/padding, transparent background, and no user interaction.
-6. Call `getFontEmbedCSS(host, captureOptions)` once. Parse every `url(...)` in
+5. Append an inner capture node to a fixed off-screen staging host. Keep the
+   off-screen position and negative z-index only on the staging host; give the
+   capture node a local origin, explicit pixel width/height, zero margin/padding,
+   transparent background, and the cloned snapshot.
+6. Call `getFontEmbedCSS(captureNode, captureOptions)` once. Parse every `url(...)` in
    the returned font CSS and require `data:` URLs; `local()` without a URL is
    allowed.
-7. Call `toBlob(host, { ...captureOptions, fontEmbedCSS })`, where:
+7. Call `toBlob(captureNode, { ...captureOptions, fontEmbedCSS })`, where:
 
 ```ts
 const captureOptions = {
@@ -238,7 +240,7 @@ const captureOptions = {
 ```
 
 8. Require a non-null blob with `type === 'image/png'`.
-9. Remove the off-screen host in `finally` and never mutate the source SVG.
+9. Remove the outer staging host in `finally` and never mutate the source SVG.
 
 Do not patch `console`, set `backgroundColor`, call Mermaid, catch-and-return a
 fallback blob, or branch by browser.
@@ -504,8 +506,12 @@ explicitly without fallback output.
 ### Task 5: Prove production async-chunk loading
 
 **Files:**
-- Create: `test/fixtures/png-download-build/nuxt.config.ts`
-- Create: `test/fixtures/png-download-build/app.vue`
+- Modify: `src/module.ts`
+- Modify: `test/moduleSetup.test.ts`
+- Create: `test/fixtures/png-async-chunk/nuxt.config.ts`
+- Create: `test/fixtures/png-async-chunk/app.vue`
+- Create: `test/fixtures/png-async-chunk/control-prefetch.ts`
+- Create: `test/fixtures/png-async-chunk/mermaid-stub.ts`
 - Create: `test/pngAsyncChunk.e2e.test.ts`
 
 **Interfaces:**
@@ -532,31 +538,50 @@ await setup({
 The fixture renders one built-in SVG diagram with SVG/PNG disclosure enabled.
 After build, scan `.output/public/_nuxt/*.js` and identify the asset containing
 the `html-to-image@1.11.11` diagnostic string `Error inlining remote css file`.
-Assert exactly one asynchronous asset contains it and no initial HTML or public
-declaration contains `html-to-image`.
+Assert exactly one asynchronous asset contains it. Add a separate control
+dynamic import with a project-owned marker so the test can prove that unrelated
+prefetch hints remain unchanged.
 
-- [ ] **Step 2: Assert the production request timeline**
+Before changing production code, assert that initial HTML contains the control
+asset but not the PNG asset. The test must fail against Nuxt's default PNG
+prefetch hint.
+
+- [ ] **Step 2: Disable only the module-owned PNG prefetch entry**
+
+Register Nuxt's official `build:manifest` hook from `src/module.ts`. Resolve the
+actual module-owned PNG rasterizer path through the module resolver, derive its
+normalized manifest key relative to `nuxt.options.rootDir`, then set
+`prefetch = false` only when the entry has that exact key and `src` and remains
+a dynamic entry.
+
+Add a focused module test proving the PNG entry changes while a control entry
+and the importing entry's `dynamicImports` array stay byte-for-byte unchanged.
+Do not match `entry.file`, inspect a hash, clear dynamic imports, change global
+prefetch behavior, or post-process HTML.
+
+- [ ] **Step 3: Assert the production request timeline**
 
 Launch Chromium and register `page.on('request')` before navigation. Assert:
 
 1. initial navigation, hydration, and diagram render do not request the
    identified asset;
 2. no `preload` or `modulepreload` link references it;
-3. opening the disclosure does not request it;
-4. choosing SVG downloads `mermaid-diagram.svg` without requesting it;
-5. the first PNG click shows `aria-busy="true"` and disabled state, requests
+3. the control dynamic asset retains its initial HTML prefetch hint;
+4. opening the disclosure does not request it;
+5. choosing SVG downloads `mermaid-diagram.svg` without requesting it;
+6. the first PNG click shows `aria-busy="true"` and disabled state, requests
    the asset, and downloads `mermaid-diagram.png`;
-6. a second PNG download succeeds while the asset request count remains one.
+7. a second PNG download succeeds while the asset request count remains one.
 
 Also run `pnpm prepack`, read `dist/types.d.mts`, and assert it contains no
 `html-to-image` string and exposes no PNG rasterizer subpath.
 
-- [ ] **Step 3: Run the production gate and commit**
+- [ ] **Step 4: Run the production gate and commit**
 
 ```bash
 python .agents/skills/vitest/scripts/run_vitest.py --root . -- test/pngAsyncChunk.e2e.test.ts
 pnpm prepack
-git add test/fixtures/png-download-build test/pngAsyncChunk.e2e.test.ts
+git add src/module.ts test/moduleSetup.test.ts test/fixtures/png-async-chunk test/pngAsyncChunk.e2e.test.ts
 git commit -m "test: verify lazy PNG production chunk"
 ```
 
