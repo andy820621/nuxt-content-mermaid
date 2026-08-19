@@ -196,6 +196,20 @@ describe('expand/fullscreen toolbars', async () => {
 
     await page.keyboard.press('Tab')
     expect(await page.getByLabel('Zoom Out').evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Enter')
+    expect(await page.getByLabel('Zoom Out').evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Enter')
+    expect(await page.getByLabel('Zoom Out').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await page.keyboard.press('Tab')
+    expect(await page.getByLabel('Zoom In').evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Enter')
+    expect(await page.getByLabel('Zoom In').evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Enter')
+    expect(await page.getByLabel('Zoom In').evaluate(element => document.activeElement === element)).toBe(true)
+
+    await page.keyboard.press('Shift+Tab')
+    expect(await page.getByLabel('Zoom Out').evaluate(element => document.activeElement === element)).toBe(true)
     await page.keyboard.press('Shift+Tab')
     expect(await page.getByLabel('Minimize diagram').evaluate(element => document.activeElement === element)).toBe(true)
 
@@ -206,6 +220,12 @@ describe('expand/fullscreen toolbars', async () => {
     const fullscreenButton = root.getByLabel('Enter fullscreen')
     await fullscreenButton.click()
     const exitFullscreenButton = root.getByLabel('Exit fullscreen')
+    expect(await exitFullscreenButton.evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Tab')
+    expect(await page.getByLabel('Zoom Out').evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Enter')
+    expect(await page.getByLabel('Zoom Out').evaluate(element => document.activeElement === element)).toBe(true)
+    await page.keyboard.press('Shift+Tab')
     expect(await exitFullscreenButton.evaluate(element => document.activeElement === element)).toBe(true)
     await exitFullscreenButton.click()
     expect(await fullscreenButton.evaluate(element => document.activeElement === element)).toBe(true)
