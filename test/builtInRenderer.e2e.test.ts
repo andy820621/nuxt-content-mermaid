@@ -279,6 +279,59 @@ describe('built-in renderer integration', async () => {
     expect(await visibleSvg.count()).toBe(1)
   })
 
+  it('captures the committed snapshot before a newer visible render leaves the queue', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+    await page.locator('#primary-queue').click()
+    await waitForRuns(page, 2)
+
+    const portableButton = page.locator('#primary [aria-label="Download portable SVG"]')
+    const downloadPromise = page.waitForEvent('download')
+    await portableButton.click()
+
+    await releaseNext(page)
+    await waitForRuns(page, 3)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
+    })).toEqual(expect.objectContaining({
+      source: 'graph TD;INITIAL-->DONE',
+      htmlLabels: false,
+    }))
+
+    await releaseNext(page)
+    await downloadPromise
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('2')
+  })
+
+  it('keeps a click-time export snapshot through a stale render completion', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await installDiagnosticCapture(page)
+    await renderInitialDiagram(page)
+
+    await page.locator('#primary-queue').click()
+    await waitForRuns(page, 2)
+    await page.locator('#primary-queue').click()
+    await waitForDiagnosticCount(page, 'queue:enqueue', 3)
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.locator('#primary [aria-label="Download portable SVG"]').click()
+
+    await releaseNext(page)
+    await waitForRuns(page, 3)
+    await releaseNext(page)
+    await waitForRuns(page, 4)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[3]
+    })).toEqual(expect.objectContaining({
+      source: 'graph TD;INITIAL-->DONE',
+      htmlLabels: false,
+    }))
+
+    await releaseNext(page)
+    await downloadPromise
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('3')
+  })
+
   it('does not change copy, expand, fullscreen, or zoom state while downloading', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installSvgDownloadCapture(page)
@@ -306,7 +359,7 @@ describe('built-in renderer integration', async () => {
     }, initialOverlayZoom, { timeout: 5000 })
     const zoomedOverlayValue = await overlayZoomInfo.textContent()
 
-    await page.locator('#primary [aria-label="Download SVG"]').evaluate((button: HTMLButtonElement) => button.click())
+    await page.locator('#primary [aria-label="Download faithful SVG"]').evaluate((button: HTMLButtonElement) => button.click())
     await waitForSvgDownloadCount(page, 1)
     await expandModal.waitFor({ state: 'visible', timeout: 5000 })
     expect(await overlayZoomInfo.textContent()).toBe(zoomedOverlayValue)
@@ -324,11 +377,16 @@ describe('built-in renderer integration', async () => {
     }, initialFullscreenZoom, { timeout: 5000 })
     const zoomedFullscreenValue = await fullscreenZoomInfo.textContent()
 
-    await page.locator('#primary [aria-label="Download SVG"]').evaluate((button: HTMLButtonElement) => button.click())
+    await page.locator('#primary [aria-label="Download portable SVG"]').evaluate((button: HTMLButtonElement) => button.click())
+    await waitForRuns(page, 2)
+    expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
+    await releaseNext(page)
     await waitForSvgDownloadCount(page, 2)
     expect(await fullscreenZoomInfo.textContent()).toBe(zoomedFullscreenValue)
     expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
     expect(await copiedButton.count()).toBe(1)
+    expect(await page.locator('#primary [data-testid="built-in-spinner"]').count()).toBe(0)
+    expect(await page.locator('#primary [data-testid="built-in-error"]').count()).toBe(0)
   })
 
   it('materializes a fresh Mermaid configuration for every render attempt', { timeout: 20000 }, async () => {
@@ -517,12 +575,15 @@ describe('built-in renderer integration', async () => {
   it('reports once per reactive conflict episode and recovers exactly once with the latest state', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialReactiveConflictDiagram(page)
-    const downloadButton = page.locator('#reactive-conflict [aria-label="Download SVG"]')
-    expect(await downloadButton.isEnabled()).toBe(true)
+    const faithfulButton = page.locator('#reactive-conflict [aria-label="Download faithful SVG"]')
+    const portableButton = page.locator('#reactive-conflict [aria-label="Download portable SVG"]')
+    expect(await faithfulButton.isEnabled()).toBe(true)
+    expect(await portableButton.isEnabled()).toBe(true)
 
     await page.locator('#reactive-conflict-enter').click()
     await waitForComponentErrors(page, 1)
-    expect(await downloadButton.isDisabled()).toBe(true)
+    expect(await faithfulButton.isDisabled()).toBe(true)
+    expect(await portableButton.isDisabled()).toBe(true)
     const fingerprint = page.locator('#component-error')
     expect(await fingerprint.getAttribute('data-name')).toBe('MermaidComponentConfigurationError')
     expect(await fingerprint.getAttribute('data-code')).toBe('CONTENT_MERMAID_COMPONENT_CONFIGURATION_ERROR')
@@ -538,7 +599,12 @@ describe('built-in renderer integration', async () => {
 
     await page.locator('#reactive-conflict-recover').click()
     await waitForRuns(page, 3)
-    expect(await downloadButton.isEnabled()).toBe(true)
+    expect(await faithfulButton.isEnabled()).toBe(true)
+    expect(await portableButton.isEnabled()).toBe(true)
+    expect(await downloadSvgText(
+      page,
+      '#reactive-conflict [aria-label="Download faithful SVG"]',
+    )).toContain('data-run-id="2"')
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
     })).toEqual(expect.objectContaining({
@@ -553,7 +619,8 @@ describe('built-in renderer integration', async () => {
 
     await page.locator('#reactive-conflict-reenter').click()
     await waitForComponentErrors(page, 2)
-    expect(await downloadButton.isDisabled()).toBe(true)
+    expect(await faithfulButton.isDisabled()).toBe(true)
+    expect(await portableButton.isDisabled()).toBe(true)
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs.length
     })).toBe(3)
@@ -623,7 +690,7 @@ describe('built-in renderer integration', async () => {
     const page = await createPage()
     await installDiagnosticCapture(page)
     await renderInitialDiagram(page)
-    const downloadSelector = '#primary [aria-label="Download SVG"]'
+    const downloadSelector = '#primary [aria-label="Download faithful SVG"]'
     expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="1"')
 
     await page.locator('#primary-fail').click()
@@ -690,19 +757,25 @@ describe('built-in renderer integration', async () => {
     await waitForRuns(page, 2)
     await releaseNext(page)
     await page.locator('#strict .mermaid > svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
-    const strictDownloadButton = page.locator('#strict [aria-label="Download SVG"]')
-    expect(await strictDownloadButton.isEnabled()).toBe(true)
-    await strictDownloadButton.click()
+    const strictFaithfulButton = page.locator('#strict [aria-label="Download faithful SVG"]')
+    const strictPortableButton = page.locator('#strict [aria-label="Download portable SVG"]')
+    expect(await strictFaithfulButton.isEnabled()).toBe(true)
+    expect(await strictPortableButton.isEnabled()).toBe(true)
+    await strictFaithfulButton.click()
     await readLatestSvgDownload(page)
 
     await page.locator('#sandbox-mount').click()
     await waitForRuns(page, 3)
-    const sandboxDownloadButton = page.locator('#sandbox [aria-label="Download SVG"]')
-    expect(await sandboxDownloadButton.isDisabled()).toBe(true)
+    const sandboxFaithfulButton = page.locator('#sandbox [aria-label="Download faithful SVG"]')
+    const sandboxPortableButton = page.locator('#sandbox [aria-label="Download portable SVG"]')
+    expect(await sandboxFaithfulButton.isDisabled()).toBe(true)
+    expect(await sandboxPortableButton.isDisabled()).toBe(true)
     await releaseNext(page)
     await page.locator('#sandbox .mermaid > iframe[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })
-    expect(await sandboxDownloadButton.isDisabled()).toBe(true)
-    await sandboxDownloadButton.evaluate((button: HTMLButtonElement) => button.click())
+    expect(await sandboxFaithfulButton.isDisabled()).toBe(true)
+    expect(await sandboxPortableButton.isDisabled()).toBe(true)
+    await sandboxFaithfulButton.evaluate((button: HTMLButtonElement) => button.click())
+    await sandboxPortableButton.evaluate((button: HTMLButtonElement) => button.click())
     await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0)))
     expect(await page.evaluate(() => {
       return (window as SvgDownloadCaptureWindow).__svgDownloads__?.length

@@ -88,7 +88,9 @@ describe('custom renderer option', async () => {
     const slotSource = page.locator('#slot-diagram [data-testid="renderer-slot-source"]')
     await slotSource.waitFor({ state: 'visible', timeout: 5000 })
     expect(await slotSource.textContent()).toBe('graph TD;A-->B;B-->C;')
-    expect(await codeDiagram.getByLabel('Download SVG').count()).toBe(0)
+    expect(await codeDiagram.locator(
+      '[aria-label="Download faithful SVG"], [aria-label="Download portable SVG"]',
+    ).count()).toBe(0)
 
     // Custom renderer does not output built-in SVG from mermaid.run
     const svg = page.locator('#diagram-container svg')
