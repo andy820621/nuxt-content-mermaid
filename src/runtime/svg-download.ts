@@ -133,14 +133,23 @@ function normalizeForeignObjectLabels(svg: SVGSVGElement) {
 }
 
 /** @internal */
-export function serializeSafeStandaloneSvg(source: SVGSVGElement): string {
+export function createSafeStandaloneSvgClone(
+  source: SVGSVGElement,
+): SVGSVGElement {
   const clone = source.cloneNode(true) as SVGSVGElement
   sanitizeSvgClone(clone)
   normalizeForeignObjectLabels(clone)
   clone.setAttribute('xmlns', SVG_NAMESPACE)
   if (clone.querySelector('[xlink\\:href]'))
     clone.setAttributeNS(XMLNS_NAMESPACE, 'xmlns:xlink', XLINK_NAMESPACE)
-  return new XMLSerializer().serializeToString(clone)
+  return clone
+}
+
+/** @internal */
+export function serializeSafeStandaloneSvg(source: SVGSVGElement): string {
+  return new XMLSerializer().serializeToString(
+    createSafeStandaloneSvgClone(source),
+  )
 }
 
 interface SvgDownloadOptions {
@@ -156,10 +165,15 @@ export function downloadStandaloneSvg(
     [serializeSafeStandaloneSvg(source)],
     { type: SVG_DOWNLOAD_MIME_TYPE },
   )
+  downloadBlob(blob, options.filename ?? SVG_DOWNLOAD_FILENAME)
+}
+
+/** @internal */
+export function downloadBlob(blob: Blob, filename: string): void {
   const objectUrl = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = objectUrl
-  anchor.download = options.filename ?? SVG_DOWNLOAD_FILENAME
+  anchor.download = filename
   anchor.hidden = true
   document.body.appendChild(anchor)
   anchor.click()
