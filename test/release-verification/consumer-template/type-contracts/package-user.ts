@@ -17,7 +17,9 @@ const options = {
       zoomIn: 'Zoom in',
       zoomOut: 'Zoom out',
       resetZoom: 'Reset zoom',
-      downloadSvg: 'Download SVG',
+      download: 'Download diagram',
+      downloadSvg: 'Download as SVG',
+      downloadPng: 'Download as PNG',
     },
     buttons: {
       copy: true,

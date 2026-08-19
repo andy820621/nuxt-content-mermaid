@@ -151,7 +151,7 @@ describe('v3 migration playground', async () => {
     expect(Math.max(...result.closing.map(center => Math.abs(center - result.sourceCenter)))).toBeLessThanOrEqual(0.25)
   })
 
-  it('downloads faithful HTML labels and portable native text from the same class diagram', { timeout: 30000 }, async () => {
+  it('downloads the sanitized committed SVG without changing Mermaid HTML labels', { timeout: 30000 }, async () => {
     const page = await createPage()
     const response = await page.goto(url('/mermaid/classdiagram/finance-ledger'))
     expect(response?.status()).toBe(200)
@@ -162,13 +162,11 @@ describe('v3 migration playground', async () => {
     await visibleSvg.waitFor({ state: 'visible', timeout: 15000 })
     expect(await visibleSvg.locator('foreignObject').count()).toBeGreaterThan(0)
 
-    const faithfulDownload = await downloadSvg(
+    const downloadTrigger = block.getByLabel('Download diagram')
+    await downloadTrigger.click()
+    const svgDownload = await downloadSvg(
       page,
-      '.mermaid-block [aria-label="Download faithful SVG"]',
-    )
-    const portableDownload = await downloadSvg(
-      page,
-      '.mermaid-block [aria-label="Download portable SVG"]',
+      '.mermaid-block [aria-label="Download as SVG"]',
     )
 
     const inspectSvg = (text: string) => page.evaluate((svgText) => {
@@ -183,29 +181,18 @@ describe('v3 migration playground', async () => {
       }
     }, text)
 
-    const faithful = await inspectSvg(faithfulDownload.text)
-    const portable = await inspectSvg(portableDownload.text)
+    const downloaded = await inspectSvg(svgDownload.text)
 
-    expect(faithfulDownload.filename).toBe('mermaid-diagram-faithful.svg')
-    expect(faithful).toMatchObject({
+    expect(svgDownload.filename).toBe('mermaid-diagram.svg')
+    expect(downloaded).toMatchObject({
       parserErrors: 0,
       rootNamespace: 'http://www.w3.org/2000/svg',
       xhtmlNamespace: 'http://www.w3.org/1999/xhtml',
     })
-    expect(faithful.foreignObjects).toBeGreaterThan(0)
-    expect(faithful.textContent).toContain('User')
-    expect(faithful.textContent).toContain('Transaction')
-
-    expect(portableDownload.filename).toBe('mermaid-diagram-portable.svg')
-    expect(portable).toMatchObject({
-      parserErrors: 0,
-      rootNamespace: 'http://www.w3.org/2000/svg',
-      foreignObjects: 0,
-    })
-    expect(portable.nativeText).toBeGreaterThan(0)
-    expect(portable.textContent).toContain('User')
-    expect(portable.textContent).toContain('Transaction')
-    expect(portable.textContent).toContain('Budget')
+    expect(downloaded.foreignObjects).toBeGreaterThan(0)
+    expect(downloaded.textContent).toContain('User')
+    expect(downloaded.textContent).toContain('Transaction')
+    expect(downloaded.textContent).toContain('Budget')
     expect(await visibleSvg.locator('foreignObject').count()).toBeGreaterThan(0)
   })
 })

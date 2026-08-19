@@ -24,6 +24,15 @@ export interface MermaidControl {
   releaseNext: () => void
 }
 
+export interface HtmlToImageControl {
+  calls: number
+  pending: number
+  failNext: (message: string) => void
+  releaseNext: () => void
+}
+
 export type MermaidTestWindow = Window & {
   __mermaidControl__?: MermaidControl
+  __htmlToImageControl__?: HtmlToImageControl
+  __htmlToImageModuleEvaluations__?: number
 }

@@ -33,6 +33,22 @@ async function waitForRuns(page: BrowserPage, expected: number) {
   }, expected, { timeout: 5000 })
 }
 
+async function activeAriaLabel(page: BrowserPage) {
+  return page.evaluate(() => document.activeElement?.getAttribute('aria-label'))
+}
+
+async function waitForPngPending(page: BrowserPage, expected: number) {
+  await page.waitForFunction((count: number) => {
+    return (window as MermaidTestWindow).__htmlToImageControl__?.pending === count
+  }, expected, { timeout: 5000 })
+}
+
+async function releaseNextPng(page: BrowserPage) {
+  await page.evaluate(() => {
+    (window as MermaidTestWindow).__htmlToImageControl__?.releaseNext()
+  })
+}
+
 async function waitForComponentErrors(page: BrowserPage, expected: number) {
   await page.waitForFunction((count: number) => {
     return document.querySelector('#component-error')?.getAttribute('data-count') === String(count)
@@ -131,9 +147,18 @@ async function readLatestSvgDownload(page: BrowserPage) {
   })
 }
 
-async function downloadSvgText(page: BrowserPage, selector: string) {
+async function openDownloadDisclosure(page: BrowserPage, rootSelector: string) {
+  const trigger = page.locator(`${rootSelector} [aria-label="Download diagram"]`)
+  if (await trigger.getAttribute('aria-expanded') !== 'true')
+    await trigger.evaluate((button: HTMLButtonElement) => button.click())
+  await page.locator(`${rootSelector} [aria-label="Download as SVG"]`)
+    .waitFor({ state: 'visible', timeout: 5000 })
+}
+
+async function downloadSvgText(page: BrowserPage, rootSelector: string) {
+  await openDownloadDisclosure(page, rootSelector)
   const downloadPromise = page.waitForEvent('download')
-  await page.locator(selector).click()
+  await page.locator(`${rootSelector} [aria-label="Download as SVG"]`).click()
   const download = await downloadPromise
   const downloadPath = await download.path()
   if (!downloadPath) throw new Error('Expected the SVG download to have a local path')
@@ -178,22 +203,167 @@ describe('built-in renderer integration', async () => {
     ]))
   })
 
-  it('removes both temporary SVG controls without creating download-time Mermaid work', { timeout: 20000 }, async () => {
+  it('keeps one snapshot download trigger without creating download-time Mermaid work', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialDiagram(page)
 
-    expect(await page.locator('#primary [aria-label="Download faithful SVG"]').count()).toBe(0)
-    expect(await page.locator('#primary [aria-label="Download portable SVG"]').count()).toBe(0)
+    expect(await page.locator('#primary .ncm-download').count()).toBe(1)
+    expect(await page.locator('#primary .ncm-download > .mermaid-btn').count()).toBe(1)
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs.length
     })).toBe(1)
+  })
+
+  it('exposes one native download disclosure without ARIA menu roles', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await page.goto(url('/'))
+
+    const trigger = page.locator('#primary [aria-label="Download diagram"]')
+    expect(await trigger.count()).toBe(1)
+    expect(await trigger.isDisabled()).toBe(true)
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+    const controlsId = await trigger.getAttribute('aria-controls')
+    expect(controlsId).toBeTruthy()
+
+    await waitForPending(page, 1)
+    await releaseNext(page)
+    await page.locator('#primary svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
+    expect(await trigger.isEnabled()).toBe(true)
+
+    await trigger.click()
+    expect(await trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(await page.locator(`#${controlsId}`).count()).toBe(1)
+    expect(await page.locator('#primary button[aria-label="Download as SVG"]').count()).toBe(1)
+    expect(await page.locator('#primary button[aria-label="Download as PNG"]').count()).toBe(1)
+    expect(await page.locator('#primary [role="menu"], #primary [role="menuitem"]').count()).toBe(0)
+  })
+
+  it('implements the accepted download keyboard contract with natural Tab order', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    const trigger = page.locator('#primary [aria-label="Download diagram"]')
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    expect(await activeAriaLabel(page)).toBe('Download as SVG')
+    await page.keyboard.press('Tab')
+    expect(await activeAriaLabel(page)).toBe('Download as PNG')
+    await page.keyboard.press('Tab')
+    expect(await activeAriaLabel(page)).toBe('Expand diagram')
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+
+    await trigger.focus()
+    await page.keyboard.press('Space')
+    expect(await activeAriaLabel(page)).toBe('Download as SVG')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Shift+Tab')
+    expect(await activeAriaLabel(page)).toBe('Download as SVG')
+    await page.keyboard.press('Shift+Tab')
+    expect(await activeAriaLabel(page)).toBe('Download diagram')
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+
+    await page.keyboard.press('Enter')
+    expect(await activeAriaLabel(page)).toBe('Download as SVG')
+    await page.keyboard.press('Escape')
+    expect(await activeAriaLabel(page)).toBe('Download diagram')
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+
+    await page.keyboard.press('Enter')
+    await page.locator('#primary-queue').dispatchEvent('pointerdown')
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(await activeAriaLabel(page)).not.toBe('Download diagram')
+  })
+
+  it('lazy-loads PNG once, exposes pending state, and restores trigger focus after each format', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+
+    const trigger = page.locator('#primary [aria-label="Download diagram"]')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__htmlToImageModuleEvaluations__ ?? 0
+    })).toBe(0)
+
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    const svgDownloadPromise = page.waitForEvent('download')
+    await page.keyboard.press('Enter')
+    expect((await svgDownloadPromise).suggestedFilename()).toBe('mermaid-diagram.svg')
+    expect(await activeAriaLabel(page)).toBe('Download diagram')
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__htmlToImageModuleEvaluations__ ?? 0
+    })).toBe(0)
+
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Tab')
+    const pngButton = page.locator('#primary [aria-label="Download as PNG"]')
+    await page.keyboard.press('Enter')
+    await waitForPngPending(page, 1)
+    expect(await trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(await pngButton.isDisabled()).toBe(true)
+    expect(await pngButton.getAttribute('aria-busy')).toBe('true')
+    expect(await pngButton.locator('.ncm-download-spinner').count()).toBe(1)
+    await pngButton.evaluate((button: HTMLButtonElement) => button.click())
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__htmlToImageControl__?.calls
+    })).toBe(1)
+
+    const pngDownloadPromise = page.waitForEvent('download')
+    await releaseNextPng(page)
+    expect((await pngDownloadPromise).suggestedFilename()).toBe('mermaid-diagram.png')
+    expect(await activeAriaLabel(page)).toBe('Download diagram')
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Enter')
+    await waitForPngPending(page, 1)
+    const secondPngDownloadPromise = page.waitForEvent('download')
+    await releaseNextPng(page)
+    expect((await secondPngDownloadPromise).suggestedFilename()).toBe('mermaid-diagram.png')
+    expect(await page.evaluate(() => ({
+      evaluations: (window as MermaidTestWindow).__htmlToImageModuleEvaluations__,
+      calls: (window as MermaidTestWindow).__htmlToImageControl__?.calls,
+      runs: (window as MermaidTestWindow).__mermaidControl__?.runs.length,
+    }))).toEqual({ evaluations: 1, calls: 2, runs: 1 })
+  })
+
+  it('reports one PNG rasterization failure without creating a download', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    const errors: string[] = []
+    let downloadCount = 0
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text())
+    })
+    page.on('download', () => {
+      downloadCount++
+    })
+    await renderInitialDiagram(page)
+
+    const trigger = page.locator('#primary [aria-label="Download diagram"]')
+    await trigger.focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Enter')
+    await waitForPngPending(page, 1)
+    await page.evaluate(() => {
+      (window as MermaidTestWindow).__htmlToImageControl__?.failNext('blocked font')
+    })
+    await releaseNextPng(page)
+    await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('false')
+
+    expect(await activeAriaLabel(page)).toBe('Download diagram')
+    expect(downloadCount).toBe(0)
+    await expect.poll(() => errors.filter(error => error.includes(
+      '[nuxt-content-mermaid] Failed to download PNG:',
+    ))).toHaveLength(1)
   })
 
   it('downloads the latest committed strict SVG and stays disabled before the first commit', { timeout: 20000 }, async () => {
     const page = await createPage()
     await page.goto(url('/'))
 
-    const downloadButton = page.locator('#primary [aria-label="Download SVG"]')
+    const downloadButton = page.locator('#primary [aria-label="Download diagram"]')
     expect(await downloadButton.count()).toBe(1)
     expect(await downloadButton.isDisabled()).toBe(true)
 
@@ -202,8 +372,9 @@ describe('built-in renderer integration', async () => {
     await page.locator('#primary svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
     expect(await downloadButton.isEnabled()).toBe(true)
 
+    await openDownloadDisclosure(page, '#primary')
     const downloadPromise = page.waitForEvent('download')
-    await downloadButton.click()
+    await page.locator('#primary [aria-label="Download as SVG"]').click()
     const download = await downloadPromise
     const downloadPath = await download.path()
 
@@ -228,7 +399,8 @@ describe('built-in renderer integration', async () => {
     expect(await visibleSvg.locator('script, foreignObject, iframe, object, embed').count()).toBe(4)
     expect(await visibleSvg.getAttribute('onclick')).toBe('alert(1)')
 
-    await page.locator('#primary [aria-label="Download SVG"]').click()
+    await openDownloadDisclosure(page, '#primary')
+    await page.locator('#primary [aria-label="Download as SVG"]').click()
     const capture = await readLatestSvgDownload(page)
 
     expect(capture).toMatchObject({
@@ -262,11 +434,12 @@ describe('built-in renderer integration', async () => {
     await renderInitialDiagram(page)
 
     const visibleSvg = page.locator('#primary svg[data-run-id="1"]')
-    const downloadButton = page.locator('#primary [aria-label="Download SVG"]')
+    const downloadButton = page.locator('#primary [aria-label="Download diagram"]')
     expect(await downloadButton.count()).toBe(1)
 
+    await openDownloadDisclosure(page, '#primary')
     const downloadPromise = page.waitForEvent('download')
-    await downloadButton.click()
+    await page.locator('#primary [aria-label="Download as SVG"]').click()
     const download = await downloadPromise
     const downloadPath = await download.path()
 
@@ -287,8 +460,9 @@ describe('built-in renderer integration', async () => {
     await page.locator('#primary-queue').click()
     await waitForRuns(page, 2)
 
+    await openDownloadDisclosure(page, '#primary')
     const downloadPromise = page.waitForEvent('download')
-    await page.locator('#primary [aria-label="Download SVG"]').click()
+    await page.locator('#primary [aria-label="Download as SVG"]').click()
     const download = await downloadPromise
     const downloadPath = await download.path()
     expect(downloadPath).not.toBeNull()
@@ -312,8 +486,9 @@ describe('built-in renderer integration', async () => {
     await page.locator('#primary-queue').click()
     await waitForDiagnosticCount(page, 'queue:enqueue', 3)
 
+    await openDownloadDisclosure(page, '#primary')
     const downloadPromise = page.waitForEvent('download')
-    await page.locator('#primary [aria-label="Download SVG"]').click()
+    await page.locator('#primary [aria-label="Download as SVG"]').click()
     const download = await downloadPromise
     const downloadPath = await download.path()
     expect(downloadPath).not.toBeNull()
@@ -356,7 +531,8 @@ describe('built-in renderer integration', async () => {
     }, initialOverlayZoom, { timeout: 5000 })
     const zoomedOverlayValue = await overlayZoomInfo.textContent()
 
-    await page.locator('#primary [aria-label="Download SVG"]').evaluate((button: HTMLButtonElement) => button.click())
+    await openDownloadDisclosure(page, '#primary')
+    await page.locator('#primary [aria-label="Download as SVG"]').evaluate((button: HTMLButtonElement) => button.click())
     await waitForSvgDownloadCount(page, 1)
     await expandModal.waitFor({ state: 'visible', timeout: 5000 })
     expect(await overlayZoomInfo.textContent()).toBe(zoomedOverlayValue)
@@ -374,7 +550,8 @@ describe('built-in renderer integration', async () => {
     }, initialFullscreenZoom, { timeout: 5000 })
     const zoomedFullscreenValue = await fullscreenZoomInfo.textContent()
 
-    await page.locator('#primary [aria-label="Download SVG"]').evaluate((button: HTMLButtonElement) => button.click())
+    await openDownloadDisclosure(page, '#primary')
+    await page.locator('#primary [aria-label="Download as SVG"]').evaluate((button: HTMLButtonElement) => button.click())
     expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
     await waitForSvgDownloadCount(page, 2)
     expect(await fullscreenZoomInfo.textContent()).toBe(zoomedFullscreenValue)
@@ -570,7 +747,7 @@ describe('built-in renderer integration', async () => {
   it('reports once per reactive conflict episode and recovers exactly once with the latest state', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialReactiveConflictDiagram(page)
-    const downloadButton = page.locator('#reactive-conflict [aria-label="Download SVG"]')
+    const downloadButton = page.locator('#reactive-conflict [aria-label="Download diagram"]')
     expect(await downloadButton.isEnabled()).toBe(true)
 
     await page.locator('#reactive-conflict-enter').click()
@@ -594,7 +771,7 @@ describe('built-in renderer integration', async () => {
     expect(await downloadButton.isEnabled()).toBe(true)
     expect(await downloadSvgText(
       page,
-      '#reactive-conflict [aria-label="Download SVG"]',
+      '#reactive-conflict',
     )).toContain('data-run-id="2"')
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs[2]
@@ -680,8 +857,7 @@ describe('built-in renderer integration', async () => {
     const page = await createPage()
     await installDiagnosticCapture(page)
     await renderInitialDiagram(page)
-    const downloadSelector = '#primary [aria-label="Download SVG"]'
-    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="1"')
+    expect(await downloadSvgText(page, '#primary')).toContain('data-run-id="1"')
 
     await page.locator('#primary-fail').click()
     await waitForRuns(page, 2)
@@ -692,7 +868,7 @@ describe('built-in renderer integration', async () => {
     expect(await error.getAttribute('data-same-error')).toBe('true')
     expect(await page.getByTestId('built-in-error-message').textContent()).toBe('Broken diagram')
     expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
-    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="1"')
+    expect(await downloadSvgText(page, '#primary')).toContain('data-run-id="1"')
 
     await page.locator('#primary-recover').click()
     await waitForRuns(page, 3)
@@ -704,12 +880,12 @@ describe('built-in renderer integration', async () => {
     await waitForPending(page, 1)
     expect(await error.isVisible()).toBe(true)
     expect(await page.locator('#primary .mermaid > svg').getAttribute('data-run-id')).toBe('1')
-    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="1"')
+    expect(await downloadSvgText(page, '#primary')).toContain('data-run-id="1"')
 
     await releaseNext(page)
     await error.waitFor({ state: 'detached', timeout: 5000 })
     await page.locator('#primary svg[data-run-id="4"]').waitFor({ state: 'visible', timeout: 5000 })
-    expect(await downloadSvgText(page, downloadSelector)).toContain('data-run-id="4"')
+    expect(await downloadSvgText(page, '#primary')).toContain('data-run-id="4"')
   })
 
   it('skips a queued request whose latest source is empty', { timeout: 20000 }, async () => {
@@ -747,14 +923,15 @@ describe('built-in renderer integration', async () => {
     await waitForRuns(page, 2)
     await releaseNext(page)
     await page.locator('#strict .mermaid > svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
-    const strictDownloadButton = page.locator('#strict [aria-label="Download SVG"]')
+    const strictDownloadButton = page.locator('#strict [aria-label="Download diagram"]')
     expect(await strictDownloadButton.isEnabled()).toBe(true)
-    await strictDownloadButton.click()
+    await openDownloadDisclosure(page, '#strict')
+    await page.locator('#strict [aria-label="Download as SVG"]').click()
     await readLatestSvgDownload(page)
 
     await page.locator('#sandbox-mount').click()
     await waitForRuns(page, 3)
-    const sandboxDownloadButton = page.locator('#sandbox [aria-label="Download SVG"]')
+    const sandboxDownloadButton = page.locator('#sandbox [aria-label="Download diagram"]')
     expect(await sandboxDownloadButton.isDisabled()).toBe(true)
     await releaseNext(page)
     await page.locator('#sandbox .mermaid > iframe[data-run-id="3"]').waitFor({ state: 'visible', timeout: 5000 })

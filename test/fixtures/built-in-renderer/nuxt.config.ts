@@ -11,7 +11,8 @@ export default defineNuxtConfig({
     '@nuxt/content',
   ],
   alias: {
-    mermaid: resolve(fixtureDir, 'mermaid-stub.ts'),
+    'html-to-image': resolve(fixtureDir, 'html-to-image-stub.ts'),
+    'mermaid': resolve(fixtureDir, 'mermaid-stub.ts'),
   },
   compatibilityDate: '2025-11-24',
   nitro: {

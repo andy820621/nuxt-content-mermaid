@@ -301,11 +301,12 @@ describe('expand/fullscreen toolbars', async () => {
     expect(await root.getByLabel('放大縮放').getAttribute('title')).toBe('放大縮放')
     await exitFullscreenButton.click()
 
-    for (const label of ['Download faithful SVG', 'Download portable SVG']) {
-      const downloadButton = root.getByLabel(label)
-      expect(await downloadButton.getAttribute('title')).toBe(label)
-      expect(await downloadButton.isEnabled()).toBe(true)
-    }
+    const downloadButton = root.getByLabel('下載圖片')
+    expect(await downloadButton.getAttribute('title')).toBe('下載圖片')
+    expect(await downloadButton.isEnabled()).toBe(true)
+    await downloadButton.click()
+    expect(await root.getByLabel('下載成 SVG').getAttribute('title')).toBe('下載成 SVG')
+    expect(await root.getByLabel('下載成 PNG').getAttribute('title')).toBe('下載成 PNG')
   })
 
   it('uses the configured copy failure label after both clipboard paths fail', { timeout: 20000 }, async () => {

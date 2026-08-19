@@ -34,7 +34,7 @@ function createDocument(options: {
   fontsReady?: Promise<unknown>
   styleSheets?: ArrayLike<CSSStyleSheet>
 } = {}): FakeDocument {
-  const document = {
+  const document: FakeDocument = {
     fonts: options.fontsReady ? { ready: options.fontsReady } : undefined,
     styleSheets: options.styleSheets ?? [],
     hosts: [],
@@ -60,7 +60,7 @@ function createDocument(options: {
       document.hosts.push(host)
       return host
     },
-  } satisfies FakeDocument
+  }
 
   return document
 }
@@ -139,7 +139,7 @@ describe('PNG snapshot rasterizer', () => {
       get cssRules() {
         throw new DOMException('Blocked', 'SecurityError')
       },
-    } as CSSStyleSheet
+    } as unknown as CSSStyleSheet
     const document = createDocument({ styleSheets: [blockedSheet] })
     const { source } = createSvg(document)
 
