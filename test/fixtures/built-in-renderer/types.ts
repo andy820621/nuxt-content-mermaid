@@ -26,6 +26,8 @@ export interface MermaidControl {
 
 export interface HtmlToImageControl {
   calls: number
+  fontFamilies: string[]
+  fontSources: string[]
   pending: number
   failNext: (message: string) => void
   releaseNext: () => void

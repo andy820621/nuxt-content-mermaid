@@ -29,7 +29,7 @@ function createLabelMarkup(includeUnsafeResources = false) {
 
   return `<foreignObject${foreignObjectAttributes}>
     <div xmlns="http://www.w3.org/1999/xhtml">
-      <strong>foreign content</strong>${image}
+      <strong class="ncm-font-used">foreign content</strong>${image}
     </div>
   </foreignObject>`
 }
