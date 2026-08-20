@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.0.4
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.3...v3.0.4)
+
+### 🩹 Fixes
+
+- Scope PNG fonts and preserve download disclosure target ([#121](https://github.com/andy820621/nuxt-content-mermaid/pull/121))
+- Avoid hydration mismatch in download disclosure IDs ([#126](https://github.com/andy820621/nuxt-content-mermaid/pull/126))
+
+### 🏡 Chore
+
+- Move pnpm settings to workspace config ([#116](https://github.com/andy820621/nuxt-content-mermaid/pull/116))
+- Rename final compatibility profile to package compatibility pr… ([#122](https://github.com/andy820621/nuxt-content-mermaid/pull/122))
+
+### ❤️ Contributors
+
+- [@BarZ](https://github.com/andy820621) - <andy820621@gmail.com>
+
 ## v3.0.3
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.2...v3.0.3)
