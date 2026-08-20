@@ -128,7 +128,8 @@ const hasError = ref(false)
 const errorContent = shallowRef<unknown | null>(null)
 const committedExportSnapshot = shallowRef<CommittedExportSnapshot | null>(null)
 const isCommittedOutputSvg = ref(false)
-const downloadDisclosureId = `ncm-download-${useId()}`
+const generatedDownloadDisclosureId = `ncm-download-${useId()}`
+const downloadDisclosureId = ref<string>()
 const isDownloadDisclosureOpen = ref(false)
 const isPngDownloadPending = ref(false)
 
@@ -669,6 +670,8 @@ async function copyToClipboard(text: string) {
 }
 
 onMounted(() => {
+  downloadDisclosureId.value = generatedDownloadDisclosureId
+
   if (!isEnabled) return
 
   document.addEventListener('pointerdown', handleDocumentPointerDown)
