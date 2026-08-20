@@ -41,6 +41,69 @@ function normalizeText(text: string | null) {
   return text?.replace(/\s+/g, ' ').trim() ?? ''
 }
 
+interface RobotsGroup {
+  userAgents: string[]
+  directives: Map<string, string[]>
+}
+
+function parseRobotsGroups(source: string): RobotsGroup[] {
+  const groups: RobotsGroup[] = []
+  let current: RobotsGroup | undefined
+
+  for (const rawLine of source.split(/\r?\n/)) {
+    const line = rawLine.replace(/#.*$/, '').trim()
+    if (!line)
+      continue
+
+    const separator = line.indexOf(':')
+    if (separator === -1)
+      continue
+
+    const name = line.slice(0, separator).trim().toLowerCase()
+    const value = line.slice(separator + 1).trim().toLowerCase()
+
+    if (name === 'user-agent') {
+      if (!current || current.directives.size > 0) {
+        current = { userAgents: [], directives: new Map() }
+        groups.push(current)
+      }
+      current.userAgents.push(value)
+      continue
+    }
+
+    if (!current)
+      continue
+
+    const values = current.directives.get(name) ?? []
+    values.push(value)
+    current.directives.set(name, values)
+  }
+
+  return groups
+}
+
+function robotsGroupFor(groups: RobotsGroup[], userAgent: string) {
+  const normalizedAgent = userAgent.toLowerCase()
+  return groups.find(group => group.userAgents.includes(normalizedAgent))
+    ?? groups.find(group => group.userAgents.includes('*'))
+}
+
+function directivePreferences(group: RobotsGroup, directive: string) {
+  return (group.directives.get(directive) ?? [])
+    .flatMap(value => value.split(',').map(preference => preference.trim()))
+}
+
+function robotsDirectiveValues(source: string, directive: string) {
+  return source.split(/\r?\n/).flatMap((rawLine) => {
+    const line = rawLine.replace(/#.*$/, '').trim()
+    const separator = line.indexOf(':')
+    if (separator === -1 || line.slice(0, separator).trim().toLowerCase() !== directive)
+      return []
+
+    return [line.slice(separator + 1).trim()]
+  })
+}
+
 describe('generated documentation website', () => {
   let browser: Browser
   let generateOutput = ''
@@ -122,7 +185,7 @@ describe('generated documentation website', () => {
     expect(generateOutput).not.toContain('[Icon] failed to load icon')
   })
 
-  it('publishes the exact production routes through canonical links and sitemap', async () => {
+  it('publishes the exact production routes and crawler policy', async () => {
     const page = await browser.newPage()
 
     try {
@@ -139,11 +202,46 @@ describe('generated documentation website', () => {
       }
 
       const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
+      const expectedSitemapURLs = PUBLIC_ROUTES.map(path => new URL(path, SITE_ORIGIN).href)
       const sitemapURLs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
         .map(([, url]) => url)
 
-      expect(sitemapURLs).toEqual(PUBLIC_ROUTES.map(path => new URL(path, SITE_ORIGIN).href))
+      expect(sitemap).not.toContain('<sitemapindex')
+      expect(sitemapURLs).toHaveLength(expectedSitemapURLs.length)
+      expect(new Set(sitemapURLs).size).toBe(expectedSitemapURLs.length)
+      expect(new Set(sitemapURLs)).toEqual(new Set(expectedSitemapURLs))
       expect(sitemap).not.toContain('/reference')
+
+      const robots = await readFile(join(generatedRoot, 'robots.txt'), 'utf8')
+      const groups = parseRobotsGroups(robots)
+      const wildcardGroup = robotsGroupFor(groups, '*')
+
+      expect(wildcardGroup?.directives.get('allow')).toContain('/')
+      expect(robotsDirectiveValues(robots, 'sitemap'))
+        .toEqual([`${SITE_ORIGIN}/sitemap.xml`])
+
+      for (const userAgent of ['GPTBot', 'ClaudeBot', 'CCBot', 'Applebot-Extended']) {
+        expect(robotsGroupFor(groups, userAgent)?.directives.get('disallow')).toContain('/')
+      }
+
+      for (const userAgent of [
+        'OAI-SearchBot',
+        'ChatGPT-User',
+        'Claude-SearchBot',
+        'Claude-User',
+        'PerplexityBot',
+        'Googlebot',
+        'Bingbot',
+        'Applebot',
+        'Google-Extended',
+      ]) {
+        expect(robotsGroupFor(groups, userAgent)?.directives.get('disallow') ?? []).not.toContain('/')
+      }
+
+      expect(directivePreferences(wildcardGroup!, 'content-signal'))
+        .toEqual(expect.arrayContaining(['search=yes', 'ai-input=yes', 'ai-train=no']))
+      expect(directivePreferences(wildcardGroup!, 'content-usage'))
+        .toEqual(expect.arrayContaining(['bots=y', 'search=y', 'ai-output=y', 'train-ai=n']))
     }
     finally {
       await page.close()

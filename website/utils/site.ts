@@ -1,3 +1,5 @@
+export const SITE_NAME = 'Nuxt Content Mermaid'
+
 export const SITE_ORIGIN = 'https://nuxt-content-mermaid.barz.app'
 
 export const PUBLIC_ROUTES = [
