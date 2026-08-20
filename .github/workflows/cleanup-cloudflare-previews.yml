@@ -1,0 +1,41 @@
+name: Clean up Cloudflare Pages previews
+
+on:
+  schedule:
+    - cron: '17 3 1 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List expired previews without deleting them
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages-preview-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
+
+      - name: Clean up expired previews
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          CLOUDFLARE_PAGES_PROJECT: nuxt-content-mermaid
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          PREVIEW_RETENTION_DAYS: '30'
+        run: node scripts/cloudflare-pages/preview-cleanup.mjs

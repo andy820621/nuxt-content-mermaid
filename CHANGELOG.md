@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.0.3
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.2...v3.0.3)
+
+### 🚀 Enhancements
+
+- Add customizable built-in control labels ([#111](https://github.com/andy820621/nuxt-content-mermaid/pull/111))
+- Download Mermaid diagrams as SVG or PNG ([#113](https://github.com/andy820621/nuxt-content-mermaid/pull/113))
+
+### 🩹 Fixes
+
+- Restore focus around diagram presentations ([#112](https://github.com/andy820621/nuxt-content-mermaid/pull/112))
+
+### ❤️ Contributors
+
+- [@BarZ](https://github.com/andy820621) - <andy820621@gmail.com>
+
 ## v3.0.2
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.1...v3.0.2)
@@ -29,7 +46,7 @@
 
 ### ❤️ Contributors
 
-- Yao Tsu Hsieh ([@andy820621](https://github.com/andy820621))
+- [@BarZ](https://github.com/andy820621) - <andy820621@gmail.com>
 
 ## v3.0.1
 
@@ -78,7 +95,7 @@
 
 ### ❤️ Contributors
 
-- Yao Tsu Hsieh ([@andy820621](https://github.com/andy820621))
+- [@BarZ](https://github.com/andy820621) - <andy820621@gmail.com>
 
 ## v3.0.0
 
