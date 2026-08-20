@@ -229,6 +229,10 @@ function reenterReactiveConflict() {
   </main>
 
   <main v-else>
+    <span
+      aria-hidden="true"
+      class="ncm-font-unrelated"
+    >page chrome</span>
     <div class="controls">
       <button
         id="primary-fail"
@@ -538,3 +542,56 @@ function reenterReactiveConflict() {
     />
   </main>
 </template>
+
+<style>
+@font-face {
+  font-family: "Ncm Used";
+  src: local("Arial"), url("/ncm-used.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  unicode-range: U+0-7F;
+}
+
+@font-face {
+  font-family: "Ncm Used";
+  src: local("Arial"), url("/ncm-used.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  unicode-range: U+0-7F;
+}
+
+@font-face {
+  font-family: "Ncm Unrelated";
+  src: local("Arial");
+  font-style: normal;
+  font-weight: 400;
+  unicode-range: U+0-7F;
+}
+
+@font-face {
+  font-family: "Ncm Used";
+  src: local("Arial");
+  font-style: normal;
+  font-weight: 400;
+  unicode-range: U+0-7F;
+}
+
+@font-face {
+  font-family: "Ncm Used";
+  src: local("Arial");
+  font-style: normal;
+  font-weight: 700;
+  unicode-range: U+400-4FF;
+}
+
+.ncm-font-used {
+  font-family: "Ncm Used", sans-serif;
+  font-weight: 700;
+}
+
+.ncm-font-unrelated {
+  position: absolute;
+  left: -10000px;
+  font-family: "Ncm Unrelated", sans-serif;
+}
+</style>

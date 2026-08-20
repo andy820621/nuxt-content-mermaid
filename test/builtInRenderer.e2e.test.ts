@@ -8,6 +8,7 @@ import { installDiagnosticCapture, readDiagnosticEvents } from './helpers/diagno
 import type { DiagnosticWindow } from './helpers/diagnosticCapture'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures/built-in-renderer')
+const crossOriginFontStylesheetUrl = 'https://fonts.example.test/scoped-fonts.css'
 
 type BrowserPage = Awaited<ReturnType<typeof createPage>>
 
@@ -147,6 +148,34 @@ async function readLatestSvgDownload(page: BrowserPage) {
   })
 }
 
+async function installCrossOriginFontStylesheet(page: BrowserPage, css: string) {
+  await page.route(crossOriginFontStylesheetUrl, route => route.fulfill({
+    status: 200,
+    contentType: 'text/css',
+    body: css,
+  }))
+
+  return page.evaluate(async (href: string) => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = href
+    await new Promise<void>((resolve, reject) => {
+      link.addEventListener('load', () => resolve(), { once: true })
+      link.addEventListener('error', () => reject(new Error(`Failed to load ${href}`)), { once: true })
+      document.head.appendChild(link)
+    })
+    await document.fonts.ready
+
+    try {
+      void link.sheet?.cssRules
+      return { readable: true }
+    }
+    catch {
+      return { readable: false }
+    }
+  }, crossOriginFontStylesheetUrl)
+}
+
 async function openDownloadDisclosure(page: BrowserPage, rootSelector: string) {
   const trigger = page.locator(`${rootSelector} [aria-label="Download diagram"]`)
   if (await trigger.getAttribute('aria-expanded') !== 'true')
@@ -224,6 +253,9 @@ describe('built-in renderer integration', async () => {
     expect(await trigger.getAttribute('aria-expanded')).toBe('false')
     const controlsId = await trigger.getAttribute('aria-controls')
     expect(controlsId).toBeTruthy()
+    const disclosure = page.locator(`#${controlsId}`)
+    expect(await disclosure.count()).toBe(1)
+    expect(await disclosure.isHidden()).toBe(true)
 
     await waitForPending(page, 1)
     await releaseNext(page)
@@ -232,10 +264,15 @@ describe('built-in renderer integration', async () => {
 
     await trigger.click()
     expect(await trigger.getAttribute('aria-expanded')).toBe('true')
-    expect(await page.locator(`#${controlsId}`).count()).toBe(1)
+    expect(await disclosure.isVisible()).toBe(true)
     expect(await page.locator('#primary button[aria-label="Download as SVG"]').count()).toBe(1)
     expect(await page.locator('#primary button[aria-label="Download as PNG"]').count()).toBe(1)
     expect(await page.locator('#primary [role="menu"], #primary [role="menuitem"]').count()).toBe(0)
+
+    await trigger.click()
+    expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(await disclosure.count()).toBe(1)
+    expect(await disclosure.isHidden()).toBe(true)
   })
 
   it('implements the accepted download keyboard contract with natural Tab order', { timeout: 20000 }, async () => {
@@ -272,6 +309,109 @@ describe('built-in renderer integration', async () => {
     await page.locator('#primary-queue').dispatchEvent('pointerdown')
     expect(await trigger.getAttribute('aria-expanded')).toBe('false')
     expect(await activeAriaLabel(page)).not.toBe('Download diagram')
+  })
+
+  it('scopes PNG font embedding to the font face used by the captured diagram', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+    await openDownloadDisclosure(page, '#primary')
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.locator('#primary [aria-label="Download as PNG"]').click()
+    await waitForPngPending(page, 1)
+
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__htmlToImageControl__?.fontFamilies
+    })).toEqual(['Ncm Used'])
+    const fontSource = await page.evaluate(() => ({
+      actual: (window as MermaidTestWindow).__htmlToImageControl__?.fontSources[0],
+      expectedUrl: new URL('/ncm-used.woff2', document.baseURI).href,
+    }))
+    expect(fontSource.actual).toContain(fontSource.expectedUrl)
+
+    await releaseNextPng(page)
+    expect((await downloadPromise).suggestedFilename()).toBe('mermaid-diagram.png')
+  })
+
+  it('skips host webfonts when the captured diagram only uses system fonts', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+    await page.addStyleTag({
+      content: '.ncm-font-used { font-family: Arial, sans-serif !important; }',
+    })
+    await openDownloadDisclosure(page, '#primary')
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.locator('#primary [aria-label="Download as PNG"]').click()
+    await waitForPngPending(page, 1)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__htmlToImageControl__?.fontFamilies
+    })).toEqual([])
+
+    await releaseNextPng(page)
+    expect((await downloadPromise).suggestedFilename()).toBe('mermaid-diagram.png')
+  })
+
+  it('ignores an unreadable stylesheet when its fonts are unrelated to the captured diagram', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    await renderInitialDiagram(page)
+    const stylesheet = await installCrossOriginFontStylesheet(page, `
+      @font-face {
+        font-family: "Ncm Blocked Unrelated";
+        src: local("Arial");
+        font-weight: 400;
+      }
+    `)
+    expect(stylesheet.readable).toBe(false)
+
+    await openDownloadDisclosure(page, '#primary')
+    const downloadPromise = page.waitForEvent('download')
+    await page.locator('#primary [aria-label="Download as PNG"]').click()
+    await waitForPngPending(page, 1)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__htmlToImageControl__?.fontFamilies
+    })).toEqual(['Ncm Used'])
+
+    await releaseNextPng(page)
+    expect((await downloadPromise).suggestedFilename()).toBe('mermaid-diagram.png')
+  })
+
+  it('fails closed when the captured diagram uses a font from an unreadable stylesheet', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    const errors: string[] = []
+    let downloadCount = 0
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text())
+    })
+    page.on('download', () => downloadCount++)
+    await renderInitialDiagram(page)
+    const stylesheet = await installCrossOriginFontStylesheet(page, `
+      @font-face {
+        font-family: "Ncm Blocked Used";
+        src: local("Arial");
+        font-style: normal;
+        font-weight: 700;
+        unicode-range: U+0-7F;
+      }
+      .ncm-font-used {
+        font-family: "Ncm Blocked Used", sans-serif;
+        font-weight: 700;
+      }
+    `)
+    expect(stylesheet.readable).toBe(false)
+    expect(await page.locator('#primary .ncm-font-used').evaluate((element) => {
+      return getComputedStyle(element).fontFamily
+    })).toContain('Ncm Blocked Used')
+
+    await openDownloadDisclosure(page, '#primary')
+    await page.locator('#primary [aria-label="Download as PNG"]').click()
+    await expect.poll(() => errors.some(error => error.includes(
+      `[nuxt-content-mermaid] Cannot read stylesheet for PNG rasterization: ${crossOriginFontStylesheetUrl}`,
+    ))).toBe(true)
+    expect(downloadCount).toBe(0)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__htmlToImageControl__?.calls
+    })).toBe(0)
   })
 
   it('lazy-loads PNG once, exposes pending state, and restores trigger focus after each format', { timeout: 20000 }, async () => {

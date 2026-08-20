@@ -1,4 +1,8 @@
 import { getFontEmbedCSS, toBlob } from 'html-to-image'
+import {
+  getScopedPngFontEmbedCSS,
+  supportsScopedPngFontEmbedding,
+} from './png-font-embedding'
 
 const ERROR_PREFIX = '[nuxt-content-mermaid]'
 
@@ -155,7 +159,8 @@ export async function rasterizePngSnapshot(
 
   const document = input.svg.ownerDocument
   await document.fonts?.ready
-  assertStylesheetsReadable(document)
+  const useScopedFontEmbedding = supportsScopedPngFontEmbedding(document)
+  if (!useScopedFontEmbedding) assertStylesheetsReadable(document)
 
   const captureOptions = {
     width: input.width,
@@ -172,7 +177,10 @@ export async function rasterizePngSnapshot(
   )
 
   try {
-    const fontEmbedCSS = await getFontEmbedCSS(captureNode, captureOptions)
+    if (useScopedFontEmbedding) await document.fonts.ready
+    const fontEmbedCSS = useScopedFontEmbedding
+      ? await getScopedPngFontEmbedCSS(captureNode, captureOptions)
+      : await getFontEmbedCSS(captureNode, captureOptions)
     assertFontsEmbedded(fontEmbedCSS)
     const blob = await toBlob(captureNode, {
       ...captureOptions,

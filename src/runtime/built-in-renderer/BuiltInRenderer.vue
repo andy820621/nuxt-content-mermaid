@@ -774,7 +774,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
             <IconDownload :size="iconSize" />
           </button>
           <div
-            v-if="isDownloadDisclosureOpen"
+            v-show="isDownloadDisclosureOpen"
             :id="downloadDisclosureId"
             ref="downloadDisclosure"
             class="ncm-download-disclosure"
