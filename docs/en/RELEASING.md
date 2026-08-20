@@ -1,136 +1,86 @@
-# Releasing
+# Release workflow
 
-A stable release has one durable starting point: an immutable annotated version
-tag on a verified `main` commit. Pushing that tag starts
-`.github/workflows/publish.yml`, which verifies one tarball, publishes that exact
-tarball to npm through Trusted Publishing, and then creates the GitHub Release.
+The maintainer reviews the release PR and pushes one immutable annotated tag.
+CI validates the source and package, publishes to npm, and creates the GitHub
+Release.
 
-The maintainer owns the PR and tag. The workflow owns packing, artifact
-verification, npm publication, and GitHub Release creation.
+## 1. Prepare the release PR
 
-## 1. Prepare one ordinary PR
-
-Create a branch from the latest clean `origin/main`. Put the product change,
-release-pipeline maintenance, version, and changelog required for one release in
-the same reviewable PR, using separate logical commits when useful.
-
-Prepare the version without creating a commit, tag, GitHub Release, or npm
-publication:
+Start from the latest `main` and use a branch named for the version being
+prepared:
 
 ```bash
-pnpm changelogen --release -r X.Y.Z --no-commit --no-tag --no-github
-pnpm install --lockfile-only --ignore-scripts
+version=3.0.3
+branch="chore/prepare-release-v$version"
+
+git switch main
+git pull --ff-only origin main
+git switch -c "$branch"
 ```
 
-Review the generated notes. The PR must contain:
+Run exactly one preparation script:
 
-- the exact stable version `X.Y.Z` in `package.json`;
-- a matching `## vX.Y.Z` section in `CHANGELOG.md`;
-- migration guidance for every Package User-visible incompatibility;
-- the commands and results used to validate the change; and
-- the tracking Issue reference.
+```bash
+pnpm release:prepare:patch
+# pnpm release:prepare:minor
+# pnpm release:prepare:major
+```
 
-Do not commit `dist` or a package archive. CI and the release verifier build
-those outputs from source.
+Review the generated version, lockfile, and changelog, then open the PR:
 
-Keep `prepack` self-contained: after a frozen install, it must generate any
-required Nuxt module types and build successfully from a checkout containing
-only tracked files. Local `.nuxt` state from `dev:prepare` is not release
-evidence.
+```bash
+git diff -- package.json pnpm-lock.yaml CHANGELOG.md
 
-Before merge, require the existing checks:
+git add -- package.json pnpm-lock.yaml CHANGELOG.md
+git diff --cached --check
+git commit -m "chore(release): prepare v$version"
+git push -u origin "$branch"
 
-- `source-verification`;
-- `final-compatibility-profiles (v3-minimum, 22.19.0)`;
-- `final-compatibility-profiles (v3-known-latest, 24.19.0)`; and
-- the Conventional PR title check.
+gh pr create \
+  --base main \
+  --head "$branch" \
+  --title "chore(release): prepare v$version" \
+  --body "Prepare v$version package version and changelog."
+```
 
-Squash-merge the PR without bypassing failed required checks, then update the
-local `main` with `git pull --ff-only origin main`.
+Review the changelog, wait for every required check, and squash-merge the PR.
+Do not commit `dist`, package archives, or other generated output.
 
 ## 2. Create the release tag
 
-Confirm that `main` is clean, its version and changelog match, and CI passed for
-the exact HEAD. Create and verify an annotated tag:
+Update `main`, verify the release identity, then create and push an annotated
+tag:
 
 ```bash
-version=X.Y.Z
+git switch main
+git pull --ff-only origin main
+
+version=3.0.3
 release_commit=$(git rev-parse HEAD)
+
+test "$(node -p "require('./package.json').version")" = "$version"
+grep -Fxq "## v$version" CHANGELOG.md
+
 git tag -a "v$version" "$release_commit" -m "v$version"
-git cat-file -t "v$version"
-git rev-list -n 1 "v$version"
+test "$(git cat-file -t "v$version")" = "tag"
+test "$(git rev-list -n 1 "v$version")" = "$release_commit"
 git push origin "refs/tags/v$version"
 ```
 
-`git cat-file` must print `tag`, and `git rev-list` must print the verified
-`main` commit. Never force-move a release tag. The tag is both the release
-trigger and the immutable record of what the version identifies.
+Never move or force-push a release tag.
 
-## 3. Monitor the publish workflow
+## 3. Monitor and verify
 
-The tag starts the single `publish` job. It:
-
-1. verifies that the ref is an annotated stable SemVer tag targeting the
-   checked-out commit;
-2. verifies tag, `package.json`, and `CHANGELOG.md` identity;
-3. installs frozen dependencies with the repository-pinned pnpm;
-4. packs exactly once into an empty retained directory;
-5. checks package contents, archive safety, exports, public types, a fresh
-   consumer production build, and basic browser SVG rendering;
-6. publishes that same `.tgz` with npm Trusted Publishing, provenance, `latest`,
-   and lifecycle scripts disabled; and
-7. creates the matching GitHub Release only after npm succeeds.
-
-The workflow does not accept manual dispatch, reconstruct state across jobs, or
-install the newly published package from the registry. Successful completion of
-the one job means the release is complete.
-
-Verify the public state independently:
+The tag starts `.github/workflows/publish.yml`:
 
 ```bash
-npm view @barzhsieh/nuxt-content-mermaid@X.Y.Z version dist-tags.latest --json
-gh release view vX.Y.Z --json tagName,isDraft,isPrerelease,url
+gh run list --workflow publish.yml --limit 1
+gh run watch <run-id> --exit-status
+
+npm view "@barzhsieh/nuxt-content-mermaid@$version" version dist-tags.latest --json
+gh release view "v$version" --json tagName,isDraft,isPrerelease,url
 ```
 
-Also confirm that npm displays provenance and `latest` points to `X.Y.Z`. Add
-the npm, workflow, and GitHub Release links to the tracking Issue, then close it.
-
-## npm Trusted Publisher setup
-
-Keep npm **Settings → Trusted Publisher** bound to:
-
-| Field | Value |
-| --- | --- |
-| Provider | GitHub Actions |
-| Organization or user | `andy820621` |
-| Repository | `nuxt-content-mermaid` |
-| Workflow filename | `publish.yml` |
-| Environment | blank |
-| Allowed actions | `npm publish` only |
-
-The exact workflow filename is part of npm's trust binding. Do not rename it or
-add an `NPM_TOKEN`/`NODE_AUTH_TOKEN` fallback. The workflow requests job-level
-`id-token: write` for OIDC and `contents: write` for the GitHub Release.
-
-## Failure recovery
-
-An npm version and a release tag are immutable facts. Diagnose external state
-before retrying an ambiguous operation, and never overwrite, unpublish, or
-force-move them.
-
-| Failure point | Recovery |
-| --- | --- |
-| PR or pre-tag verification fails | Fix the original branch and rerun the complete validation. |
-| Tag workflow fails before npm because of transient infrastructure | Rerun the same tag workflow. |
-| Tag workflow finds a deterministic source or artifact defect before npm | Keep the tag unchanged; fix `main` and prepare the next patch version. |
-| `npm publish` result is ambiguous | Query the exact version first. Rerun only if it is absent; never publish again when it exists. |
-| npm succeeds but GitHub Release creation fails | Create the GitHub Release for the existing tag with `pnpm changelogen gh release X.Y.Z`; do not rerun publication. |
-| The published package is defective | Deprecate that exact version and publish a corrective patch; do not overwrite or unpublish it. |
-| Tag, npm version, or GitHub Release identity conflicts | Stop and reconcile the external state manually. Do not force a tag or assume success. |
-
-## Documentation website
-
-Website synchronization is an ordinary follow-up after the package release. A
-delayed or failed website deployment does not change npm, tag, or GitHub Release
-state and must not cause republishing. Repair documentation through an ordinary
-PR or deployment retry.
+If publication is ambiguous, query the exact npm version before retrying. If
+npm succeeded but GitHub Release creation failed, run
+`pnpm changelogen gh release "$version"`; never republish the npm version.
