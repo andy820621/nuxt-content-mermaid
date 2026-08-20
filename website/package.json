@@ -14,6 +14,7 @@
     "@nuxtjs/i18n": "^10.6.0",
     "better-sqlite3": "12.6.2",
     "nuxt": "catalog:dev",
+    "nuxt-ai-ready": "2.0.1",
     "reka-ui": "^2.10.3",
     "remark-breaks": "^4.0.0"
   },

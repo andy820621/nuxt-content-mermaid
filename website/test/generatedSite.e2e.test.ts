@@ -23,6 +23,7 @@ const contentTypes: Record<string, string> = {
   '.ico': 'image/x-icon',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
@@ -34,6 +35,10 @@ function generatedRouteFile(path: string) {
     return join(generatedRoot, 'index.html')
 
   return join(generatedRoot, `${path.slice(1)}.html`)
+}
+
+function markdownRouteFor(path: string) {
+  return path === '/' ? '/index.md' : `${path}.md`
 }
 
 function normalizeText(text: string | null) {
@@ -369,6 +374,60 @@ describe('generated documentation website', () => {
         expect(webSite?.inLanguage).toBe(expectedLocale)
         expect(webSite?.url).toBe(expectedLocale === 'zh-TW' ? `${SITE_ORIGIN}/zh` : `${SITE_ORIGIN}/`)
       }
+    }
+    finally {
+      await page.close()
+    }
+  }, 30_000)
+
+  it('publishes AI-readable Markdown and LLM indexes without widening the sitemap', async () => {
+    const page = await browser.newPage({ javaScriptEnabled: false })
+
+    try {
+      for (const path of PUBLIC_ROUTES) {
+        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+        const heading = normalizeText(await page.locator('#main-content h1').textContent())
+        const markdownPath = markdownRouteFor(path)
+        const markdownAlternateHrefs = await page
+          .locator('link[rel="alternate"][type="text/markdown"]')
+          .evaluateAll(links => links.map(link => link.getAttribute('href')))
+
+        expect(markdownAlternateHrefs).toHaveLength(1)
+        expect(new URL(markdownAlternateHrefs[0]!, SITE_ORIGIN).pathname).toBe(markdownPath)
+
+        const markdownResponse = await fetch(`${staticSiteURL}${markdownPath}`)
+        const markdown = await markdownResponse.text()
+
+        expect(markdownResponse.status).toBe(200)
+        expect(markdown).toContain(heading)
+        expect(markdown).not.toMatch(/<!doctype html|<html(?:\s|>)|__NUXT__|<script[^>]+src=["'][^"']*\/_nuxt\//i)
+      }
+
+      const llmsResponse = await fetch(`${staticSiteURL}/llms.txt`)
+      const llms = await llmsResponse.text()
+
+      expect(llmsResponse.status).toBe(200)
+      expect(llms).toContain(`# ${SITE_NAME}`)
+      expect(llms).toContain('Turn Mermaid code blocks into interactive diagrams without leaving your Markdown workflow.')
+      expect(llms).toContain('/llms-full.txt')
+      expect(llms).toContain('/index.md')
+      expect(llms).toContain('/getting-started.md')
+      expect(llms).toContain('/zh.md')
+      expect(llms).toMatch(/繁體中文|Traditional Chinese/)
+
+      const llmsFullResponse = await fetch(`${staticSiteURL}/llms-full.txt`)
+      const llmsFull = await llmsFullResponse.text()
+
+      expect(llmsFullResponse.status).toBe(200)
+      expect(llmsFull).toContain('Install Nuxt Content Mermaid')
+      expect(llmsFull).toContain('安裝 Nuxt Content Mermaid')
+      expect(llmsFull).not.toContain('This file is generated during prerender.')
+      expect(llmsFull).not.toMatch(/<!doctype html|<html(?:\s|>)|__NUXT__|<script[^>]+src=["'][^"']*\/_nuxt\//i)
+
+      const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
+      expect(sitemap).not.toContain('.md</loc>')
+      expect(sitemap).not.toContain('/llms.txt</loc>')
+      expect(sitemap).not.toContain('/llms-full.txt</loc>')
     }
     finally {
       await page.close()

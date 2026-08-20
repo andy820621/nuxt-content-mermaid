@@ -199,6 +199,8 @@ git diff --stat
 
 Commit：`feat(website): publish static AI-readable docs`
 
+**Checkpoint result:** RED 精確捕捉缺少 `text/markdown` alternate；GREEN 後 focused generated-site E2E 7/7、website typecheck、targeted ESLint 與 `git diff --check` 通過。生成產物包含 18 個 Markdown variants、`/llms.txt`、`/llms-full.txt`，且 sitemap 仍只包含 HTML routes。
+
 ## Task 3：更新 durable contract、完整驗證與 code review
 
 1. 更新 `docs/specs/documentation-website.md`：
