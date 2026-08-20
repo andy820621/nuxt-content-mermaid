@@ -10,7 +10,7 @@ Start from the latest `main` and use a branch named for the version being
 prepared:
 
 ```bash
-version=3.0.3
+version=3.0.4
 branch="chore/prepare-release-v$version"
 
 git switch main
@@ -26,13 +26,11 @@ pnpm release:prepare:patch
 # pnpm release:prepare:major
 ```
 
-Review the generated version, lockfile, and changelog, then open the PR:
+Review the generated version, lockfile, and changelog in your editor, then open
+the PR:
 
 ```bash
-git diff -- package.json pnpm-lock.yaml CHANGELOG.md
-
 git add -- package.json pnpm-lock.yaml CHANGELOG.md
-git diff --cached --check
 git commit -m "chore(release): prepare v$version"
 git push -u origin "$branch"
 
@@ -55,27 +53,30 @@ tag:
 git switch main
 git pull --ff-only origin main
 
-version=3.0.3
+version=3.0.4
 release_commit=$(git rev-parse HEAD)
 
-test "$(node -p "require('./package.json').version")" = "$version"
-grep -Fxq "## v$version" CHANGELOG.md
-
-git tag -a "v$version" "$release_commit" -m "v$version"
-test "$(git cat-file -t "v$version")" = "tag"
-test "$(git rev-list -n 1 "v$version")" = "$release_commit"
-git push origin "refs/tags/v$version"
+test "$(node -p "require('./package.json').version")" = "$version" &&
+  grep -Fxq "## v$version" CHANGELOG.md &&
+  git tag -a "v$version" "$release_commit" -m "v$version" &&
+  git push origin "refs/tags/v$version"
 ```
 
 Never move or force-push a release tag.
 
 ## 3. Monitor and verify
 
-The tag starts `.github/workflows/publish.yml`:
+The tag starts `.github/workflows/publish.yml`. After the run appears, watch it
+and verify both published outputs:
 
 ```bash
-gh run list --workflow publish.yml --limit 1
-gh run watch <run-id> --exit-status
+gh run watch "$(gh run list \
+  --workflow publish.yml \
+  --commit "$release_commit" \
+  --limit 1 \
+  --json databaseId \
+  --jq '.[0].databaseId')" \
+  --exit-status
 
 npm view "@barzhsieh/nuxt-content-mermaid@$version" version dist-tags.latest --json
 gh release view "v$version" --json tagName,isDraft,isPrerelease,url
