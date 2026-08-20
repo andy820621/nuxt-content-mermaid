@@ -21,24 +21,35 @@ catalogs:
     eslint: ^10.8.1
     nuxt: 4.5.2
     typescript: ~5.9.3
-    vue-tsc: ^3.3.9
+    vue-tsc: ^3.3.10
     yaml: ^2.9.0
   integrations:
     '@nuxt/content': 3.15.2
     '@nuxt/kit': ^4.5.2
     '@nuxt/schema': 4.5.2
     '@nuxtjs/mdc': ^0.23.1
-    mermaid: ~11.16.1
+    mermaid: ~11.17.0
   test:
     '@nuxt/test-utils': ^4.1.0
     playwright: ^1.62.1
-    vitest: ^4.1.10
+    vitest: ^4.1.11
   types:
     '@types/node': ^25.3.0
 
 overrides:
+  '@babel/core@<=7.29.0': 7.29.6
+  'brace-expansion@>=2.0.0 <2.1.4': 2.1.4
   'dagre-d3-es@7.0.14>lodash-es': 4.18.1
-  'mermaid@11.16.1>uuid': 14.0.1
+  'engine.io-client@>=6.0.0 <6.6.6': 6.6.6
+  'flatted@<=3.4.1': 3.4.4
+  'js-yaml@>=4.0.0 <4.3.1': 4.3.1
+  'lodash@>=4.0.0 <4.18.0': 4.18.1
+  'mermaid@11.17.0>uuid': 14.0.1
+  'minimatch@>=5.0.0 <5.1.8': 5.1.8
+  'minimatch@>=9.0.0 <9.0.7': 9.0.7
+  'picomatch@<2.3.2': 2.3.2
+  'socket.io-parser@>=4.0.0 <4.2.7': 4.2.7
+  'tar@>=7.0.0 <7.5.21': 7.5.22
 
 onlyBuiltDependencies:
   - '@parcel/watcher'

@@ -10,7 +10,7 @@
 Nuxt 與 Nuxt Content 是由套件使用者擁有的 peer dependencies。請在您的應用程式安裝與更新它們，並維持 lockfile 與安全性工具為最新狀態。所有位於已發布 peer 範圍內的非 prerelease 版本都是 Declared-Compatible Combination；未來的 Nuxt 或 Nuxt Content major，必須等後續套件版本明確加入才受支援。
 
 Mermaid 是 Module-Owned Dependency。套件會綁定並解析
-`mermaid@~11.16.1`；請勿只是為了滿足本模組而另行安裝 Mermaid。tilde 範圍可接受 Mermaid 11.16 內的 patch release；Mermaid 的 minor 或 major 則需要明確的套件更新。
+`mermaid@~11.17.0`；請勿只是為了滿足本模組而另行安裝 Mermaid。tilde 範圍可接受 Mermaid 11.17 內的 patch release；Mermaid 的 minor 或 major 則需要明確的套件更新。
 
 Compatibility 不等於 Security Recommendation。舊版 Nuxt 或 Nuxt Content 即使仍在 peer 範圍中，仍可能尚未修補或不適合用於正式環境。請以受上游維護的版本，以及應用程式的 lockfile、Dependabot 與安全性工具做出決定。
 

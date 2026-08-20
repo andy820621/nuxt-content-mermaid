@@ -10,7 +10,7 @@ const VERSION_KEYS = Object.freeze([
 ])
 const RUNTIME_VERSIONS = Object.freeze({
   betterSqlite3: '12.11.1',
-  mermaid: '11.16.1',
+  mermaid: '11.17.0',
   typescript: '5.9.3',
   vueTsc: '3.2.5',
 })

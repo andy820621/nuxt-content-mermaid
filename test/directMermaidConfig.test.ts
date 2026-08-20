@@ -132,7 +132,7 @@ describe('Direct Mermaid Config materialization', () => {
     expect(inspections).toBe(0)
   })
 
-  it('supports the exact Mermaid 11.16.1 font callback paths', () => {
+  it('supports the exact Mermaid 11.17.0 font callback paths', () => {
     const callback = () => ({ fontSize: 16 })
     const supportedPaths = [
       ['sequence', 'actorFont'],
@@ -202,7 +202,7 @@ describe('Direct Mermaid Config materialization', () => {
     } as unknown as MermaidConfig)
 
     expect(materializeUnsupportedCapability).toThrowError(expect.objectContaining({
-      message: expect.stringContaining('exact Mermaid 11.16.1'),
+      message: expect.stringContaining('exact Mermaid 11.17.0'),
     }))
     expect(materializeUnsupportedCapability).toThrowError(expect.objectContaining({
       message: expect.stringContaining('DOMPurify 3.4.13'),
