@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify, stripVTControlCharacters } from 'node:util'
-import { chromium, type Browser } from 'playwright'
+import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PUBLIC_ROUTES, SITE_NAME, SITE_ORIGIN } from '../utils/site'
 
@@ -52,6 +52,48 @@ function localizedRoutePair(path: string) {
     'en-US': new URL(englishPath, SITE_ORIGIN).href,
     'zh-TW': new URL(chinesePath, SITE_ORIGIN).href,
   }
+}
+
+interface SchemaNode {
+  '@id'?: string
+  '@type'?: string | string[]
+  'description'?: string
+  'inLanguage'?: string
+  'isPartOf'?: string | { '@id'?: string }
+  'name'?: string
+  'url'?: string
+}
+
+function isSchemaNode(value: unknown): value is SchemaNode {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasSchemaType(node: SchemaNode, type: string) {
+  const types = Array.isArray(node['@type']) ? node['@type'] : [node['@type']]
+  return types.includes(type)
+}
+
+function schemaReferenceID(reference: SchemaNode['isPartOf']) {
+  return typeof reference === 'string' ? reference : reference?.['@id']
+}
+
+async function schemaNodes(page: Page) {
+  const sources = await page.locator('script[type="application/ld+json"]').allTextContents()
+
+  return sources.flatMap((source) => {
+    const document: unknown = JSON.parse(source)
+    if (!isSchemaNode(document))
+      return []
+
+    const graph = (document as Record<string, unknown>)['@graph']
+    return Array.isArray(graph) ? graph.filter(isSchemaNode) : [document]
+  })
+}
+
+async function metaContents(page: Page, selector: string) {
+  return page.locator(selector).evaluateAll(elements => (
+    elements.map(element => element.getAttribute('content'))
+  ))
 }
 
 interface RobotsGroup {
@@ -235,16 +277,6 @@ describe('generated documentation website', () => {
         }
       }
 
-      await page.goto(staticSiteURL, { waitUntil: 'domcontentloaded' })
-      const structuredData = await page.locator('script[type="application/ld+json"]')
-        .allTextContents()
-      expect(structuredData.map(source => JSON.parse(source))).toContainEqual({
-        '@context': 'https://schema.org',
-        '@type': 'WebSite',
-        'name': SITE_NAME,
-        'url': `${SITE_ORIGIN}/`,
-      })
-
       const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
       const expectedSitemapURLs = PUBLIC_ROUTES.map(path => new URL(path, SITE_ORIGIN).href)
       const sitemapURLs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
@@ -286,6 +318,57 @@ describe('generated documentation website', () => {
         .toEqual(expect.arrayContaining(['search=yes', 'ai-input=yes', 'ai-train=no']))
       expect(directivePreferences(wildcardGroup!, 'content-usage'))
         .toEqual(expect.arrayContaining(['bots=y', 'search=y', 'ai-output=y', 'train-ai=n']))
+    }
+    finally {
+      await page.close()
+    }
+  }, 30_000)
+
+  it('derives consistent social metadata and structured data from each documentation page', async () => {
+    const page = await browser.newPage({ javaScriptEnabled: false })
+    const expectedSocialImage = `${SITE_ORIGIN}/assets/nuxt-content-mermaid.png`
+    const siteDescriptions = {
+      'en-US': 'Turn Mermaid code blocks into interactive diagrams without leaving your Markdown workflow.',
+      'zh-TW': '不離開 Markdown 工作流程，將 Mermaid 程式碼區塊轉換為互動式圖表。',
+    } as const
+
+    try {
+      for (const path of PUBLIC_ROUTES) {
+        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+
+        const expectedLocale = path === '/zh' || path.startsWith('/zh/') ? 'zh-TW' : 'en-US'
+        const canonicalURL = new URL(path, SITE_ORIGIN).href
+        const title = await page.title()
+        const pageTitle = title.slice(0, -` · ${SITE_NAME}`.length)
+        const description = await page.locator('meta[name="description"]').getAttribute('content')
+
+        expect(description).not.toBeNull()
+        expect(await metaContents(page, 'meta[property="og:title"]')).toEqual([title])
+        expect(await metaContents(page, 'meta[property="og:description"]')).toEqual([description])
+        expect(await metaContents(page, 'meta[name="twitter:title"]')).toEqual([pageTitle])
+        expect(await metaContents(page, 'meta[name="twitter:description"]')).toEqual([description])
+        expect(await metaContents(page, 'meta[property="og:image"]')).toEqual([expectedSocialImage])
+        expect(await metaContents(page, 'meta[property="og:image:alt"]')).toEqual([SITE_NAME])
+        expect(await metaContents(page, 'meta[name="twitter:card"]')).toEqual(['summary_large_image'])
+        expect(await metaContents(page, 'meta[name="twitter:image"]')).toEqual([expectedSocialImage])
+        expect(await metaContents(page, 'meta[name="twitter:image:alt"]')).toEqual([SITE_NAME])
+
+        const nodes = await schemaNodes(page)
+        const matchingPages = nodes.filter(node => hasSchemaType(node, 'WebPage') && node.url === canonicalURL)
+        expect(matchingPages).toHaveLength(1)
+
+        const webPage = matchingPages[0]!
+        expect(webPage.description).toBe(description)
+        expect(webPage.inLanguage).toBe(expectedLocale)
+
+        const webSiteID = schemaReferenceID(webPage.isPartOf)
+        const webSite = nodes.find(node => hasSchemaType(node, 'WebSite') && node['@id'] === webSiteID)
+        expect(webSite).toBeDefined()
+        expect(webSite?.name).toBe(SITE_NAME)
+        expect(webSite?.description).toBe(siteDescriptions[expectedLocale])
+        expect(webSite?.inLanguage).toBe(expectedLocale)
+        expect(webSite?.url).toBe(expectedLocale === 'zh-TW' ? `${SITE_ORIGIN}/zh` : `${SITE_ORIGIN}/`)
+      }
     }
     finally {
       await page.close()

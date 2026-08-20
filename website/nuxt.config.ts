@@ -1,7 +1,7 @@
 import type { LocaleObject } from '@nuxtjs/i18n'
 import { fileURLToPath } from 'node:url'
 import type { SupportedLocale } from './types/i18n'
-import { PUBLIC_ROUTES, SITE_NAME, SITE_ORIGIN } from './utils/site'
+import { PUBLIC_ROUTES, SITE_DESCRIPTION, SITE_NAME, SITE_ORIGIN, toSiteURL } from './utils/site'
 
 const brandAssetsDir = fileURLToPath(new URL('../src/assets', import.meta.url))
 
@@ -12,9 +12,7 @@ const locales: LocaleObject<SupportedLocale>[] = [
 
 export default defineNuxtConfig({
   modules: [
-    'nuxt-site-config',
-    '@nuxtjs/robots',
-    '@nuxtjs/sitemap',
+    '@nuxtjs/seo',
     '@nuxt/content',
     '@barzhsieh/nuxt-content-mermaid',
     '@nuxtjs/i18n',
@@ -25,6 +23,9 @@ export default defineNuxtConfig({
   site: {
     name: SITE_NAME,
     url: SITE_ORIGIN,
+    description: SITE_DESCRIPTION,
+    trailingSlash: false,
+    titleSeparator: '·',
   },
   colorMode: {
     preference: 'system',
@@ -80,6 +81,14 @@ export default defineNuxtConfig({
       ],
     },
   },
+  linkChecker: {
+    runOnBuild: true,
+    failOnError: true,
+    fetchRemoteUrls: false,
+  },
+  ogImage: {
+    enabled: false,
+  },
   robots: {
     sitemap: [`${SITE_ORIGIN}/sitemap.xml`],
     groups: [
@@ -103,6 +112,16 @@ export default defineNuxtConfig({
         },
       },
     ],
+  },
+  seo: {
+    minify: false,
+    meta: {
+      ogImage: toSiteURL('/assets/nuxt-content-mermaid.png'),
+      ogImageAlt: SITE_NAME,
+      twitterCard: 'summary_large_image',
+      twitterImage: toSiteURL('/assets/nuxt-content-mermaid.png'),
+      twitterImageAlt: SITE_NAME,
+    },
   },
   sitemap: {
     autoI18n: false,

@@ -90,11 +90,14 @@ site: {
   trailingSlash: false,
   titleSeparator: '·',
 },
-app: {
-  seoMeta: {
+seo: {
+  // Avoid mutating Content/Shiki inline styles between SSR and hydration.
+  minify: false,
+  meta: {
     ogImage: toSiteURL('/assets/nuxt-content-mermaid.png'),
     ogImageAlt: SITE_NAME,
     twitterCard: 'summary_large_image',
+    twitterImage: toSiteURL('/assets/nuxt-content-mermaid.png'),
     twitterImageAlt: SITE_NAME,
   },
 },
@@ -114,9 +117,10 @@ ogImage: {
    - 刪除手寫 title template、canonical、global OG/Twitter 與 raw WebSite JSON-LD。
    - `useLocaleHead` 只輸出 `rel="alternate"` 與 `og:locale:alternate`。
    - 保留 favicon、body attributes 與 root alternate URL 正規化。
-6. `website/pages/index.vue` 與 `website/pages/[...slug].vue` 只提供 reactive `title`、`description`，移除 `ogTitle`、`ogDescription`。
-7. 不新增 Portfolio 式 `usePageSEO` 或 Content SEO schema；Nuxt SEO defaults 直接衍生公開 metadata。
-8. 執行 `nuxt prepare` 重新產生官方型別。
+6. 新增窄介面 `useDocumentationSeo(page)`：頁面只傳一次 reactive `title`、`description`；Nuxt SEO 自動衍生 OG，adapter 補足 module 不會自動產生的 `twitter:title`、`twitter:description`，並把 page facts 與目前語系合併進預設 WebPage node。
+7. `website/pages/index.vue` 與 `website/pages/[...slug].vue` 改用此介面，移除重複 `ogTitle`、`ogDescription`。
+8. 不複製 Portfolio 的 Article、publisher identity 或 Content schema；WebSite identity 與 WebPage linkage 仍由 Nuxt SEO defaults 衍生。
+9. 執行 `nuxt prepare` 重新產生官方型別。
 
 ### Checkpoint
 
@@ -130,6 +134,8 @@ git diff --stat
 ```
 
 Commit：`feat(website): centralize Nuxt SEO orchestration`
+
+**Checkpoint result:** RED 精確捕捉缺少 `twitter:title`；GREEN 後 focused generated-site E2E 6/6、website typecheck、targeted ESLint 與 `git diff --check` 通過。實作期間確認 SEO Utils build minifier 會改寫 Content/Shiki inline style 並造成 hydration mismatch，因此以 `seo.minify: false` 保留 SSR/client 一致性，既有 hydration E2E 已鎖定此回歸。
 
 ## Task 2：加入靜態 AI-ready / GEO 產物
 

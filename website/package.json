@@ -10,12 +10,10 @@
   "dependencies": {
     "@barzhsieh/nuxt-content-mermaid": "workspace:*",
     "@nuxt/content": "catalog:integrations",
+    "@nuxtjs/seo": "^5.3.14",
     "@nuxtjs/i18n": "^10.6.0",
-    "@nuxtjs/robots": "^6.1.5",
-    "@nuxtjs/sitemap": "^8.3.4",
     "better-sqlite3": "12.6.2",
     "nuxt": "catalog:dev",
-    "nuxt-site-config": "^4.2.3",
     "reka-ui": "^2.10.3",
     "remark-breaks": "^4.0.0"
   },

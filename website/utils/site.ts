@@ -2,6 +2,8 @@ export const SITE_NAME = 'Nuxt Content Mermaid'
 
 export const SITE_ORIGIN = 'https://nuxt-content-mermaid.barz.app'
 
+export const SITE_DESCRIPTION = 'Turn Mermaid code blocks into interactive diagrams without leaving your Markdown workflow.'
+
 export const PUBLIC_ROUTES = [
   '/',
   '/getting-started',
