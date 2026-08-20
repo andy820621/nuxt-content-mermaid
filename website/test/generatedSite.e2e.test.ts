@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { chromium, type Browser } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { PUBLIC_ROUTES, SITE_ORIGIN } from '../utils/site'
+import { PUBLIC_ROUTES, SITE_NAME, SITE_ORIGIN } from '../utils/site'
 
 const execFileAsync = promisify(execFile)
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
@@ -39,6 +39,20 @@ function generatedRouteFile(path: string) {
 
 function normalizeText(text: string | null) {
   return text?.replace(/\s+/g, ' ').trim() ?? ''
+}
+
+function localizedRoutePair(path: string) {
+  const englishPath = path === '/zh'
+    ? '/'
+    : path.startsWith('/zh/')
+      ? path.slice(3)
+      : path
+  const chinesePath = englishPath === '/' ? '/zh' : `/zh${englishPath}`
+
+  return {
+    'en-US': new URL(englishPath, SITE_ORIGIN).href,
+    'zh-TW': new URL(chinesePath, SITE_ORIGIN).href,
+  }
 }
 
 interface RobotsGroup {
@@ -191,6 +205,7 @@ describe('generated documentation website', () => {
     try {
       for (const path of PUBLIC_ROUTES) {
         const response = await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+        const expectedLocale = path === '/zh' || path.startsWith('/zh/') ? 'zh-TW' : 'en-US'
 
         expect(response?.status()).toBe(200)
         const canonical = page.locator('link[rel="canonical"]')
@@ -199,7 +214,29 @@ describe('generated documentation website', () => {
           .toBe(new URL(path, SITE_ORIGIN).href)
         expect(await page.locator('meta[property="og:url"]').getAttribute('content'))
           .toBe(new URL(path, SITE_ORIGIN).href)
+        expect(await page.locator('html').getAttribute('lang')).toBe(expectedLocale)
+        const title = await page.title()
+        expect(title).not.toBe('')
+        expect(title.endsWith(` · ${SITE_NAME}`)).toBe(true)
+        expect(await page.locator('meta[property="og:locale"]').getAttribute('content'))
+          .toBe(expectedLocale.replace('-', '_'))
+
+        for (const [language, href] of Object.entries(localizedRoutePair(path))) {
+          const alternate = page.locator(`link[rel="alternate"][hreflang="${language}"]`)
+          expect(await alternate.count()).toBe(1)
+          expect(await alternate.getAttribute('href')).toBe(href)
+        }
       }
+
+      await page.goto(staticSiteURL, { waitUntil: 'domcontentloaded' })
+      const structuredData = await page.locator('script[type="application/ld+json"]')
+        .allTextContents()
+      expect(structuredData.map(source => JSON.parse(source))).toContainEqual({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        'name': SITE_NAME,
+        'url': `${SITE_ORIGIN}/`,
+      })
 
       const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
       const expectedSitemapURLs = PUBLIC_ROUTES.map(path => new URL(path, SITE_ORIGIN).href)

@@ -2,10 +2,11 @@
 import type { ContentNavigationItem } from '@nuxt/content'
 import type { SupportedLocale } from '~/types/i18n'
 import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
-import { SITE_ORIGIN, toSiteURL } from '~/utils/site'
+import { SITE_NAME, SITE_ORIGIN, toSiteURL } from '~/utils/site'
 
-const { locale, localeProperties } = useI18n()
+const { locale } = useI18n()
 const localePath = useLocalePath()
+const localeHead = useLocaleHead({ seo: true })
 
 const mobileMenuButton = useTemplateRef<HTMLButtonElement>('mobileMenuButton')
 const mobileMenuOpen = ref(false)
@@ -32,30 +33,47 @@ const socialImageUrl = `${SITE_ORIGIN}/assets/nuxt-content-mermaid.png`
 const route = useRoute()
 
 useHead(() => ({
-  htmlAttrs: {
-    lang: localeProperties.value.language,
-  },
+  htmlAttrs: localeHead.value.htmlAttrs,
   bodyAttrs: {
     class: mobileMenuOpen.value ? 'mobile-menu-open' : undefined,
   },
   link: [
-    { rel: 'canonical', href: toSiteURL(route.path) },
+    ...(localeHead.value.link ?? []).map(link => ({
+      ...link,
+      href: link.href === SITE_ORIGIN ? `${SITE_ORIGIN}/` : link.href,
+    })),
     { rel: 'icon', href: '/assets/favicon/favicon.ico', sizes: 'any' },
     { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-32x32.png', sizes: '32x32' },
     { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-16x16.png', sizes: '16x16' },
     { rel: 'apple-touch-icon', href: '/assets/favicon/apple-touch-icon.png', sizes: '180x180' },
   ],
+  meta: localeHead.value.meta,
+  script: route.path === '/'
+    ? [{
+        key: 'website-schema',
+        type: 'application/ld+json',
+        innerHTML: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          'name': SITE_NAME,
+          'url': `${SITE_ORIGIN}/`,
+        }),
+      }]
+    : [],
+  titleTemplate: titleChunk => titleChunk
+    ? `${titleChunk} · ${SITE_NAME}`
+    : SITE_NAME,
 }))
 
 useSeoMeta({
-  ogSiteName: 'Nuxt Content Mermaid',
+  ogSiteName: SITE_NAME,
   ogType: 'website',
   ogUrl: () => toSiteURL(route.path),
   ogImage: socialImageUrl,
-  ogImageAlt: 'Nuxt Content Mermaid',
+  ogImageAlt: SITE_NAME,
   twitterCard: 'summary_large_image',
   twitterImage: socialImageUrl,
-  twitterImageAlt: 'Nuxt Content Mermaid',
+  twitterImageAlt: SITE_NAME,
 })
 
 let mobileViewport: MediaQueryList | undefined
