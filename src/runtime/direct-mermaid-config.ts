@@ -66,7 +66,7 @@ function validateDirectValue(
     return
 
   if (typeof value === 'function')
-    invalidDirectConfig(path, 'a supported capability at its exact Mermaid 11.16.1 or DOMPurify 3.4.13 path')
+    invalidDirectConfig(path, 'a supported capability at its exact Mermaid 11.17.0 or DOMPurify 3.4.13 path')
   if (typeof value === 'symbol' || typeof value === 'bigint')
     invalidDirectConfig(path, 'structural data')
   if (value === null || typeof value !== 'object') return

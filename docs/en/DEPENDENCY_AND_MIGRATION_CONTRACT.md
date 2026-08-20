@@ -17,8 +17,8 @@ Declared-Compatible Combination; a future Nuxt or Nuxt Content major is not
 supported until a later package release adds it.
 
 Mermaid is a Module-Owned Dependency. The package bundles and resolves
-`mermaid@~11.16.1`; do not add Mermaid solely to satisfy this module. The tilde
-range can accept patched releases in Mermaid 11.16, while a Mermaid minor or
+`mermaid@~11.17.0`; do not add Mermaid solely to satisfy this module. The tilde
+range can accept patched releases in Mermaid 11.17, while a Mermaid minor or
 major needs an explicit package update.
 
 Compatibility is not a Security Recommendation. An old Nuxt or Nuxt Content

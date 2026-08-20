@@ -53,7 +53,7 @@ describe('package root runtime contract', () => {
         '@nuxt/content': '3.15.2',
         '@nuxt/kit': '^4.5.2',
         '@nuxt/schema': '4.5.2',
-        'mermaid': '~11.16.1',
+        'mermaid': '~11.17.0',
       },
     })
   })

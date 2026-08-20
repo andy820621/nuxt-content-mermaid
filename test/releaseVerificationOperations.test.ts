@@ -26,7 +26,7 @@ const profile = {
     betterSqlite3: '12.11.1',
     nuxt: '4.5.2',
     nuxtContent: '3.15.2',
-    mermaid: '11.16.1',
+    mermaid: '11.17.0',
     typescript: '5.9.3',
     vueTsc: '3.2.5',
   },
@@ -37,7 +37,7 @@ const finalProfile = {
   nodeVersion: process.versions.node,
   versions: {
     ...profile.versions,
-    mermaid: '11.16.1',
+    mermaid: '11.17.0',
   },
   expectedResolutions: {
     nuxtKit: '4.5.2',
@@ -172,7 +172,7 @@ function createContractManifest(overrides: Record<string, unknown> = {}) {
     dependencies: {
       '@nuxt/kit': '^4.5.2',
       'html-to-image': '1.11.11',
-      'mermaid': '~11.16.1',
+      'mermaid': '~11.17.0',
     },
     exports: {
       '.': './dist/module.mjs',
@@ -257,7 +257,7 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
       '@barzhsieh/nuxt-content-mermaid': pathToFileURL(archivePath).href,
       '@nuxt/content': '3.15.2',
       'better-sqlite3': '12.11.1',
-      'mermaid': '11.16.1',
+      'mermaid': '11.17.0',
       'nuxt': '4.5.2',
     })
     expect(packageJson.devDependencies).toEqual({
@@ -292,7 +292,7 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
     })
 
     const packageJson = JSON.parse(await readFile(join(consumerDirectory, 'package.json'), 'utf8'))
-    expect(packageJson.dependencies.mermaid).toBe('11.16.1')
+    expect(packageJson.dependencies.mermaid).toBe('11.17.0')
     expect(packageJson.devDependencies['@nuxt/schema']).toBe('4.5.2')
     expect(packageJson.overrides).toEqual({
       '@nuxt/kit': '4.5.2',
@@ -306,7 +306,7 @@ if (process.env.NPM_CONFIG_REGISTRY !== 'https://registry.example.test/') {
   })
 
   it.each([
-    ['@barzhsieh/nuxt-content-mermaid', 'mermaid', '11.12.3', 'expected 11.16.1, received 11.12.3'],
+    ['@barzhsieh/nuxt-content-mermaid', 'mermaid', '11.12.3', 'expected 11.17.0, received 11.12.3'],
     ['@barzhsieh/nuxt-content-mermaid', '@nuxt/kit', '4.3.1', 'expected 4.5.2, received 4.3.1'],
     ['nuxt', '@nuxt/schema', '4.3.1', 'expected 4.5.2, received 4.3.1'],
   ])(
@@ -505,21 +505,21 @@ describe('package archive inspection', () => {
       dependencies: {
         '@nuxt/kit': '4.5.2',
         'html-to-image': '1.11.11',
-        'mermaid': '~11.16.1',
+        'mermaid': '~11.17.0',
       },
     }],
     ['dependencies.html-to-image', {
       dependencies: {
         '@nuxt/kit': '^4.5.2',
         'html-to-image': '^1.11.11',
-        'mermaid': '~11.16.1',
+        'mermaid': '~11.17.0',
       },
     }],
     ['dependencies.mermaid', {
       dependencies: {
         '@nuxt/kit': '^4.5.2',
         'html-to-image': '1.11.11',
-        'mermaid': '^11.16.1',
+        'mermaid': '^11.17.0',
       },
     }],
   ])('rejects a packed artifact with the wrong %s contract', async (field, overrides) => {

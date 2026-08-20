@@ -341,7 +341,7 @@ function assertArchiveDependencyContract(manifest) {
     manifest.dependencies?.['html-to-image'],
     '1.11.11',
   )
-  assertArchiveContractValue('dependencies.mermaid', manifest.dependencies?.mermaid, '~11.16.1')
+  assertArchiveContractValue('dependencies.mermaid', manifest.dependencies?.mermaid, '~11.17.0')
   return {
     node: manifest.engines.node,
     nuxt: manifest.peerDependencies.nuxt,
