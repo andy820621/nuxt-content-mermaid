@@ -60,21 +60,30 @@ interface RobotsGroup {
   directives: Map<string, string[]>
 }
 
+function parseRobotsDirective(rawLine: string) {
+  const line = rawLine.replace(/#.*$/, '').trim()
+  const separator = line.indexOf(':')
+
+  if (!line || separator === -1)
+    return
+
+  return {
+    name: line.slice(0, separator).trim().toLowerCase(),
+    value: line.slice(separator + 1).trim(),
+  }
+}
+
 function parseRobotsGroups(source: string): RobotsGroup[] {
   const groups: RobotsGroup[] = []
   let current: RobotsGroup | undefined
 
   for (const rawLine of source.split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*$/, '').trim()
-    if (!line)
+    const directive = parseRobotsDirective(rawLine)
+    if (!directive)
       continue
 
-    const separator = line.indexOf(':')
-    if (separator === -1)
-      continue
-
-    const name = line.slice(0, separator).trim().toLowerCase()
-    const value = line.slice(separator + 1).trim().toLowerCase()
+    const { name } = directive
+    const value = directive.value.toLowerCase()
 
     if (name === 'user-agent') {
       if (!current || current.directives.size > 0) {
@@ -109,12 +118,11 @@ function directivePreferences(group: RobotsGroup, directive: string) {
 
 function robotsDirectiveValues(source: string, directive: string) {
   return source.split(/\r?\n/).flatMap((rawLine) => {
-    const line = rawLine.replace(/#.*$/, '').trim()
-    const separator = line.indexOf(':')
-    if (separator === -1 || line.slice(0, separator).trim().toLowerCase() !== directive)
+    const parsedDirective = parseRobotsDirective(rawLine)
+    if (!parsedDirective || parsedDirective.name !== directive)
       return []
 
-    return [line.slice(separator + 1).trim()]
+    return [parsedDirective.value]
   })
 }
 
