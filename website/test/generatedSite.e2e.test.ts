@@ -3,7 +3,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
+import { promisify, stripVTControlCharacters } from 'node:util'
 import { chromium, type Browser } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PUBLIC_ROUTES, SITE_NAME, SITE_ORIGIN } from '../utils/site'
@@ -12,7 +12,6 @@ const execFileAsync = promisify(execFile)
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 const generatedRoot = join(websiteRoot, '.output/public')
-const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g')
 const generateEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('VITEST')),
 )
@@ -142,7 +141,7 @@ describe('generated documentation website', () => {
         maxBuffer: 16 * 1024 * 1024,
       },
     )
-    generateOutput = `${result.stdout}\n${result.stderr}`.replace(ansiEscape, '')
+    generateOutput = stripVTControlCharacters(`${result.stdout}\n${result.stderr}`)
 
     server = createServer(async (request, response) => {
       try {
