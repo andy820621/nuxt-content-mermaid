@@ -161,6 +161,12 @@ Hero 是首頁唯一的直接子 section。右側 `ContentRenderer` 只將 `Cont
 
 全站以 production identity `https://nuxt-content-mermaid.barz.app` 產生 canonical、Open Graph 與 sitemap URLs。這個 origin 是公開套件文件的 canonical authority；hosting provider、DNS activation 與 production evidence 屬於營運紀錄，不是 durable product contract。
 
+`website/utils/site.ts` 中的 `SITE_ORIGIN`、`SITE_NAME` 與 `PUBLIC_ROUTES` 是網站公開身分的單一來源。`/sitemap.xml` 的 URL 集合必須完全等於 `PUBLIC_ROUTES`；目前共有 18 個 URL，但這個數量會隨正式文件調整，不是永久上限。
+
+Repository-owned `/robots.txt` 允許傳統搜尋 crawler 與 AI 即時引用，並阻擋 GPTBot、ClaudeBot、CCBot 與 Applebot-Extended。Google-Extended 為保留 Gemini grounding 而允許，這是「不允許 AI 訓練」偏好的明確例外。Cloudflare 或其他 hosting layer 不得 prepend、改寫或覆蓋這份 crawler policy。
+
+`app.vue` 以 Nuxt i18n locale head 統一擁有 canonical、`en-US`／`zh-TW` reciprocal alternates、HTML language 與 Open Graph locale；所有頁面使用 ` · Nuxt Content Mermaid` title template，且只有英文首頁輸出一個最小 `WebSite` JSON-LD node。這些 metadata、robots 與 sitemap 行為都是 website-local contract，不改變 npm package API 或 release contract。
+
 ## Architecture boundaries
 
 - 只有一個 `docs` page collection。
@@ -189,6 +195,8 @@ git diff --check
 
 Website-local tests 應涵蓋：
 
+- Static crawler policy、`PUBLIC_ROUTES` sitemap 集合與 module ownership。
+- 每條公開 route 的 canonical、locale alternates、title、Open Graph locale 與首頁 `WebSite` JSON-LD。
 - English／Traditional Chinese navigation filtering 與 locale switching。
 - Landing source／rendered tabs 與 320px containment。
 - Theme persistence、Mermaid redraw、animation、reduced-motion 與 fallback。
