@@ -37,7 +37,7 @@ jobs:
       - name: Verify source
         run: pnpm verify:source
 
-  final-compatibility-profiles:
+  package-compatibility-profiles:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -69,5 +69,5 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Verify Final Compatibility Profile
+      - name: Verify Package Compatibility Profile
         run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}
