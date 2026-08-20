@@ -1,8 +1,4 @@
 {
-  "nuxtSiteConfig": {
-    "name": "Nuxt Content Mermaid",
-    "description": "Turn Mermaid code blocks into interactive diagrams without leaving your Markdown workflow."
-  },
   "site": {
     "name": "Nuxt Content Mermaid",
     "github": "Nuxt Content Mermaid on GitHub",
