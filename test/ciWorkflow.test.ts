@@ -21,7 +21,10 @@ type CompatibilityJob = {
 }
 
 type ParsedWorkflow = {
-  jobs: Record<string, CompatibilityJob>
+  jobs: {
+    'source-verification': unknown
+    'package-compatibility-profiles': CompatibilityJob
+  }
 }
 
 async function readWorkflow() {
