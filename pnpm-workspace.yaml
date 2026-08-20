@@ -3,6 +3,8 @@ packages:
   - test/fixtures/*
   - website
 
+shamefullyHoist: true
+
 linkWorkspacePackages: false
 preferWorkspacePackages: false
 
