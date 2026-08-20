@@ -862,6 +862,33 @@ describe('built-in renderer integration', async () => {
     await page.locator('#markdown-missing-page-config svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
+  it('defers the SSR Content download disclosure relationship until hydration', { timeout: 20000 }, async () => {
+    const page = await createPage()
+    const hydrationErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error' && message.text().includes('Hydration completed but contains mismatches'))
+        hydrationErrors.push(message.text())
+    })
+
+    const ssrResponse = await page.request.get(url('/markdown-missing-page-config'))
+    expect(ssrResponse.status()).toBe(200)
+    const ssrHtml = await ssrResponse.text()
+    expect(ssrHtml).not.toContain('aria-controls="ncm-download-')
+    expect(ssrHtml).not.toContain('id="ncm-download-')
+
+    const response = await page.goto(url('/markdown-missing-page-config'))
+    expect(response?.status()).toBe(200)
+
+    const trigger = page.locator('#markdown-missing-page-config [aria-label="Download diagram"]')
+    await trigger.waitFor({ state: 'attached', timeout: 5000 })
+    const controlsId = await trigger.getAttribute('aria-controls')
+    expect(controlsId).toBeTruthy()
+    if (!controlsId) throw new Error('Expected the hydrated download disclosure ID')
+
+    expect(await page.locator(`[id="${controlsId}"]`).count()).toBe(1)
+    expect(hydrationErrors).toEqual([])
+  })
+
   it('revalidates reactive Page Mermaid Config updates through the shared seam', { timeout: 20000 }, async () => {
     const page = await createPage()
     await renderInitialDiagram(page)
