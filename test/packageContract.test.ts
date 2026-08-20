@@ -37,6 +37,9 @@ describe('package root runtime contract', () => {
         node: '24.19.0',
       },
     })
+    expect(packageJson.dependencies['html-to-image']).toBe('1.11.11')
+    expect(packageJson.peerDependencies).not.toHaveProperty('html-to-image')
+    expect(packageJson.exports).not.toHaveProperty('./png-rasterizer')
   })
 
   it('keeps the development catalogs on the Known-Latest Compatibility Profile', async () => {

@@ -32,7 +32,7 @@ jobs:
         run: npm run dev:prepare
 
       - name: Install Playwright browsers
-        run: npx playwright install
+        run: npx playwright install --with-deps chromium
 
       - name: Verify source
         run: pnpm verify:source
@@ -67,7 +67,7 @@ jobs:
         run: npm run dev:prepare
 
       - name: Install Playwright browsers
-        run: npx playwright install
+        run: npx playwright install --with-deps chromium
 
       - name: Verify Final Compatibility Profile
         run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}

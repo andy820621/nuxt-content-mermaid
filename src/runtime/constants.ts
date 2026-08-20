@@ -29,7 +29,9 @@ export const TOOLBAR_LABEL_KEYS = [
   'zoomIn',
   'zoomOut',
   'resetZoom',
+  'download',
   'downloadSvg',
+  'downloadPng',
 ] as const satisfies readonly (keyof MermaidToolbarLabels)[]
 export const DEFAULT_TOOLBAR_LABELS = {
   copy: 'Copy',
@@ -43,7 +45,9 @@ export const DEFAULT_TOOLBAR_LABELS = {
   zoomIn: 'Zoom In',
   zoomOut: 'Zoom Out',
   resetZoom: 'Reset Zoom',
-  downloadSvg: 'Download SVG',
+  download: 'Download diagram',
+  downloadSvg: 'Download as SVG',
+  downloadPng: 'Download as PNG',
 } satisfies Required<MermaidToolbarLabels>
 export const DEFAULT_TOOLBAR_OPTIONS: MermaidToolbarOptions = {
   title: 'mermaid',

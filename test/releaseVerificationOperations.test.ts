@@ -171,6 +171,7 @@ function createContractManifest(overrides: Record<string, unknown> = {}) {
     },
     dependencies: {
       '@nuxt/kit': '^4.5.2',
+      'html-to-image': '1.11.11',
       'mermaid': '~11.16.1',
     },
     exports: {
@@ -503,12 +504,21 @@ describe('package archive inspection', () => {
     ['dependencies.@nuxt/kit', {
       dependencies: {
         '@nuxt/kit': '4.5.2',
+        'html-to-image': '1.11.11',
+        'mermaid': '~11.16.1',
+      },
+    }],
+    ['dependencies.html-to-image', {
+      dependencies: {
+        '@nuxt/kit': '^4.5.2',
+        'html-to-image': '^1.11.11',
         'mermaid': '~11.16.1',
       },
     }],
     ['dependencies.mermaid', {
       dependencies: {
         '@nuxt/kit': '^4.5.2',
+        'html-to-image': '1.11.11',
         'mermaid': '^11.16.1',
       },
     }],

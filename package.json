@@ -65,6 +65,7 @@
     "@nuxt/kit": "catalog:integrations",
     "defu": "catalog:dev",
     "destr": "catalog:dev",
+    "html-to-image": "1.11.11",
     "mermaid": "catalog:integrations",
     "yaml": "catalog:dev"
   },

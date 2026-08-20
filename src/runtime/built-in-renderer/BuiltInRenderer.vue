@@ -8,6 +8,7 @@ import {
   computed,
   watch,
   shallowRef,
+  useId,
   useTemplateRef,
 } from 'vue'
 
@@ -18,6 +19,11 @@ import type { MermaidComponentSource } from '../component-configuration'
 import { materializeMermaidConfigForInvocation, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
+import {
+  createSafeStandaloneSvgClone,
+  downloadBlob,
+  downloadStandaloneSvg,
+} from '../svg-download'
 import { parseSizeToPx, isRecord } from '../utils'
 import { useMermaidTheme } from '../composables/useMermaidTheme'
 import { useMermaidCursors } from '../composables/useMermaidCursors'
@@ -32,12 +38,28 @@ import type { MermaidToolbarLabels, MermaidToolbarOptions } from '../../types/me
 import type { MermaidComponentProps } from '../../types/config'
 import IconExpand from '../components/icons/IconExpand.vue'
 import IconCollapse from '../components/icons/IconCollapse.vue'
+import IconDownload from '../components/icons/IconDownload.vue'
 import MermaidFullscreenPresentation from '../components/MermaidFullscreenPresentation.vue'
 import { DEFAULT_TOOLBAR_LABELS } from '../constants'
 
 type BuiltInRendererProps = MermaidComponentProps & {
   componentSource: MermaidComponentSource
   spinnerComponent: Component | string
+}
+
+type PngRasterizerModule = typeof import('../png-rasterizer')
+
+let pngRasterizerModulePromise: Promise<PngRasterizerModule> | undefined
+
+function loadPngRasterizer(): Promise<PngRasterizerModule> {
+  return pngRasterizerModulePromise
+    ??= import('../png-rasterizer')
+}
+
+interface CommittedExportSnapshot {
+  svg: SVGSVGElement
+  width: number
+  height: number
 }
 
 const props = defineProps<BuiltInRendererProps>()
@@ -74,6 +96,10 @@ const { currentTheme: manualThemeMode } = useMermaidTheme()
 const mermaidBlock = useTemplateRef('mermaidBlock')
 const mermaidWrapper = useTemplateRef('mermaidWrapper')
 const mermaidContainer = useTemplateRef('mermaidContainer')
+const downloadRoot = useTemplateRef<HTMLDivElement>('downloadRoot')
+const downloadTrigger = useTemplateRef<HTMLButtonElement>('downloadTrigger')
+const downloadDisclosure = useTemplateRef<HTMLDivElement>('downloadDisclosure')
+const downloadSvgButton = useTemplateRef<HTMLButtonElement>('downloadSvgButton')
 const expandButton = useTemplateRef<HTMLButtonElement>('expandButton')
 const fullscreenButton = useTemplateRef<HTMLButtonElement>('fullscreenButton')
 const getExpandFocusTarget = () => expandButton.value
@@ -100,6 +126,11 @@ const hasRenderedOnce = ref(false)
 const isLoading = ref(false)
 const hasError = ref(false)
 const errorContent = shallowRef<unknown | null>(null)
+const committedExportSnapshot = shallowRef<CommittedExportSnapshot | null>(null)
+const isCommittedOutputSvg = ref(false)
+const downloadDisclosureId = `ncm-download-${useId()}`
+const isDownloadDisclosureOpen = ref(false)
+const isPngDownloadPending = ref(false)
 
 const decodedCode = computed(() => props.code ? decodeURIComponent(props.code) : '')
 // Holds the mermaid definition - defaults to decoded prop, falls back to DOM extraction for direct component usage
@@ -140,6 +171,11 @@ const toolbarFontSize = computed(() => {
   return defaultToolbarFontSize
 })
 const showCopyButton = computed(() => toolbarButtons.value.copy !== false)
+const canDownloadSvg = computed(() => {
+  return isCommittedOutputSvg.value
+    && committedExportSnapshot.value !== null
+    && componentSource.value.kind !== 'conflict'
+})
 const copySource = computed(() => decodedCode.value || mermaidDefinition.value || '')
 const hasCopySource = computed(() => !!copySource.value)
 
@@ -415,6 +451,97 @@ function getMermaidSvg(): SVGSVGElement | null {
   return svg instanceof SVGSVGElement ? svg : null
 }
 
+function closeDownloadDisclosure(focusTrigger = false) {
+  isDownloadDisclosureOpen.value = false
+  if (!focusTrigger) return
+
+  void nextTick(() => {
+    if (downloadTrigger.value?.isConnected)
+      downloadTrigger.value.focus()
+  })
+}
+
+async function toggleDownloadDisclosure(event: MouseEvent) {
+  if (!canDownloadSvg.value || isPngDownloadPending.value) return
+
+  if (isDownloadDisclosureOpen.value) {
+    closeDownloadDisclosure()
+    return
+  }
+
+  isDownloadDisclosureOpen.value = true
+  if (event.detail === 0) {
+    await nextTick()
+    downloadSvgButton.value?.focus()
+  }
+}
+
+function handleDownloadFocusout(event: FocusEvent) {
+  if (isPngDownloadPending.value) return
+
+  const nextTarget = event.relatedTarget
+  if (nextTarget instanceof Node
+    && downloadDisclosure.value?.contains(nextTarget)) {
+    return
+  }
+  closeDownloadDisclosure()
+}
+
+function handleDownloadEscape() {
+  closeDownloadDisclosure(true)
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  const target = event.target
+  if (isDownloadDisclosureOpen.value
+    && !isPngDownloadPending.value
+    && target instanceof Node
+    && !downloadRoot.value?.contains(target)) {
+    closeDownloadDisclosure()
+  }
+}
+
+function downloadSvg() {
+  const snapshot = committedExportSnapshot.value
+  if (!canDownloadSvg.value || !snapshot) return
+  try {
+    downloadStandaloneSvg(snapshot.svg, {
+      filename: 'mermaid-diagram.svg',
+    })
+  }
+  finally {
+    closeDownloadDisclosure(true)
+  }
+}
+
+async function downloadPng() {
+  const snapshot = committedExportSnapshot.value
+  if (!canDownloadSvg.value || !snapshot || isPngDownloadPending.value)
+    return
+
+  isPngDownloadPending.value = true
+  try {
+    const svg = createSafeStandaloneSvgClone(snapshot.svg)
+    const { rasterizePngSnapshot } = await loadPngRasterizer()
+    const blob = await rasterizePngSnapshot({
+      svg,
+      width: snapshot.width,
+      height: snapshot.height,
+    })
+    downloadBlob(blob, 'mermaid-diagram.png')
+  }
+  catch (error) {
+    console.error(
+      '[nuxt-content-mermaid] Failed to download PNG:',
+      error,
+    )
+  }
+  finally {
+    isPngDownloadPending.value = false
+    closeDownloadDisclosure(true)
+  }
+}
+
 function getMermaidViewport(): HTMLDivElement | null {
   return mermaidWrapper.value
 }
@@ -442,6 +569,22 @@ async function renderMermaid() {
 
   if (outcome.status === 'success') {
     hasRenderedOnce.value = true
+    const committedSvg = getMermaidSvg()
+    const bounds = committedSvg?.getBoundingClientRect()
+    const isValidSvgSnapshot = committedSvg
+      && bounds
+      && Number.isFinite(bounds.width)
+      && bounds.width > 0
+      && Number.isFinite(bounds.height)
+      && bounds.height > 0
+    isCommittedOutputSvg.value = Boolean(isValidSvgSnapshot)
+    if (isValidSvgSnapshot) {
+      committedExportSnapshot.value = {
+        svg: committedSvg.cloneNode(true) as SVGSVGElement,
+        width: bounds.width,
+        height: bounds.height,
+      }
+    }
   }
   else if (outcome.status === 'failure') {
     console.error('[nuxt-content-mermaid]', outcome.error)
@@ -528,6 +671,8 @@ async function copyToClipboard(text: string) {
 onMounted(() => {
   if (!isEnabled) return
 
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
+
   // Extract definition: prefer code prop, fallback to DOM extraction for direct component usage
   if (!mermaidDefinition.value && mermaidContainer.value)
     mermaidDefinition.value = extractMermaidDefinition(mermaidContainer.value)
@@ -539,6 +684,12 @@ onUnmounted(() => {
   requestBuiltInRender?.invalidate()
   stopLazyObservation()
   if (copyResetTimer) clearTimeout(copyResetTimer)
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+})
+
+watch(canDownloadSvg, (isEligible) => {
+  if (!isEligible)
+    closeDownloadDisclosure()
 })
 
 // Resolve every reactive render input at one post-flush boundary so a Vue update
@@ -605,6 +756,59 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
             :size="iconSize"
           />
         </button>
+        <div
+          ref="downloadRoot"
+          class="ncm-download"
+        >
+          <button
+            ref="downloadTrigger"
+            type="button"
+            class="mermaid-btn"
+            :title="toolbarLabels.download"
+            :aria-label="toolbarLabels.download"
+            :aria-expanded="isDownloadDisclosureOpen"
+            :aria-controls="downloadDisclosureId"
+            :disabled="!canDownloadSvg"
+            @click="toggleDownloadDisclosure"
+          >
+            <IconDownload :size="iconSize" />
+          </button>
+          <div
+            v-if="isDownloadDisclosureOpen"
+            :id="downloadDisclosureId"
+            ref="downloadDisclosure"
+            class="ncm-download-disclosure"
+            @focusout="handleDownloadFocusout"
+            @keydown.esc.stop.prevent="handleDownloadEscape"
+          >
+            <button
+              ref="downloadSvgButton"
+              type="button"
+              class="ncm-download-choice"
+              :title="toolbarLabels.downloadSvg"
+              :aria-label="toolbarLabels.downloadSvg"
+              @click="downloadSvg"
+            >
+              {{ toolbarLabels.downloadSvg }}
+            </button>
+            <button
+              type="button"
+              class="ncm-download-choice"
+              :title="toolbarLabels.downloadPng"
+              :aria-label="toolbarLabels.downloadPng"
+              :disabled="isPngDownloadPending"
+              :aria-busy="isPngDownloadPending || undefined"
+              @click="downloadPng"
+            >
+              <span
+                v-if="isPngDownloadPending"
+                class="ncm-download-spinner"
+                aria-hidden="true"
+              />
+              {{ toolbarLabels.downloadPng }}
+            </button>
+          </div>
+        </div>
         <button
           v-if="showExpandToolbarButton"
           ref="expandButton"
@@ -771,6 +975,65 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   justify-self: flex-end;
   display: flex;
   gap: 0;
+}
+
+.ncm-download {
+  position: relative;
+  display: flex;
+}
+
+.ncm-download-disclosure {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: max-content;
+  padding: 4px;
+  border: var(--ncm-border);
+  border-radius: 4px;
+  background: var(--ncm-code-bg);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+
+.ncm-download-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 3px;
+  color: var(--ncm-text);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.ncm-download-choice:hover,
+.ncm-download-choice:focus-visible {
+  background: var(--ncm-code-bg-hover);
+}
+
+.ncm-download-choice:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ncm-download-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ncm-download-spin 0.8s linear infinite;
+}
+
+@keyframes ncm-download-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .mermaid-btn {

@@ -80,7 +80,7 @@ export function createMermaidRenderer(
         const mermaid = await dependencies.loadMermaid()
         mermaid.initialize(config)
 
-        const staging = createStagingTarget(target)
+        const staging = createStagingTarget(target.ownerDocument)
         stagingRoot = staging.root
         const result = await mermaid.render(
           `nuxt-content-mermaid-${++renderId}`,
@@ -143,12 +143,7 @@ export function createMermaidRenderer(
       }
     }
 
-    const outcome = renderQueue.then(render)
-    renderQueue = outcome.then(
-      () => undefined,
-      () => undefined,
-    )
-    return outcome
+    return enqueueMermaidOperation(render)
   }
 
   request.invalidate = () => {
@@ -156,6 +151,17 @@ export function createMermaidRenderer(
   }
 
   return request
+}
+
+function enqueueMermaidOperation<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const outcome = renderQueue.then(operation)
+  renderQueue = outcome.then(
+    () => undefined,
+    () => undefined,
+  )
+  return outcome
 }
 
 function removeStagingRoot(root: HTMLDivElement) {
@@ -173,8 +179,7 @@ function removeStagingRoot(root: HTMLDivElement) {
   }
 }
 
-function createStagingTarget(target: HTMLDivElement) {
-  const document = target.ownerDocument
+function createStagingTarget(document: Document) {
   const root = document.createElement('div')
   const stagingTarget = document.createElement('div')
 

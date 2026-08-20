@@ -14,6 +14,7 @@ vi.mock('@nuxt/kit', () => ({
   defineNuxtModule: (config: unknown) => config,
   createResolver: () => ({
     resolve: (...parts: string[]) => parts.join('/'),
+    resolvePath: async (path: string) => `${path}.ts`,
   }),
   addPlugin,
   addComponent,
@@ -33,15 +34,19 @@ interface NuxtStub {
   options: {
     css?: string[]
     mermaidContent?: unknown
+    rootDir: string
     runtimeConfig: { public: Record<string, unknown> }
   }
-  hook: (name: string, fn: (...args: unknown[]) => void) => void
+  hook: (name: string, fn: (...args: unknown[]) => unknown) => void
 }
 
 function createNuxtStub() {
-  const hooks: Record<string, Array<(...args: unknown[]) => void>> = {}
+  const hooks: Record<string, Array<(...args: unknown[]) => unknown>> = {}
   const nuxt: NuxtStub = {
-    options: { runtimeConfig: { public: {} } },
+    options: {
+      rootDir: process.cwd(),
+      runtimeConfig: { public: {} },
+    },
     hook: (name, fn) => {
       (hooks[name] ||= []).push(fn)
     },
@@ -224,6 +229,7 @@ describe('module setup', () => {
     })
     expect(addTypeTemplate).toHaveBeenCalled()
     expect(addVitePlugin).toHaveBeenCalledTimes(1)
+    expect(hooks['build:manifest']).toHaveLength(1)
     expect(hooks['content:file:beforeParse']).toHaveLength(1)
     expect(nuxt.options.runtimeConfig.public).toHaveProperty('contentMermaid')
     expect(nuxt.options.runtimeConfig.public.contentMermaid).not.toHaveProperty('enabled')
@@ -255,6 +261,49 @@ describe('module setup', () => {
     const serverConfig: Record<string, unknown> = {}
     optimizeDepsPlugin.configEnvironment?.('server', serverConfig)
     expect(serverConfig.optimizeDeps).toBeUndefined()
+  })
+
+  it('disables prefetch only for the module-owned PNG rasterizer entry', async () => {
+    const mod = await import('../src/module')
+    const moduleDef = mod.default as { setup?: (options: Partial<ModuleOptions>, nuxt: NuxtStub) => unknown }
+    const { nuxt, hooks } = createNuxtStub()
+
+    await moduleDef.setup?.({}, nuxt)
+
+    const buildManifest = hooks['build:manifest']?.[0]
+    if (!buildManifest)
+      throw new Error('build:manifest hook not registered')
+
+    const pngRasterizerEntry = {
+      file: 'png-rasterizer.hash.js',
+      src: 'runtime/png-rasterizer.ts',
+      isDynamicEntry: true,
+      prefetch: true,
+    }
+    const controlEntry = {
+      file: 'control.hash.js',
+      src: 'runtime/control.ts',
+      isDynamicEntry: true,
+      prefetch: true,
+    }
+    const manifest = {
+      'entry.ts': {
+        file: 'entry.hash.js',
+        src: 'entry.ts',
+        dynamicImports: ['runtime/png-rasterizer.ts', 'runtime/control.ts'],
+      },
+      'runtime/png-rasterizer.ts': pngRasterizerEntry,
+      'runtime/control.ts': controlEntry,
+    }
+
+    await buildManifest(manifest)
+
+    expect(pngRasterizerEntry.prefetch).toBe(false)
+    expect(controlEntry.prefetch).toBe(true)
+    expect(manifest['entry.ts'].dynamicImports).toEqual([
+      'runtime/png-rasterizer.ts',
+      'runtime/control.ts',
+    ])
   })
 
   it('delegates every Markdown body and writes back the exact transform result', async () => {

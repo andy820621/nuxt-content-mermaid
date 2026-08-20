@@ -31,7 +31,9 @@ describe('runtime options snapshot resolver', () => {
           zoomIn: 'Zoom In',
           zoomOut: 'Zoom Out',
           resetZoom: 'Reset Zoom',
-          downloadSvg: 'Download SVG',
+          download: 'Download diagram',
+          downloadSvg: 'Download as SVG',
+          downloadPng: 'Download as PNG',
         },
       },
     })

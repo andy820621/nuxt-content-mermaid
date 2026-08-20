@@ -19,6 +19,47 @@ const control: MermaidControl = {
   },
 }
 
+function createLabelMarkup(includeUnsafeResources = false) {
+  const foreignObjectAttributes = includeUnsafeResources
+    ? ' xml:base="https://example.invalid/assets/"'
+    : ''
+  const image = includeUnsafeResources
+    ? '<img srcset="label.png 1x, label@2x.png 2x" />'
+    : ''
+
+  return `<foreignObject${foreignObjectAttributes}>
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <strong>foreign content</strong>${image}
+    </div>
+  </foreignObject>`
+}
+
+function createStrictSvg(id: number, source: string) {
+  if (!source.includes('__UNSAFE__'))
+    return `<svg data-run-id="${id}" data-source="${source}" width="600" height="400">
+      ${createLabelMarkup()}
+    </svg>`
+
+  return `<svg data-run-id="${id}" data-source="${source}" width="600" height="400" onclick="alert(1)">
+    <style>.safe { fill: url(#paint); }</style>
+    <style>@import url("https://example.invalid/theme.css"); .unsafe { fill: red; }</style>
+    <defs>
+      <linearGradient id="paint"><stop offset="1" stop-color="red"></stop></linearGradient>
+      <rect id="safe-shape" width="10" height="10"></rect>
+    </defs>
+    <a href="javascript:alert(1)" onclick="alert(1)"><text id="link-label">Link label</text></a>
+    <rect id="safe-paint" width="20" height="20" fill="url(#paint)"></rect>
+    <use id="safe-use" href="#safe-shape"></use>
+    <use id="unsafe-use" href="data:image/svg+xml,unsafe"></use>
+    <image id="external-image" href="https://example.invalid/image.svg"></image>
+    <script>window.__unsafeSvgScript__ = true</script>
+    ${createLabelMarkup(true)}
+    <iframe src="javascript:alert(1)"></iframe>
+    <object data="data:text/html,unsafe"></object>
+    <embed src="https://example.invalid/plugin"></embed>
+  </svg>`
+}
+
 if (typeof window !== 'undefined')
   (window as MermaidTestWindow).__mermaidControl__ = control
 
@@ -77,7 +118,7 @@ const mermaidStub = {
       diagramType: 'flowchart',
       svg: currentSecurityLevel === 'sandbox'
         ? `<iframe data-run-id="${id}" data-source="${source}"></iframe>`
-        : `<svg data-run-id="${id}" data-source="${source}" width="600" height="400"></svg>`,
+        : createStrictSvg(id, source),
     }
   },
 }

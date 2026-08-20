@@ -21,7 +21,9 @@ export type MermaidToolbarLabels = {
   zoomIn?: string
   zoomOut?: string
   resetZoom?: string
+  download?: string
   downloadSvg?: string
+  downloadPng?: string
 }
 
 export type MermaidToolbarOptions = {

@@ -21,7 +21,9 @@ const customLabels = {
   zoomIn: '放大縮放',
   zoomOut: '縮小縮放',
   resetZoom: '重設縮放',
-  downloadSvg: '下載 SVG',
+  download: '下載圖片',
+  downloadSvg: '下載成 SVG',
+  downloadPng: '下載成 PNG',
 }
 </script>
 
