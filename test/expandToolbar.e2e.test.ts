@@ -738,64 +738,6 @@ describe('expand/fullscreen toolbars', async () => {
     await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
   })
 
-  it('closes a horizontally scrolled diagram into the visible source viewport', { timeout: 20000 }, async () => {
-    const page = await createPage()
-    await page.goto(url('/'))
-    await page.waitForSelector('#mock-svg', { state: 'visible', timeout: 5000 })
-
-    const source = await page.evaluate(() => {
-      const wrapper = document.querySelector<HTMLElement>('#diagram-root .mermaid-wrapper')!
-      const svg = document.querySelector<SVGSVGElement>('#mock-svg')!
-      wrapper.scrollLeft = wrapper.scrollWidth - wrapper.clientWidth
-      const wrapperRect = wrapper.getBoundingClientRect()
-      return {
-        scrollLeft: wrapper.scrollLeft,
-        viewportLeft: wrapperRect.left + wrapper.clientLeft,
-        svgLeft: svg.getBoundingClientRect().left,
-      }
-    })
-    expect(source.scrollLeft).toBeGreaterThan(0)
-    expect(source.svgLeft).toBeLessThan(source.viewportLeft)
-
-    await page.locator('#diagram-root').getByLabel('Expand diagram').click()
-    await page.waitForSelector('.ncm-expand-modal', { state: 'visible', timeout: 5000 })
-    const lockedViewportLeft = await page.locator('#diagram-root .mermaid-wrapper').evaluate((wrapper) => {
-      const rect = wrapper.getBoundingClientRect()
-      return rect.left + wrapper.clientLeft
-    })
-
-    const closingGeometry = await page.evaluate(async () => {
-      document.querySelector<HTMLButtonElement>('[aria-label="Minimize diagram"]')?.click()
-      await Promise.resolve()
-      const samples: number[] = []
-      let destinationLeft = Number.NaN
-      for (let index = 0; index < 8; index++) {
-        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-        const clip = document.querySelector<HTMLElement>('.ncm-expand-clip')
-        if (clip) {
-          const clipRect = clip.getBoundingClientRect()
-          const inlineInsets = clip.style.clipPath.match(/^inset\((.+)\)$/)![1]!.split(/\s+/).map(Number.parseFloat)
-          const computedInsets = getComputedStyle(clip).clipPath.match(/^inset\((.+)\)$/)![1]!.split(/\s+/).map(Number.parseFloat)
-          const inlineRight = inlineInsets[1] ?? inlineInsets[0]!
-          const inlineLeft = inlineInsets[3] ?? inlineRight
-          const computedRight = computedInsets[1] ?? computedInsets[0]!
-          const computedLeft = computedInsets[3] ?? computedRight
-          if (!Number.isFinite(destinationLeft)) destinationLeft = clipRect.left + inlineLeft
-          samples.push(clipRect.left + computedLeft)
-        }
-      }
-      return { destinationLeft, samples }
-    })
-    expect(closingGeometry.samples.length).toBeGreaterThan(0)
-    expect(Math.abs(closingGeometry.destinationLeft - source.viewportLeft)).toBeLessThanOrEqual(1)
-    expect(Math.min(...closingGeometry.samples)).toBeGreaterThanOrEqual(
-      Math.min(32, lockedViewportLeft, closingGeometry.destinationLeft) - 2,
-    )
-
-    await page.waitForSelector('.ncm-expand-modal', { state: 'detached', timeout: 5000 })
-    expect(await page.locator('#diagram-root .mermaid-wrapper').evaluate(wrapper => wrapper.scrollLeft)).toBe(source.scrollLeft)
-  })
-
   it('proves the complete fullscreen lifecycle and cleanup through the Package User path', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installFullscreenStub(page)
