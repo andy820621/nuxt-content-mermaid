@@ -59,6 +59,10 @@ function localizedRoutePair(path: string) {
   }
 }
 
+function localeForRoute(path: string) {
+  return path === '/zh' || path.startsWith('/zh/') ? 'zh-TW' : 'en-US'
+}
+
 interface SchemaNode {
   '@id'?: string
   '@type'?: string | string[]
@@ -259,7 +263,7 @@ describe('generated documentation website', () => {
     try {
       for (const path of PUBLIC_ROUTES) {
         const response = await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
-        const expectedLocale = path === '/zh' || path.startsWith('/zh/') ? 'zh-TW' : 'en-US'
+        const expectedLocale = localeForRoute(path)
 
         expect(response?.status()).toBe(200)
         const canonical = page.locator('link[rel="canonical"]')
@@ -341,7 +345,7 @@ describe('generated documentation website', () => {
       for (const path of PUBLIC_ROUTES) {
         await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
 
-        const expectedLocale = path === '/zh' || path.startsWith('/zh/') ? 'zh-TW' : 'en-US'
+        const expectedLocale = localeForRoute(path)
         const canonicalURL = new URL(path, SITE_ORIGIN).href
         const title = await page.title()
         const pageTitle = title.slice(0, -` · ${SITE_NAME}`.length)
