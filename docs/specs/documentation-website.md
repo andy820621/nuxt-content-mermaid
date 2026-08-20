@@ -161,11 +161,34 @@ Hero 是首頁唯一的直接子 section。右側 `ContentRenderer` 只將 `Cont
 
 全站以 production identity `https://nuxt-content-mermaid.barz.app` 產生 canonical、Open Graph 與 sitemap URLs。這個 origin 是公開套件文件的 canonical authority；hosting provider、DNS activation 與 production evidence 屬於營運紀錄，不是 durable product contract。
 
-`website/utils/site.ts` 中的 `SITE_ORIGIN`、`SITE_NAME` 與 `PUBLIC_ROUTES` 是網站公開身分的單一來源。`/sitemap.xml` 的 URL 集合必須完全等於 `PUBLIC_ROUTES`；目前共有 18 個 URL，但這個數量會隨正式文件調整，不是永久上限。
+`website/utils/site.ts` 中的 `SITE_ORIGIN`、`SITE_NAME`、`SITE_DESCRIPTION` 與 `PUBLIC_ROUTES` 是網站公開身分的單一來源。`/sitemap.xml` 的 URL 集合必須完全等於 `PUBLIC_ROUTES`；目前共有 18 個 URL，但這個數量會隨正式文件調整，不是永久上限。
 
 Repository-owned `/robots.txt` 允許傳統搜尋 crawler 與 AI 即時引用，並阻擋 GPTBot、ClaudeBot、CCBot 與 Applebot-Extended。Google-Extended 為保留 Gemini grounding 而允許，這是「不允許 AI 訓練」偏好的明確例外。Cloudflare 或其他 hosting layer 不得 prepend、改寫或覆蓋這份 crawler policy。
 
-`app.vue` 以 Nuxt i18n locale head 統一擁有 canonical、`en-US`／`zh-TW` reciprocal alternates、HTML language 與 Open Graph locale；所有頁面使用 ` · Nuxt Content Mermaid` title template，且只有英文首頁輸出一個最小 `WebSite` JSON-LD node。這些 metadata、robots 與 sitemap 行為都是 website-local contract，不改變 npm package API 或 release contract。
+SEO ownership 以「頁面提供事實、module 衍生表示」為原則：
+
+| 資料或產物 | 唯一 owner |
+|---|---|
+| origin、站名、預設描述、HTML route inventory | `website/utils/site.ts` |
+| 每頁 title、description 與 WebPage facts | Nuxt Content page + `useDocumentationSeo` |
+| canonical、HTML language、title template、Open Graph 與共用 Twitter defaults | Nuxt SEO Utils |
+| reciprocal `en-US`／`zh-TW` alternates 與 alternate OG locales | Nuxt i18n |
+| localized WebSite、WebPage graph 與 translation linkage | Nuxt Schema.org |
+| sitemap、robots | `@nuxtjs/seo` 內含 modules |
+| internal link build gate | Nuxt Link Checker |
+| Markdown variants、`llms.txt`、`llms-full.txt` | `nuxt-ai-ready` |
+
+`useDocumentationSeo` 是 page-facing 窄介面：頁面只傳一次 reactive title 與 description；Nuxt SEO 自動產生 Open Graph，adapter 補上明確 Twitter title／description 並把 page facts 與 locale 合併到 module-owned WebPage node。`app.vue` 只保留 locale alternates、alternate OG locales、favicon 與 app-shell attributes，不再手寫 canonical、global social tags、title template 或 raw JSON-LD。
+
+所有正式頁面都有 localized WebSite 與 WebPage graph。WebPage 使用該頁 canonical URL、title、description 與 language，並透過 `isPartOf` 指向同語系 WebSite；不宣告缺少可靠 identity 的 Person、Organization、Article、BlogPosting 或 SoftwareApplication。Open Graph 使用 repository-owned static social image，dynamic OG image 保持停用。
+
+Nuxt SEO Utils 的 inline style build minifier 保持停用，因為它會改寫 Nuxt Content／Shiki 的 SSR style text，造成 client hydration mismatch；bundle minification 仍由 Nuxt／Vite 負責。
+
+每個 `PUBLIC_ROUTES` HTML page 都衍生一個 AI-readable Markdown variant：`/` 對應 `/index.md`，其餘 route 對應 `${route}.md`。另外發布 `/llms.txt` 與 `/llms-full.txt`；目前因此共有 18 個 Markdown variants 與兩個 LLM indexes。這些 routes 不加入 `PUBLIC_ROUTES` 或 sitemap，HTML 透過 `rel="alternate" type="text/markdown"` 指向對應 variant。
+
+`nuxt-ai-ready` 只使用 build-time Content source、sitemap crawl 與 i18n detection；content negotiation、runtime database／sync、cron、MCP、WebMCP、Agent Skills、API Catalog 與 Content Signal injection 全部停用。Repository robots 仍是 crawler policy 的唯一 owner。
+
+Nuxt Link Checker 在 generate 時將 internal errors 視為失敗，但不抓取 external URLs。這些 metadata、Schema、crawler、link 與 AI-readable 行為都是 website-local contract，不改變 npm package API 或 release contract。
 
 ## Architecture boundaries
 
@@ -174,7 +197,7 @@ Repository-owned `/robots.txt` 允許傳統搜尋 crawler 與 AI 即時引用，
 - Landing Mermaid fence 是 Markdown body，不是 asset 或 TypeScript constant。
 - Sidebar 直接來自 `queryCollectionNavigation()`；TOC 直接來自 Markdown headings。
 - Locale filtering 只處理 navigation projection，不建立第二份 collection。
-- 沒有 Reference records、virtual module、generated Markdown 或 website artifact verifier。
+- 沒有 Reference records、第二份 route manifest、手寫 Markdown generator 或 website artifact verifier；AI-readable Markdown 完全由正式 Content 與 sitemap 衍生。
 - AI agent 的研究、plans、task reports、ports、tokens、screenshots 與臨時檢查結果不得成為 durable product contract。
 
 ## 品質與交付邊界
@@ -196,7 +219,9 @@ git diff --check
 Website-local tests 應涵蓋：
 
 - Static crawler policy、`PUBLIC_ROUTES` sitemap 集合與 module ownership。
-- 每條公開 route 的 canonical、locale alternates、title、Open Graph locale 與首頁 `WebSite` JSON-LD。
+- 每條公開 route 的 canonical、locale alternates、title、Open Graph／Twitter metadata，以及 localized WebPage → WebSite graph。
+- 每條公開 route 的 Markdown alternate 與靜態 Markdown variant，並驗證 `llms.txt`／`llms-full.txt` 及 sitemap 邊界。
+- Internal links／fragments 與 hydration invariants；external URL availability 不是 build gate。
 - English／Traditional Chinese navigation filtering 與 locale switching。
 - Landing source／rendered tabs 與 320px containment。
 - Theme persistence、Mermaid redraw、animation、reduced-motion 與 fallback。
@@ -205,4 +230,4 @@ Website-local tests 應涵蓋：
 - Desktop page TOC scrollspy、hash navigation 與 responsive visibility。
 - Shared footer ownership、license links 與 short-page placement。
 
-這些驗證只保護 Documentation Website baseline，不形成 package release contract。Static output 的 route、canonical metadata、sitemap、hydration 與 no-JavaScript reading path 均屬 website-local verification boundary。
+這些驗證只保護 Documentation Website baseline，不形成 package release contract。Static output 的 HTML route、canonical metadata、Schema、sitemap、Markdown／LLM artifacts、hydration 與 no-JavaScript reading path 均屬 website-local verification boundary。
