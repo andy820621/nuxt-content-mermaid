@@ -56,7 +56,7 @@
     "release:prepare:major": "changelogen --release --major --no-commit --no-tag --no-github && pnpm install --lockfile-only --ignore-scripts",
     "release:prepare:minor": "changelogen --release --minor --no-commit --no-tag --no-github && pnpm install --lockfile-only --ignore-scripts",
     "release:prepare:patch": "changelogen --release --patch --no-commit --no-tag --no-github && pnpm install --lockfile-only --ignore-scripts",
-    "test": "vitest run",
+    "test": "vitest run --exclude test/packagePrepack.test.ts && vitest run test/packagePrepack.test.ts",
     "test:package-artifact": "node scripts/release-verification/package-artifact.mjs --profile v3-known-latest",
     "test:compatibility-profile": "node scripts/release-verification/package-artifact.mjs",
     "test:package-contract": "pnpm prepack && vue-tsc -p test/release-verification/consumer-template/type-contracts/tsconfig.json --noEmit",
