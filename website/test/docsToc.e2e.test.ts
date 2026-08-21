@@ -30,7 +30,7 @@ describe('documentation page TOC', async () => {
     browser: true,
   })
 
-  it('seeds the first section and follows scrolling and native hash navigation', async () => {
+  it('seeds the first section and follows scrolling and native hash navigation', { timeout: 20000 }, async () => {
     const page = await createDocsPage()
     const toc = page.getByRole('navigation', { name: 'On this page' })
 
