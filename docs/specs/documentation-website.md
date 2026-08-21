@@ -91,7 +91,6 @@ Advanced pages 的責任如下：
 - Desktop 的 Documentation 與 Troubleshooting links。
 - Theme toggle、locale switcher 與 GitHub repository link。
 - Mobile documentation menu。
-- Route-aware Open Graph metadata。
 - Nuxt page/layout outlet。
 - Project ownership 與 MIT License footer。
 
