@@ -74,6 +74,10 @@ describe('package prepack lifecycle', () => {
       timeout: 60_000,
     })
 
+    await Promise.all([
+      expect(access(join(workspace, 'dist', 'types', 'config.ts'))).resolves.toBeUndefined(),
+      expect(access(join(workspace, 'dist', 'types', 'mermaid.d.ts'))).resolves.toBeUndefined(),
+    ])
     const archives = (await readdir(artifactDirectory)).filter(filename => filename.endsWith('.tgz'))
     expect(archives).toHaveLength(1)
   }, 70_000)
