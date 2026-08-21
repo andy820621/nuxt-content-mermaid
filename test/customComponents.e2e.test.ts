@@ -13,12 +13,21 @@ describe('custom renderer/spinner/error components', async () => {
 
   it('uses custom spinner while rendering and hides after success', { timeout: 20000 }, async () => {
     const page = await createPage()
+    await page.addInitScript(() => {
+      (window as typeof window & { __holdMermaidRender__?: boolean }).__holdMermaidRender__ = true
+    })
     await page.goto(url('/'))
 
     const spinner = page.locator('#test-spinner')
     await spinner.waitFor({ state: 'visible', timeout: 5000 })
 
-    // Wait for stubbed mermaid to finish
+    await expect.poll(() => page.evaluate(() => {
+      return typeof (window as typeof window & { __releaseMermaidRender__?: () => void }).__releaseMermaidRender__
+    })).toBe('function')
+    await page.evaluate(() => {
+      (window as typeof window & { __releaseMermaidRender__?: () => void }).__releaseMermaidRender__?.()
+    })
+
     await spinner.waitFor({ state: 'detached', timeout: 5000 })
 
     const svg = page.locator('#diagram-container svg#mock-svg')

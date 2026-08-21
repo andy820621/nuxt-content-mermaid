@@ -3,16 +3,15 @@ import { readFile, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
-import { chromium, type Browser } from 'playwright'
+import { promisify, stripVTControlCharacters } from 'node:util'
+import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { PUBLIC_ROUTES, SITE_ORIGIN } from '../utils/site'
+import { PUBLIC_ROUTES, SITE_NAME, SITE_ORIGIN } from '../utils/site'
 
 const execFileAsync = promisify(execFile)
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 const generatedRoot = join(websiteRoot, '.output/public')
-const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g')
 const generateEnvironment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('VITEST')),
 )
@@ -24,6 +23,7 @@ const contentTypes: Record<string, string> = {
   '.ico': 'image/x-icon',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
@@ -37,8 +37,143 @@ function generatedRouteFile(path: string) {
   return join(generatedRoot, `${path.slice(1)}.html`)
 }
 
+function markdownRouteFor(path: string) {
+  return path === '/' ? '/index.md' : `${path}.md`
+}
+
 function normalizeText(text: string | null) {
   return text?.replace(/\s+/g, ' ').trim() ?? ''
+}
+
+function localizedRoutePair(path: string) {
+  const englishPath = path === '/zh'
+    ? '/'
+    : path.startsWith('/zh/')
+      ? path.slice(3)
+      : path
+  const chinesePath = englishPath === '/' ? '/zh' : `/zh${englishPath}`
+
+  return {
+    'en-US': new URL(englishPath, SITE_ORIGIN).href,
+    'zh-TW': new URL(chinesePath, SITE_ORIGIN).href,
+  }
+}
+
+function localeForRoute(path: string) {
+  return path === '/zh' || path.startsWith('/zh/') ? 'zh-TW' : 'en-US'
+}
+
+interface SchemaNode {
+  '@id'?: string
+  '@type'?: string | string[]
+  'description'?: string
+  'inLanguage'?: string
+  'isPartOf'?: string | { '@id'?: string }
+  'name'?: string
+  'url'?: string
+}
+
+function isSchemaNode(value: unknown): value is SchemaNode {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasSchemaType(node: SchemaNode, type: string) {
+  const types = Array.isArray(node['@type']) ? node['@type'] : [node['@type']]
+  return types.includes(type)
+}
+
+function schemaReferenceID(reference: SchemaNode['isPartOf']) {
+  return typeof reference === 'string' ? reference : reference?.['@id']
+}
+
+async function schemaNodes(page: Page) {
+  const sources = await page.locator('script[type="application/ld+json"]').allTextContents()
+
+  return sources.flatMap((source) => {
+    const document: unknown = JSON.parse(source)
+    if (!isSchemaNode(document))
+      return []
+
+    const graph = (document as Record<string, unknown>)['@graph']
+    return Array.isArray(graph) ? graph.filter(isSchemaNode) : [document]
+  })
+}
+
+async function metaContents(page: Page, selector: string) {
+  return page.locator(selector).evaluateAll(elements => (
+    elements.map(element => element.getAttribute('content'))
+  ))
+}
+
+interface RobotsGroup {
+  userAgents: string[]
+  directives: Map<string, string[]>
+}
+
+function parseRobotsDirective(rawLine: string) {
+  const line = rawLine.replace(/#.*$/, '').trim()
+  const separator = line.indexOf(':')
+
+  if (!line || separator === -1)
+    return
+
+  return {
+    name: line.slice(0, separator).trim().toLowerCase(),
+    value: line.slice(separator + 1).trim(),
+  }
+}
+
+function parseRobotsGroups(source: string): RobotsGroup[] {
+  const groups: RobotsGroup[] = []
+  let current: RobotsGroup | undefined
+
+  for (const rawLine of source.split(/\r?\n/)) {
+    const directive = parseRobotsDirective(rawLine)
+    if (!directive)
+      continue
+
+    const { name } = directive
+    const value = directive.value.toLowerCase()
+
+    if (name === 'user-agent') {
+      if (!current || current.directives.size > 0) {
+        current = { userAgents: [], directives: new Map() }
+        groups.push(current)
+      }
+      current.userAgents.push(value)
+      continue
+    }
+
+    if (!current)
+      continue
+
+    const values = current.directives.get(name) ?? []
+    values.push(value)
+    current.directives.set(name, values)
+  }
+
+  return groups
+}
+
+function robotsGroupFor(groups: RobotsGroup[], userAgent: string) {
+  const normalizedAgent = userAgent.toLowerCase()
+  return groups.find(group => group.userAgents.includes(normalizedAgent))
+    ?? groups.find(group => group.userAgents.includes('*'))
+}
+
+function directivePreferences(group: RobotsGroup, directive: string) {
+  return (group.directives.get(directive) ?? [])
+    .flatMap(value => value.split(',').map(preference => preference.trim()))
+}
+
+function robotsDirectiveValues(source: string, directive: string) {
+  return source.split(/\r?\n/).flatMap((rawLine) => {
+    const parsedDirective = parseRobotsDirective(rawLine)
+    if (!parsedDirective || parsedDirective.name !== directive)
+      return []
+
+    return [parsedDirective.value]
+  })
 }
 
 describe('generated documentation website', () => {
@@ -57,7 +192,7 @@ describe('generated documentation website', () => {
         maxBuffer: 16 * 1024 * 1024,
       },
     )
-    generateOutput = `${result.stdout}\n${result.stderr}`.replace(ansiEscape, '')
+    generateOutput = stripVTControlCharacters(`${result.stdout}\n${result.stderr}`)
 
     server = createServer(async (request, response) => {
       try {
@@ -122,12 +257,13 @@ describe('generated documentation website', () => {
     expect(generateOutput).not.toContain('[Icon] failed to load icon')
   })
 
-  it('publishes the exact production routes through canonical links and sitemap', async () => {
+  it('publishes the exact production routes and crawler policy', async () => {
     const page = await browser.newPage()
 
     try {
       for (const path of PUBLIC_ROUTES) {
         const response = await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+        const expectedLocale = localeForRoute(path)
 
         expect(response?.status()).toBe(200)
         const canonical = page.locator('link[rel="canonical"]')
@@ -136,14 +272,166 @@ describe('generated documentation website', () => {
           .toBe(new URL(path, SITE_ORIGIN).href)
         expect(await page.locator('meta[property="og:url"]').getAttribute('content'))
           .toBe(new URL(path, SITE_ORIGIN).href)
+        expect(await page.locator('html').getAttribute('lang')).toBe(expectedLocale)
+        const title = await page.title()
+        expect(title).not.toBe('')
+        expect(title.endsWith(` · ${SITE_NAME}`)).toBe(true)
+        expect(await page.locator('meta[property="og:locale"]').getAttribute('content'))
+          .toBe(expectedLocale.replace('-', '_'))
+
+        for (const [language, href] of Object.entries(localizedRoutePair(path))) {
+          const alternate = page.locator(`link[rel="alternate"][hreflang="${language}"]`)
+          expect(await alternate.count()).toBe(1)
+          expect(await alternate.getAttribute('href')).toBe(href)
+        }
       }
 
       const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
+      const expectedSitemapURLs = PUBLIC_ROUTES.map(path => new URL(path, SITE_ORIGIN).href)
       const sitemapURLs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
         .map(([, url]) => url)
 
-      expect(sitemapURLs).toEqual(PUBLIC_ROUTES.map(path => new URL(path, SITE_ORIGIN).href))
+      expect(sitemap).not.toContain('<sitemapindex')
+      expect(sitemapURLs).toHaveLength(expectedSitemapURLs.length)
+      expect(new Set(sitemapURLs).size).toBe(expectedSitemapURLs.length)
+      expect(new Set(sitemapURLs)).toEqual(new Set(expectedSitemapURLs))
       expect(sitemap).not.toContain('/reference')
+
+      const robots = await readFile(join(generatedRoot, 'robots.txt'), 'utf8')
+      const groups = parseRobotsGroups(robots)
+      const wildcardGroup = robotsGroupFor(groups, '*')
+
+      expect(wildcardGroup?.directives.get('allow')).toContain('/')
+      expect(robotsDirectiveValues(robots, 'sitemap'))
+        .toEqual([`${SITE_ORIGIN}/sitemap.xml`])
+
+      for (const userAgent of ['GPTBot', 'ClaudeBot', 'CCBot', 'Applebot-Extended']) {
+        expect(robotsGroupFor(groups, userAgent)?.directives.get('disallow')).toContain('/')
+      }
+
+      for (const userAgent of [
+        'OAI-SearchBot',
+        'ChatGPT-User',
+        'Claude-SearchBot',
+        'Claude-User',
+        'PerplexityBot',
+        'Googlebot',
+        'Bingbot',
+        'Applebot',
+        'Google-Extended',
+      ]) {
+        expect(robotsGroupFor(groups, userAgent)?.directives.get('disallow') ?? []).not.toContain('/')
+      }
+
+      expect(directivePreferences(wildcardGroup!, 'content-signal'))
+        .toEqual(expect.arrayContaining(['search=yes', 'ai-input=yes', 'ai-train=no']))
+      expect(directivePreferences(wildcardGroup!, 'content-usage'))
+        .toEqual(expect.arrayContaining(['bots=y', 'search=y', 'ai-output=y', 'train-ai=n']))
+    }
+    finally {
+      await page.close()
+    }
+  }, 30_000)
+
+  it('derives consistent social metadata and structured data from each documentation page', async () => {
+    const page = await browser.newPage({ javaScriptEnabled: false })
+    const expectedSocialImage = `${SITE_ORIGIN}/assets/nuxt-content-mermaid.png`
+    const siteDescriptions = {
+      'en-US': 'Turn Mermaid code blocks into interactive diagrams without leaving your Markdown workflow.',
+      'zh-TW': '不離開 Markdown 工作流程，將 Mermaid 程式碼區塊轉換為互動式圖表。',
+    } as const
+
+    try {
+      for (const path of PUBLIC_ROUTES) {
+        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+
+        const expectedLocale = localeForRoute(path)
+        const canonicalURL = new URL(path, SITE_ORIGIN).href
+        const title = await page.title()
+        const pageTitle = title.slice(0, -` · ${SITE_NAME}`.length)
+        const description = await page.locator('meta[name="description"]').getAttribute('content')
+
+        expect(description).not.toBeNull()
+        expect(await metaContents(page, 'meta[property="og:title"]')).toEqual([title])
+        expect(await metaContents(page, 'meta[property="og:description"]')).toEqual([description])
+        expect(await metaContents(page, 'meta[name="twitter:title"]')).toEqual([pageTitle])
+        expect(await metaContents(page, 'meta[name="twitter:description"]')).toEqual([description])
+        expect(await metaContents(page, 'meta[property="og:image"]')).toEqual([expectedSocialImage])
+        expect(await metaContents(page, 'meta[property="og:image:alt"]')).toEqual([SITE_NAME])
+        expect(await metaContents(page, 'meta[name="twitter:card"]')).toEqual(['summary_large_image'])
+        expect(await metaContents(page, 'meta[name="twitter:image"]')).toEqual([expectedSocialImage])
+        expect(await metaContents(page, 'meta[name="twitter:image:alt"]')).toEqual([SITE_NAME])
+
+        const nodes = await schemaNodes(page)
+        const matchingPages = nodes.filter(node => hasSchemaType(node, 'WebPage') && node.url === canonicalURL)
+        expect(matchingPages).toHaveLength(1)
+
+        const webPage = matchingPages[0]!
+        expect(webPage.description).toBe(description)
+        expect(webPage.inLanguage).toBe(expectedLocale)
+
+        const webSiteID = schemaReferenceID(webPage.isPartOf)
+        const webSite = nodes.find(node => hasSchemaType(node, 'WebSite') && node['@id'] === webSiteID)
+        expect(webSite).toBeDefined()
+        expect(webSite?.name).toBe(SITE_NAME)
+        expect(webSite?.description).toBe(siteDescriptions[expectedLocale])
+        expect(webSite?.inLanguage).toBe(expectedLocale)
+        expect(webSite?.url).toBe(expectedLocale === 'zh-TW' ? `${SITE_ORIGIN}/zh` : `${SITE_ORIGIN}/`)
+      }
+    }
+    finally {
+      await page.close()
+    }
+  }, 30_000)
+
+  it('publishes AI-readable Markdown and LLM indexes without widening the sitemap', async () => {
+    const page = await browser.newPage({ javaScriptEnabled: false })
+
+    try {
+      for (const path of PUBLIC_ROUTES) {
+        await page.goto(`${staticSiteURL}${path}`, { waitUntil: 'domcontentloaded' })
+        const heading = normalizeText(await page.locator('#main-content h1').textContent())
+        const markdownPath = markdownRouteFor(path)
+        const markdownAlternateHrefs = await page
+          .locator('link[rel="alternate"][type="text/markdown"]')
+          .evaluateAll(links => links.map(link => link.getAttribute('href')))
+
+        expect(markdownAlternateHrefs).toHaveLength(1)
+        expect(new URL(markdownAlternateHrefs[0]!, SITE_ORIGIN).pathname).toBe(markdownPath)
+
+        const markdownResponse = await fetch(`${staticSiteURL}${markdownPath}`)
+        const markdown = await markdownResponse.text()
+
+        expect(markdownResponse.status).toBe(200)
+        expect(markdown).toContain(heading)
+        expect(markdown).not.toMatch(/<!doctype html|<html(?:\s|>)|__NUXT__|<script[^>]+src=["'][^"']*\/_nuxt\//i)
+      }
+
+      const llmsResponse = await fetch(`${staticSiteURL}/llms.txt`)
+      const llms = await llmsResponse.text()
+
+      expect(llmsResponse.status).toBe(200)
+      expect(llms).toContain(`# ${SITE_NAME}`)
+      expect(llms).toContain('Turn Mermaid code blocks into interactive diagrams without leaving your Markdown workflow.')
+      expect(llms).toContain('/llms-full.txt')
+      expect(llms).toContain('/index.md')
+      expect(llms).toContain('/getting-started.md')
+      expect(llms).toContain('/zh.md')
+      expect(llms).toMatch(/繁體中文|Traditional Chinese/)
+
+      const llmsFullResponse = await fetch(`${staticSiteURL}/llms-full.txt`)
+      const llmsFull = await llmsFullResponse.text()
+
+      expect(llmsFullResponse.status).toBe(200)
+      expect(llmsFull).toContain('Install Nuxt Content Mermaid')
+      expect(llmsFull).toContain('安裝 Nuxt Content Mermaid')
+      expect(llmsFull).not.toContain('This file is generated during prerender.')
+      expect(llmsFull).not.toMatch(/<!doctype html|<html(?:\s|>)|__NUXT__|<script[^>]+src=["'][^"']*\/_nuxt\//i)
+
+      const sitemap = await readFile(join(generatedRoot, 'sitemap.xml'), 'utf8')
+      expect(sitemap).not.toContain('.md</loc>')
+      expect(sitemap).not.toContain('/llms.txt</loc>')
+      expect(sitemap).not.toContain('/llms-full.txt</loc>')
     }
     finally {
       await page.close()

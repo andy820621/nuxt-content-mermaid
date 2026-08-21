@@ -1,4 +1,7 @@
 {
+  "nuxtSiteConfig": {
+    "description": "不離開 Markdown 工作流程，將 Mermaid 程式碼區塊轉換為互動式圖表。"
+  },
   "site": {
     "name": "Nuxt Content Mermaid",
     "github": "Nuxt Content Mermaid GitHub 儲存庫",

@@ -2,10 +2,12 @@
 import type { ContentNavigationItem } from '@nuxt/content'
 import type { SupportedLocale } from '~/types/i18n'
 import { filterLocaleNavigation } from '~/utils/filterLocaleNavigation'
-import { SITE_ORIGIN, toSiteURL } from '~/utils/site'
+import { SITE_ORIGIN } from '~/utils/site'
 
-const { locale, localeProperties } = useI18n()
+const { locale } = useI18n()
 const localePath = useLocalePath()
+const localeHead = useLocaleHead({ seo: true })
+const route = useRoute()
 
 const mobileMenuButton = useTemplateRef<HTMLButtonElement>('mobileMenuButton')
 const mobileMenuOpen = ref(false)
@@ -28,35 +30,25 @@ const localizedNavigation = computed(() => filterLocaleNavigation(
 
 const mobileNavigationItems = computed(() => flattenPages(localizedNavigation.value))
 
-const socialImageUrl = `${SITE_ORIGIN}/assets/nuxt-content-mermaid.png`
-const route = useRoute()
-
 useHead(() => ({
-  htmlAttrs: {
-    lang: localeProperties.value.language,
-  },
   bodyAttrs: {
     class: mobileMenuOpen.value ? 'mobile-menu-open' : undefined,
   },
   link: [
-    { rel: 'canonical', href: toSiteURL(route.path) },
+    ...(localeHead.value.link ?? [])
+      .filter(link => link.rel === 'alternate')
+      .map(link => ({
+        ...link,
+        href: link.href === SITE_ORIGIN ? `${SITE_ORIGIN}/` : link.href,
+      })),
     { rel: 'icon', href: '/assets/favicon/favicon.ico', sizes: 'any' },
     { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-32x32.png', sizes: '32x32' },
     { rel: 'icon', type: 'image/png', href: '/assets/favicon/favicon-16x16.png', sizes: '16x16' },
     { rel: 'apple-touch-icon', href: '/assets/favicon/apple-touch-icon.png', sizes: '180x180' },
   ],
+  meta: (localeHead.value.meta ?? [])
+    .filter(meta => meta.property === 'og:locale:alternate'),
 }))
-
-useSeoMeta({
-  ogSiteName: 'Nuxt Content Mermaid',
-  ogType: 'website',
-  ogUrl: () => toSiteURL(route.path),
-  ogImage: socialImageUrl,
-  ogImageAlt: 'Nuxt Content Mermaid',
-  twitterCard: 'summary_large_image',
-  twitterImage: socialImageUrl,
-  twitterImageAlt: 'Nuxt Content Mermaid',
-})
 
 let mobileViewport: MediaQueryList | undefined
 

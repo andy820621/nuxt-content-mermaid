@@ -11,17 +11,20 @@
     "@barzhsieh/nuxt-content-mermaid": "workspace:*",
     "@nuxt/content": "catalog:integrations",
     "@nuxtjs/i18n": "^10.6.0",
+    "@nuxtjs/seo": "^5.3.14",
     "better-sqlite3": "12.6.2",
     "nuxt": "catalog:dev",
+    "nuxt-ai-ready": "2.0.1",
     "reka-ui": "^2.10.3",
     "remark-breaks": "^4.0.0"
   },
   "devDependencies": {
     "@iconify-json/line-md": "^1.2.16",
     "@iconify-json/material-symbols-light": "^1.2.88",
-    "@nuxt/test-utils": "catalog:test",
     "@nuxt/icon": "catalog:dev",
+    "@nuxt/test-utils": "catalog:test",
     "@nuxtjs/color-mode": "catalog:dev",
+    "nuxtseo-layer-devtools": "^5.3.14",
     "playwright": "catalog:test",
     "vitest": "catalog:test"
   },

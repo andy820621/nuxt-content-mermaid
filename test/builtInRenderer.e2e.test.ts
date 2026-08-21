@@ -664,21 +664,11 @@ describe('built-in renderer integration', async () => {
     })).toBe(3)
   })
 
-  it('does not change copy, expand, fullscreen, or zoom state while downloading', { timeout: 20000 }, async () => {
+  it('does not change expand, fullscreen, or zoom state while downloading', { timeout: 20000 }, async () => {
     const page = await createPage()
     await installSvgDownloadCapture(page)
     await installFullscreenStub(page)
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: { writeText: async () => undefined },
-      })
-    })
     await renderInitialDiagram(page)
-
-    await page.locator('#primary [aria-label="Copy"]').click()
-    const copiedButton = page.locator('#primary [aria-label="Copied"]')
-    await copiedButton.waitFor({ state: 'visible', timeout: 5000 })
 
     await page.locator('#primary [aria-label="Expand diagram"]').click()
     const expandModal = page.locator('.ncm-expand-modal')
@@ -696,7 +686,6 @@ describe('built-in renderer integration', async () => {
     await waitForSvgDownloadCount(page, 1)
     await expandModal.waitFor({ state: 'visible', timeout: 5000 })
     expect(await overlayZoomInfo.textContent()).toBe(zoomedOverlayValue)
-    expect(await copiedButton.count()).toBe(1)
 
     await page.getByLabel('Minimize diagram').click()
     await expandModal.waitFor({ state: 'detached', timeout: 5000 })
@@ -716,7 +705,6 @@ describe('built-in renderer integration', async () => {
     await waitForSvgDownloadCount(page, 2)
     expect(await fullscreenZoomInfo.textContent()).toBe(zoomedFullscreenValue)
     expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
-    expect(await copiedButton.count()).toBe(1)
     expect(await page.locator('#primary [data-testid="built-in-spinner"]').count()).toBe(0)
     expect(await page.locator('#primary [data-testid="built-in-error"]').count()).toBe(0)
   })

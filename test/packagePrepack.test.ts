@@ -51,10 +51,14 @@ afterEach(async () => {
 })
 
 describe('package prepack lifecycle', () => {
-  it('packs successfully from a clean tracked workspace without generated Nuxt state', async () => {
+  it('packs successfully when a clean tracked workspace starts without generated Nuxt state', async () => {
     const workspace = await createCleanTrackedWorkspace()
     const artifactDirectory = join(workspace, 'artifacts')
     await mkdir(artifactDirectory)
+
+    await expect(access(join(workspace, '.nuxt', 'tsconfig.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
 
     await execFileAsync('pnpm', [
       'pack',
@@ -70,8 +74,22 @@ describe('package prepack lifecycle', () => {
       timeout: 60_000,
     })
 
-    await expect(access(join(workspace, '.nuxt', 'tsconfig.json'))).resolves.toBeUndefined()
     const archives = (await readdir(artifactDirectory)).filter(filename => filename.endsWith('.tgz'))
     expect(archives).toHaveLength(1)
+
+    const archiveDirectory = join(workspace, 'archive')
+    await mkdir(archiveDirectory)
+    await execFileAsync('tar', [
+      '-xzf',
+      join(artifactDirectory, archives[0]!),
+      '-C',
+      archiveDirectory,
+    ])
+
+    const packagedTypesDirectory = join(archiveDirectory, 'package', 'dist', 'types')
+    await Promise.all([
+      expect(access(join(packagedTypesDirectory, 'config.ts'))).resolves.toBeUndefined(),
+      expect(access(join(packagedTypesDirectory, 'mermaid.d.ts'))).resolves.toBeUndefined(),
+    ])
   }, 70_000)
 })

@@ -2,6 +2,8 @@ type InitCall = { theme?: string }
 type RunCall = { source: string, threw: boolean }
 type GlobalMermaidStub = typeof globalThis & {
   __forceMermaidError?: boolean
+  __holdMermaidRender__?: boolean
+  __releaseMermaidRender__?: () => void
   __mermaidCalls__?: InitCall[]
   __mermaidRuns__?: RunCall[]
 }
@@ -20,9 +22,21 @@ const mermaidStub = {
     calls.push(config)
   },
   render: async (_renderId: string, source: string) => {
-    await new Promise(resolve => setTimeout(resolve, 200))
+    const globalState = globalThis as GlobalMermaidStub
+    if (globalState.__holdMermaidRender__) {
+      await new Promise<void>((resolve) => {
+        globalState.__releaseMermaidRender__ = () => {
+          globalState.__holdMermaidRender__ = false
+          delete globalState.__releaseMermaidRender__
+          resolve()
+        }
+      })
+    }
+    else {
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
     const shouldThrow = source.includes('__FORCE_ERROR__')
-      || ((globalThis as GlobalMermaidStub).__forceMermaidError === true)
+      || (globalState.__forceMermaidError === true)
     runs.push({ source, threw: shouldThrow })
 
     if (shouldThrow) {

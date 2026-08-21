@@ -16,12 +16,7 @@ if (!page.value) {
   })
 }
 
-useSeoMeta({
-  title: page.value.title,
-  description: page.value.description,
-  ogTitle: page.value.title,
-  ogDescription: page.value.description,
-})
+useDocumentationSeo(page)
 
 const landingContentComponents = {
   ContentMermaidTransport: LandingMermaidDemo,
@@ -37,7 +32,9 @@ const landingContentComponents = {
   >
     <section class="landing-hero">
       <div class="landing-hero__copy">
-        <p class="landing-eyebrow">{{ $t('landing.eyebrow') }}</p>
+        <p class="landing-eyebrow">
+          {{ $t('landing.eyebrow') }}
+        </p>
         <h1>{{ page.title }}</h1>
         <p class="landing-description">
           {{ page.description }}
@@ -58,6 +55,5 @@ const landingContentComponents = {
         :components="landingContentComponents"
       />
     </section>
-
   </main>
 </template>

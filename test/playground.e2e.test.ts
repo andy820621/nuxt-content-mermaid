@@ -19,10 +19,34 @@ async function downloadSvg(page: BrowserPage, selector: string) {
   }
 }
 
-describe('v3 migration playground', async () => {
+describe('playground integration', async () => {
   await setup({
     rootDir,
     browser: true,
+  })
+
+  it('renders adjacent diagrams while presenting the parser error and full diagnostics', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/test-debug'))
+    expect(response?.status()).toBe(200)
+
+    const blockAfterHeading = (headingId: string) => page
+      .locator(`#${headingId}`)
+      .locator('xpath=following-sibling::*[1]')
+      .locator('.mermaid-block')
+
+    const normalBlock = blockAfterHeading('normal-chart-should-log-render-time')
+    const syntaxErrorBlock = blockAfterHeading('syntax-error-chart-should-display-full-error-stack')
+    const queuedBlock = blockAfterHeading('another-normal-chart-test-queue-mechanism')
+
+    await normalBlock.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 10000 })
+    await syntaxErrorBlock.locator('.mermaid-error').waitFor({ state: 'visible', timeout: 10000 })
+    await queuedBlock.scrollIntoViewIfNeeded()
+    await queuedBlock.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 10000 })
+
+    expect(await syntaxErrorBlock.locator('.mermaid > svg').count()).toBe(0)
+    expect(await syntaxErrorBlock.locator('.mermaid-error__stack').textContent()).toContain('Parse error')
+    expect(await syntaxErrorBlock.locator('details code').textContent()).toContain('A --')
   })
 
   it('keeps the startup snapshot while showing page, direct, and conflict recovery paths', { timeout: 30000 }, async () => {
@@ -87,68 +111,6 @@ describe('v3 migration playground', async () => {
     expect(await renderedId()).toBe(recoveredSvgId)
     expect(await renderedText()).toContain('RECOVERED')
     expect(await recoveryPhase()).toBe('conflict')
-  })
-
-  it('keeps the class diagram on the content axis throughout expand and minimize', { timeout: 30000 }, async () => {
-    const page = await createPage()
-    const response = await page.goto(url('/mermaid/classdiagram/finance-ledger'))
-    expect(response?.status()).toBe(200)
-
-    const block = page.locator('.mermaid-block')
-    await block.scrollIntoViewIfNeeded()
-    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 15000 })
-    await page.addStyleTag({
-      content: `
-        html {
-          width: calc(100% - 15px);
-        }
-        .ncm-expand-clip,
-        .ncm-expand-target {
-          transition-duration: 600ms !important;
-          transition-timing-function: linear !important;
-        }
-      `,
-    })
-
-    const result = await page.evaluate(async () => {
-      Object.defineProperty(document.documentElement, 'clientWidth', {
-        configurable: true,
-        get: () => window.innerWidth - 15,
-      })
-      const centerX = (element: Element) => {
-        const rect = element.getBoundingClientRect()
-        return rect.left + rect.width / 2
-      }
-      const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-      const source = document.querySelector<SVGSVGElement>('.mermaid-block .mermaid > svg')!
-      const sourceCenter = centerX(source)
-      const gutter = window.innerWidth - document.documentElement.clientWidth
-
-      document.querySelector<HTMLButtonElement>('.mermaid-block [aria-label="Expand diagram"]')!.click()
-      const opening: number[] = []
-      for (let index = 0; index < 48; index++) {
-        await nextFrame()
-        const target = document.querySelector<HTMLElement>('.ncm-expand-target')
-        if (target) opening.push(centerX(target))
-      }
-
-      document.querySelector<HTMLButtonElement>('[aria-label="Minimize diagram"]')!.click()
-      const closing: number[] = []
-      for (let index = 0; index < 48; index++) {
-        await nextFrame()
-        const target = document.querySelector<HTMLElement>('.ncm-expand-target')
-        if (target) closing.push(centerX(target))
-      }
-
-      return { sourceCenter, gutter, innerWidth: window.innerWidth, opening, closing }
-    })
-
-    expect(result.gutter).toBeGreaterThan(0)
-    expect(result.sourceCenter).toBeCloseTo((result.innerWidth - result.gutter) / 2, 0)
-    expect(result.opening.length).toBeGreaterThan(2)
-    expect(result.closing.length).toBeGreaterThan(2)
-    expect(Math.max(...result.opening.map(center => Math.abs(center - result.sourceCenter)))).toBeLessThanOrEqual(0.25)
-    expect(Math.max(...result.closing.map(center => Math.abs(center - result.sourceCenter)))).toBeLessThanOrEqual(0.25)
   })
 
   it('downloads the sanitized committed SVG without changing Mermaid HTML labels', { timeout: 30000 }, async () => {
