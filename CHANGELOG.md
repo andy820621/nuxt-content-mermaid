@@ -1,5 +1,31 @@
 # Changelog
 
+## v3.0.5
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.4...v3.0.5)
+
+### 🚀 Enhancements
+
+- **website:** Establish SEO and crawler foundations ([#130](https://github.com/andy820621/nuxt-content-mermaid/pull/130))
+
+### 🩹 Fixes
+
+- Handle missing page configuration during SSR ([#132](https://github.com/andy820621/nuxt-content-mermaid/pull/132))
+
+### 📖 Documentation
+
+- Simplify release workflow ([#128](https://github.com/andy820621/nuxt-content-mermaid/pull/128))
+
+### Upgrade notes
+
+- After upgrading, stop the Nuxt/Docus app, remove its generated `.data/content` cache (or the configured local Content cache path), then restart or rebuild. Invalidate restored CI Content caches too. Cached markup from 3.0.4 can retain the old binding and continue causing SSR errors.
+- Separate inline attributes with whitespace, for example `{title="x" toolbar.title="y"}`. Comma-separated attributes now preserve the original code fence.
+- PNG export: after a network failure, some browsers keep the failed module load, so retrying may still fail until the page is reloaded. SVG export remains available.
+
+### ❤️ Contributors
+
+- Yao Tsu Hsieh ([@andy820621](https://github.com/andy820621))
+
 ## v3.0.4
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.3...v3.0.4)
