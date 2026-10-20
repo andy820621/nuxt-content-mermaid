@@ -2,6 +2,7 @@ import type { NuxtConfig, PublicRuntimeConfig } from '@nuxt/schema'
 import type {
   MermaidComponentProps,
   ModuleOptions,
+  PageMermaidConfig,
   RuntimeMermaidConfig,
   RuntimeOptions,
 } from '@barzhsieh/nuxt-content-mermaid'
@@ -44,6 +45,19 @@ const directProps = {
     },
   },
 } satisfies MermaidComponentProps
+
+// @ts-expect-error Mermaid 12 removed nested defaultRenderer from Page Mermaid Config
+const legacyPageConfig: PageMermaidConfig = { flowchart: { defaultRenderer: 'dagre-wrapper' } }
+
+// @ts-expect-error Mermaid 12 removed nested defaultRenderer from Direct Mermaid Config
+const legacyDirectProps: MermaidComponentProps = { config: { class: { defaultRenderer: 'elk' } } }
+
+// @ts-expect-error Mermaid 12 removed nested defaultRenderer from Runtime Mermaid Config
+const legacyLoaderOptions: RuntimeOptions = { loader: { init: { state: { defaultRenderer: 'elk' } } } }
+
+const migratedPageConfig = { layout: 'dagre' } satisfies PageMermaidConfig
+const migratedDirectProps = { config: { layout: 'elk' } } satisfies MermaidComponentProps
+const migratedLoaderOptions = { loader: { init: { layout: 'dagre', look: 'classic' } } } satisfies RuntimeOptions
 
 // @ts-expect-error runtime transport cannot contain functions
 const invalidRuntimeFunction: RuntimeMermaidConfig = { sequence: { actorFont: () => ({}) } }
@@ -90,6 +104,12 @@ void [
   publicRuntimeConfig,
   pageProps,
   directProps,
+  legacyPageConfig,
+  legacyDirectProps,
+  legacyLoaderOptions,
+  migratedPageConfig,
+  migratedDirectProps,
+  migratedLoaderOptions,
   invalidRuntimeFunction,
   invalidNestedRuntimeFunction,
   invalidRuntimeInstance,

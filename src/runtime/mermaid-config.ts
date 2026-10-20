@@ -4,6 +4,9 @@ import type { JsonObject } from '../types/config'
 import type { MermaidComponentSource } from './component-configuration'
 import { mergeDirectMermaidConfigForInvocation } from './direct-mermaid-config'
 import type { MermaidThemeMode } from './composables/useMermaidTheme'
+import { MERMAID_LOG_PREFIX } from './constants'
+
+const defaultRendererWarnings = import.meta.dev ? new Set<string>() : undefined
 
 interface ThemeOptions {
   colorModeValue?: string
@@ -88,6 +91,25 @@ export function materializeMermaidConfigForInvocation(
       value: options.theme,
       writable: true,
     })
+  }
+
+  if (import.meta.dev && defaultRendererWarnings) {
+    const sources = [
+      ['loader.init', options.runtimeConfig],
+      [options.source.kind === 'page' ? 'Page Mermaid Config' : 'Direct Mermaid Config',
+        options.source.kind === 'runtime-only' ? undefined : options.source.config],
+    ] as const
+
+    for (const [source, config] of sources) {
+      for (const diagram of ['flowchart', 'class', 'state'] as const) {
+        const diagramConfig = config?.[diagram]
+        const key = `${source}.${diagram}.defaultRenderer`
+        if (!diagramConfig || !Object.hasOwn(diagramConfig, 'defaultRenderer') || defaultRendererWarnings.has(key)) continue
+
+        defaultRendererWarnings.add(key)
+        console.warn(`${MERMAID_LOG_PREFIX} ${key} is ignored by Mermaid 12. Use top-level layout: 'dagre' (previously 'dagre-wrapper') or layout: 'elk' instead.`)
+      }
+    }
   }
 
   return sourceWorkingCopy
