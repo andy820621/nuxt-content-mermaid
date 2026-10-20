@@ -10,7 +10,7 @@ preferWorkspacePackages: false
 
 catalogs:
   dev:
-    '@nuxt/devtools': 3.4.1
+    '@nuxt/devtools': 3.4.4
     '@nuxt/eslint-config': 1.17.0
     '@nuxt/icon': 2.5.0
     '@nuxt/module-builder': 1.0.3
@@ -48,6 +48,7 @@ overrides:
   'minimatch@>=5.0.0 <5.1.8': 5.1.8
   'minimatch@>=9.0.0 <9.0.7': 9.0.7
   'picomatch@<2.3.2': 2.3.2
+  'sharp@<0.35.5': 0.35.5
   'socket.io-parser@>=4.0.0 <4.2.7': 4.2.7
   'tar@>=7.0.0 <7.5.21': 7.5.22
 
