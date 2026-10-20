@@ -72,7 +72,8 @@ describe('Markdown Diagram Protocol', () => {
     const diagram = parseDiagramFrontmatter(protocol.source)
 
     expect(protocol.component?.tag).toBe('content-mermaid-transport')
-    expect(protocol.props[':page-config']).toBe('config')
+    expect(protocol.props[':page-data']).toBe('runtimeData')
+    expect(protocol.props).not.toHaveProperty(':page-config')
     expect(protocol.props).not.toHaveProperty(':markdown-page-config')
     expect(protocol.props).not.toHaveProperty(':config')
     expect(protocol.parsed.data.config).toEqual({
@@ -134,7 +135,8 @@ describe('Markdown Diagram Protocol', () => {
     const protocol = await parseProtocol(markdown)
 
     expect(protocol.parsed.data.config).toEqual({ theme: 'forest' })
-    expect(protocol.props[':page-config']).toBe('config')
+    expect(protocol.props[':page-data']).toBe('runtimeData')
+    expect(protocol.props).not.toHaveProperty(':page-config')
     expect(protocol.props).not.toHaveProperty(':markdown-page-config')
   })
 

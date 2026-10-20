@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { resolveModuleConfiguration } from '../src/runtime/configuration/module'
 
 describe('module configuration resolver', () => {
+  it('rejects out-of-range lazy thresholds in both module options and runtime overrides', () => {
+    expect(() => resolveModuleConfiguration({
+      nuxtResolvedOptions: { loader: { lazy: { threshold: -0.1 } } },
+      runtimeOverrides: {},
+    })).toThrowError(expect.objectContaining({
+      message: expect.stringContaining('contentMermaid.loader.lazy.threshold'),
+    }))
+    expect(() => resolveModuleConfiguration({
+      nuxtResolvedOptions: {},
+      runtimeOverrides: { loader: { lazy: { threshold: 2 } } },
+    })).toThrowError(expect.objectContaining({
+      message: expect.stringContaining('runtimeConfig.public.contentMermaid.loader.lazy.threshold'),
+    }))
+  })
+
   it('merges package defaults, Nuxt options, and runtime overrides in order without transporting activation', () => {
     const result = resolveModuleConfiguration({
       nuxtResolvedOptions: {

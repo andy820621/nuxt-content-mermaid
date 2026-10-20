@@ -40,6 +40,7 @@ export interface RuntimeOptions {
     /**
      * Whether to lazy load the diagram when it enters the viewport.
      * Can be a boolean or an object with IntersectionObserver options.
+     * The threshold must be between 0 and 1, inclusive.
      * @default true
      */
     lazy?: boolean | { threshold?: number }

@@ -4,16 +4,17 @@ import type { PageMermaidConfig } from '../../types/config'
 import type { MermaidToolbarOptions } from '../../types/mermaid'
 
 const props = defineProps<{
-  pageConfig?: PageMermaidConfig | null
+  pageData?: { config?: PageMermaidConfig | null }
   toolbar?: MermaidToolbarOptions
   code?: string
 }>()
 
-// Nuxt Content serializes an absent optional frontmatter field as null. Keep that
-// sentinel normalization inside this Markdown-only transport component.
-const normalizedPageConfig = computed(() =>
-  props.pageConfig === null ? undefined : props.pageConfig,
-)
+// Bind the whole MDC data object: unresolved field bindings become literal strings.
+// Nuxt Content serializes an absent optional frontmatter field as null.
+const normalizedPageConfig = computed(() => {
+  const config = props.pageData?.config
+  return config === null ? undefined : config
+})
 const MermaidComponent = resolveComponent('Mermaid')
 </script>
 

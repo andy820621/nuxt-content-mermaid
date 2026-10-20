@@ -118,7 +118,7 @@ The component accepts exactly one optional configuration source:
 
 The props are a TypeScript discriminated union. A source is provided when its value is not `undefined`; providing both is a component configuration error before either value is inspected, merged, materialized, or selected. With neither source, diagram configuration comes from the Runtime Mermaid Snapshot alone.
 
-The Markdown Diagram Transform emits the Page Mermaid Config protocol. Page and direct configs are source discriminators rather than competing override layers, so no precedence exists between them.
+The Markdown Diagram Transform binds the MDC renderer's data object. The Markdown-only transport reads `config` from that object, preserving a missing renderer-payload field as `undefined` and normalizing Nuxt Content's absent-field `null` sentinel. Without a payload value, diagrams use the Runtime Mermaid Snapshot alone. Explicit values still pass through the shared Component Source Resolver, including invalid values. Page and direct configs are source discriminators rather than competing override layers, so no precedence exists between them.
 
 The Diagram Config Resolver combines runtime configuration with the selected source using its source-specific validation and materialization policy. Theme Resolution Policy remains separate from structural merge.
 
@@ -193,7 +193,7 @@ Browser verification against Mermaid 11.12.3 established that a truly disconnect
 | Runtime transport | Runtime options permit only strict pure data | Move function and non-plain values to Direct Mermaid Config |
 | Runtime mutation | Public runtime config is read at NuxtApp initialization | Post-start mutation has no rerender or reinitialization guarantee |
 | Component props | `pageConfig` and `config` are mutually exclusive | Content-generated calls use Page Mermaid Config; direct calls retain `config` |
-| Markdown output | The transform emits the Page Mermaid Config binding | Update tests or integrations that match generated markup |
+| Markdown output | The transform emits `:page-data="runtimeData"`; the Markdown transport reads `config` and passes it to the renderer's `pageConfig` | Update integrations matching generated markup and reparse existing Content caches; the renderer prop remains `pageConfig` |
 | Merge behavior | Property presence, array replacement, explicit falsy replacement | Migrate config relying on `defu` array or null behavior |
 | Expand boolean | A boolean resets the whole preset | Re-enable above lower `false` with an explicit `enabled: true` patch |
 | Invalid configuration | Fail fast without fallback and expose diagnostic fingerprints | Invalid transport or config props stop their owning phase |

@@ -58,7 +58,7 @@ describe('transformMarkdownDiagrams', () => {
 
     const output = transformMarkdownDiagrams(body)
 
-    expect(output).toContain('<ContentMermaidTransport :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></ContentMermaidTransport>')
+    expect(output).toContain('<ContentMermaidTransport :page-data="runtimeData" code="graph%20TD%0A%20%20A%20--%3E%20B"></ContentMermaidTransport>')
     expect(output).not.toContain('<Mermaid')
     expect(output).not.toContain(':config="config"')
   })
@@ -81,7 +81,7 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(output).toContain('<ContentMermaidTransport :page-config="config" code="')
+    expect(output).toContain('<ContentMermaidTransport :page-data="runtimeData" code="')
     expect(output).not.toContain('<Mermaid')
   })
 
@@ -89,7 +89,7 @@ describe('transformMarkdownDiagrams', () => {
     const body = loadFixture('multiple-blocks.md')
     const output = transformMarkdownDiagrams(body)
 
-    const matches = output.match(/<ContentMermaidTransport :page-config="config" code="/g) || []
+    const matches = output.match(/<ContentMermaidTransport :page-data="runtimeData" code="/g) || []
     expect(matches.length).toBe(2)
     expect(output).toContain('graph%20TD%0A%20%20A%5BStart%5D%20--%3E%20B%7BChoice%7D')
     expect(output).toContain('sequenceDiagram%0A%20%20participant%20Alice')
@@ -116,7 +116,7 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(output).toContain('<ContentMermaidTransport :page-config="config" code="')
+    expect(output).toContain('<ContentMermaidTransport :page-data="runtimeData" code="')
   })
 
   it('preserves non-target Markdown exactly', () => {
@@ -199,6 +199,36 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
+  it.each([
+    'title="ok" @bad',
+    'title="x", toolbar.title="y"',
+  ])('preserves the entire fence when inline metadata has an invalid trailing token: %s', (metadata) => {
+    const body = ['```mermaid {' + metadata + '}', 'graph TD; A-->B', '```'].join('\n')
+    expect(transformMarkdownDiagrams(body)).toBe(body)
+  })
+
+  describe.each([
+    { title: 'Plain title' },
+    { title: 'C:\\' },
+    { title: 'C:\\\\' },
+    { title: 'A "quoted" title' },
+    { title: 'C:\\"quoted"' },
+  ])('inline metadata escapes: $title', ({ title }) => {
+    it('preserves escaped quotes and backslashes in a quoted attribute', () => {
+      const body = ['```mermaid {title=' + JSON.stringify(title) + '}', 'graph TD; A-->B', '```'].join('\n')
+      const output = transformMarkdownDiagrams(body)
+      expect(extractFrontmatter(extractDecodedCode(output))).toMatchObject({ title })
+    })
+
+    it('preserves a balanced value and the following attribute', async () => {
+      const config = { extension: { title } }
+      const body = ['```mermaid {config=' + JSON.stringify(config) + ' toolbar.title="After config"}', 'graph TD; A-->B', '```'].join('\n')
+      const output = transformMarkdownDiagrams(body)
+      expect(extractFrontmatter(extractDecodedCode(output))).toMatchObject({ config })
+      expect(await extractToolbarProp(output)).toEqual({ title: 'After config' })
+    })
   })
 
   it('extracts toolbar props from mermaid YAML frontmatter', async () => {
@@ -499,7 +529,7 @@ describe('transformMarkdownDiagrams', () => {
     ].join('\n')
 
     const output = transformMarkdownDiagrams(body)
-    expect(output).toContain('  <ContentMermaidTransport :page-config="config" code="graph%20TD%0A%20%20A%20--%3E%20B"></ContentMermaidTransport>')
+    expect(output).toContain('  <ContentMermaidTransport :page-data="runtimeData" code="graph%20TD%0A%20%20A%20--%3E%20B"></ContentMermaidTransport>')
   })
 
   it('does not transform mermaid fences inside other fenced code blocks', () => {

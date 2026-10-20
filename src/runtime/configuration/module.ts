@@ -175,6 +175,10 @@ export function validateRuntimeOptions(value: JsonObject, phase: ConfigurationVa
         assertPlainObject(lazy, phase)
         assertKnownKeys(lazy, new Set(['threshold']), phase, ['loader', 'lazy'])
         assertNumberProperty(lazy, 'threshold', phase, ['loader', 'lazy'])
+        const threshold = descriptorValue(lazy, 'threshold')
+        if (typeof threshold === 'number' && (threshold < 0 || threshold > 1)) {
+          throwConfigurationIssue(phase, ['loader', 'lazy', 'threshold'], 'INVALID_VALUE', 'a number between 0 and 1', 'out-of-range-number')
+        }
       }
     }
   }

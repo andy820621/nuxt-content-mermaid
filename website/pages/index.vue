@@ -51,7 +51,6 @@ const landingContentComponents = {
       <ContentRenderer
         class="landing-demo-content"
         :value="page"
-        :data="{ config: null }"
         :components="landingContentComponents"
       />
     </section>
