@@ -24,7 +24,7 @@ Landing 與 docs layout 解決不同問題，但共用同一個 Content collecti
 ## 產品目標
 
 - 首次造訪的 Package User 能理解套件用途、看到真實 Mermaid diagram，並前往 Getting Started。
-- Package User 依序完成模組啟用與第一張圖、diagram authoring、configuration，接著依需求深入主題與樣式、自訂渲染或互動操作；遇到問題可前往 troubleshooting，升級時可前往 v3 migration。
+- Package User 依序完成模組啟用與第一張圖、diagram authoring、configuration，接著依需求深入主題與樣式、自訂渲染或互動操作；遇到問題可前往 troubleshooting，升級時可前往 v4 migration，既有 v3 migration 保留。
 - Production website 是 canonical package documentation；repository README 只保留 bounded distribution summary。
 - English 與 Traditional Chinese 使用相同資訊架構；英文為 canonical language，中文是 best-effort translation。
 - Desktop 與 mobile 都具備清楚的 navigation、active state、keyboard focus 與無水平溢位的閱讀體驗。
@@ -57,6 +57,7 @@ website/content/
 │   └── 3.interactions.md            # /advanced/interactions
 ├── 6.troubleshooting.md             # /troubleshooting
 ├── 7.migration/1.v3.md              # /migration/v3
+├── 7.migration/2.v4.md              # /migration/v4
 └── zh/
     ├── 1.index.md                   # /zh
     ├── 2.getting-started.md         # /zh/getting-started
@@ -67,7 +68,8 @@ website/content/
     │   ├── 2.custom-rendering.md    # /zh/advanced/custom-rendering
     │   └── 3.interactions.md        # /zh/advanced/interactions
     ├── 6.troubleshooting.md         # /zh/troubleshooting
-    └── 7.migration/1.v3.md          # /zh/migration/v3
+    ├── 7.migration/1.v3.md          # /zh/migration/v3
+    └── 7.migration/2.v4.md          # /zh/migration/v4
 ```
 
 首頁設定 `navigation: false`，不出現在 docs navigation。`advanced` 只提供三個 leaf pages，不提供 `/advanced` 或 `/zh/advanced` landing route。網站沒有 `/reference` route；public configuration guidance 位於 `/writing-diagrams` 與 `/configuration`。

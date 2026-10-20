@@ -8,7 +8,7 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![License][license-src]][license-href]
 [![Nuxt][nuxt-src]][nuxt-href]
-[![Mermaid](https://img.shields.io/badge/mermaid-11.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
+[![Mermaid](https://img.shields.io/badge/mermaid-12.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
 **@barzhsieh/nuxt-content-mermaid** 會將 Nuxt Content Markdown 中的
@@ -38,9 +38,10 @@ dependencies，以及 Nuxt Content database connector。
 - Node.js `>=22.19.0`
 - Nuxt `^4.1.0`
 - Nuxt Content `>=3.5.0 <4.0.0`
+- ES2024 瀏覽器；Safari／iOS／iPadOS `17.4+`
 
-相依擁有權、Nuxt Content v2 遷移邊界與渲染保證，請參閱
-[相依與遷移契約](./docs/ch/DEPENDENCY_AND_MIGRATION_CONTRACT.md)。
+相依擁有權、v4 遷移邊界與渲染保證，請參閱
+[4.x 相依與遷移契約](./docs/ch/DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md)。
 
 ## 快速開始
 
@@ -77,6 +78,7 @@ Mermaid 已包含在本模組中，不需要另外安裝。資料庫 connector �
 - [設定](https://nuxt-content-mermaid.barz.app/zh/configuration)
 - [疑難排解](https://nuxt-content-mermaid.barz.app/zh/troubleshooting)
 - [升級至 v3](https://nuxt-content-mermaid.barz.app/zh/migration/v3)
+- [升級至 v4](https://nuxt-content-mermaid.barz.app/zh/migration/v4)
 
 ## 支持與貢獻
 

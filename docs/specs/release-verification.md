@@ -2,7 +2,7 @@
 
 ## 目的
 
-本規格定義 3.x stable release 的最小可靠模型：
+本規格定義目前 4.x stable release 的最小可靠模型；既有 `v3-minimum`／`v3-known-latest` profile ID 保留，實際版本以 profile 定義為準：
 
 `annotated tag → 一個 publish job → 一個 tarball → npm → GitHub Release`
 

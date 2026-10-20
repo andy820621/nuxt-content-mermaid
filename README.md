@@ -8,7 +8,7 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![License][license-src]][license-href]
 [![Nuxt][nuxt-src]][nuxt-href]
-[![Mermaid](https://img.shields.io/badge/mermaid-11.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
+[![Mermaid](https://img.shields.io/badge/mermaid-12.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
 **@barzhsieh/nuxt-content-mermaid** turns `mermaid` code blocks in Nuxt
@@ -38,10 +38,11 @@ Nuxt Content peer dependencies and the Nuxt Content database connector.
 - Node.js `>=22.19.0`
 - Nuxt `^4.1.0`
 - Nuxt Content `>=3.5.0 <4.0.0`
+- ES2024 browsers; Safari / iOS / iPadOS `17.4+`
 
-For dependency ownership, the Nuxt Content v2 migration boundary, and rendering
+For dependency ownership, the v4 migration boundary, and rendering
 guarantees, see the
-[Dependency and Migration Contract](./docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT.md).
+[4.x Dependency and Migration Contract](./docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md).
 
 ## Quick start
 
@@ -79,6 +80,7 @@ For database connector choices and a complete first-project walkthrough, follow
 - [Configuration](https://nuxt-content-mermaid.barz.app/configuration)
 - [Troubleshooting](https://nuxt-content-mermaid.barz.app/troubleshooting)
 - [Migration to v3](https://nuxt-content-mermaid.barz.app/migration/v3)
+- [Migration to v4](https://nuxt-content-mermaid.barz.app/migration/v4)
 
 ## Support and contribution
 
