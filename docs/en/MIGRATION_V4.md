@@ -1,9 +1,13 @@
 # Migration to v4
 
+> **Applies to the upcoming 4.x release (not yet published).** The current npm
+> release is 3.0.5 and bundles Mermaid 11. The changes below take effect after
+> upgrading to 4.x; publishing this guide does not upgrade installed packages.
+
 Version 4 bundles Mermaid `~12.2.0`. This is a major release because Mermaid's
-public configuration types remove `defaultRenderer` and the supported browser
-baseline rises to ES2024 / Safari 17.4+. Layout, geometry, and dimensions remain
-outside the package's rendering contract.
+public configuration types remove `defaultRenderer`. It also adopts Mermaid 12's
+ES2024 / Safari 17.4+ requirements. Layout, geometry, and dimensions remain outside
+the package's rendering contract.
 
 Node.js `>=22.19.0`, Nuxt `^4.1.0`, and Nuxt Content `>=3.5.0 <4.0.0` are unchanged.
 After 4.0 is published, install `@barzhsieh/nuxt-content-mermaid@^4` to opt in.
@@ -14,17 +18,25 @@ An application's `^3.x` range does **not** receive Mermaid 12 automatically.
 Remove `flowchart.defaultRenderer`, `class.defaultRenderer`, and
 `state.defaultRenderer` from all three package configuration sources:
 
-| Source | Where to update |
-| --- | --- |
-| Page Mermaid Config | The Markdown page's `config` frontmatter / `pageConfig` prop |
-| Direct Mermaid Config | The component's `config` prop |
-| Runtime Mermaid Config | `contentMermaid.loader.init` or its public runtime equivalent |
+| Source | Where to update | Scope of top-level `layout` |
+| --- | --- | --- |
+| Page Mermaid Config | The Content page's `config` frontmatter / `pageConfig` prop | Supporting diagrams on that page |
+| Direct Mermaid Config | The component's `config` prop | That component instance |
+| Runtime Mermaid Config | `contentMermaid.loader.init` or `runtimeConfig.public.contentMermaid.loader.init` | Application-wide shared default |
 
-Use top-level `layout: 'dagre'` for the old `'dagre-wrapper'` value, or
-`layout: 'elk'` for `'elk'`. Keep other diagram options in their existing object.
+Select top-level `layout: 'dagre'` for dagre rendering (the intent of the legacy
+`'dagre-wrapper'` value), or explicitly select `layout: 'elk'` to request ELK.
+Keep other diagram options in their existing object. Choose the required scope:
+moving a nested `flowchart.defaultRenderer` to top-level `layout` can also affect
+other diagram types at that scope, rather than preserving a flowchart-only choice.
+
+This applies to diagram types that support the selected layout, such as flowchart,
+class, state, and ER; not every Mermaid diagram type supports ELK.
+`flowchart.layout`, `class.layout`, and `state.layout` may pass Mermaid's type
+checks, but those renderers select their layout from the configuration's top level.
 
 ```yaml
-# Before: Page Mermaid Config
+# Legacy Page Mermaid Config
 config:
   flowchart:
     defaultRenderer: elk
@@ -32,18 +44,32 @@ config:
 ```
 
 ```yaml
-# After
+# Opt into ELK for supporting diagrams across this Content page
 config:
   layout: elk
   flowchart:
     htmlLabels: false
 ```
 
-For Direct Mermaid Config:
+To select ELK for just one diagram, use Direct Mermaid Config on that instance:
 
 ```vue
 <Mermaid :config="{ layout: 'elk' }" :code="code" />
 ```
+
+Alternatively, put Mermaid frontmatter inside that diagram's code fence. This is
+single-diagram source configuration, distinct from Content page frontmatter:
+
+````markdown
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart LR
+  A --> B
+```
+````
 
 For runtime defaults:
 
@@ -58,8 +84,8 @@ export default defineNuxtConfig({
 Mermaid 12 silently ignores the old keys at runtime. This module preserves the
 input and warns in development once per **source × field per page load**, even
 with multiple diagrams or repeated renders. Production builds remove this
-warning. No automatic conversion occurs; an old `'elk'` value alone no longer
-selects ELK.
+warning. No automatic conversion occurs; Mermaid 12 requires an explicit
+top-level `layout: 'elk'` to select ELK.
 
 The module defaults to `layout: 'dagre'` and `look: 'classic'`. Package Users can
 override either. The existing default/dark theme policy is unchanged. ELK is
@@ -75,6 +101,11 @@ Mermaid Config and `loader.init`; do not cast away the error as a migration.
 The package does not add a compatibility type layer for the removed fields.
 
 ## Check reader browsers
+
+4.x is the first line to declare this package's browser floor explicitly.
+3.x did not specify a minimum Safari version and did not guarantee support for
+all older browsers. The higher requirement comes from the Mermaid 11-to-12
+upstream change; it is not a comparison with a previously declared package floor.
 
 Mermaid 12 targets ES2024 and Safari 17.4+, including iOS / iPadOS 17.4+
 ([upstream requirements](https://github.com/mermaid-js/mermaid/blob/1fb7869866dd619168d840291c9c54b4f129758b/packages/mermaid/src/docs/config/usage.md#L27-L33)).
@@ -92,14 +123,15 @@ also reached diagram error handling. These probes are not an emulation of an
 older Safari, and cannot guarantee the whole application's compatibility.
 
 Applications that require older browsers must supply and verify the necessary
-transforms / polyfills themselves, or retain 3.x. Real Safari 17.4 and physical
-iOS devices have not been verified. Source shown in an error slot may be clipped
+transforms / polyfills themselves, or remain on 3.x and verify their application's
+browser behavior. Real Safari 17.4 and physical iOS devices have not been verified.
+Source shown in an error slot may be clipped
 by existing CSS; this separate limitation is tracked in [#145](https://github.com/andy820621/nuxt-content-mermaid/issues/145).
 
 ## Review diagram dimensions
 
-Dagre/classic defaults preserve the intended rendering direction, but Mermaid
-12 can change spacing, labels, SVG dimensions, and geometry. Review diagrams
+The defaults select dagre layout and the classic look. They do not freeze
+spacing, labels, SVG dimensions, or geometry across Mermaid versions. Review diagrams
 inside constrained layouts and update application-owned visual snapshots.
 Byte-identical SVG and geometry are not package compatibility guarantees.
 

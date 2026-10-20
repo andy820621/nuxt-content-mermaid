@@ -87,14 +87,14 @@ The 4.x Compatibility Contract retains two fixed profiles that verify the
 Publishable Package Artifact through clean installation, public types, production build,
 and basic browser SVG rendering:
 
-These profiles verify the Mermaid 12.2 candidate. Their IDs remain unchanged;
-they do not imply that the frozen 3.x line bundles Mermaid 12. The active
-Module-Owned Dependency range is `~12.2.0`; host floors remain unchanged.
-
 | Profile | Node | Nuxt | Nuxt Content | Mermaid | Kit resolution | Schema resolution |
 | --- | --- | --- | --- | --- | --- | --- |
 | `v3-minimum` | `22.19.0` | `4.1.0` | `3.5.0` | `12.2.0` | `4.5.2` | `4.5.2` |
 | `v3-known-latest` | `24.19.0` | `4.6.2` | `3.16.2` | `12.2.0` | `4.6.2` | `4.6.2` |
+
+These profiles verify the 4.x Mermaid 12.2 dependency. Their legacy IDs remain
+unchanged; they do not imply that 3.x bundles Mermaid 12. The 4.x Module-Owned
+Dependency range is `~12.2.0`; host floors remain unchanged.
 
 Each profile runs under its exact declared Node runtime. Kit and Schema remain
 one shallow pair of expected artifact resolutions rather than additional

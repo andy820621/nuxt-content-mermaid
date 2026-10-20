@@ -1,5 +1,7 @@
 # 4.x 相依與遷移契約
 
+> **即將推出的 4.x 契約；4.0 尚未發布。** 目前 npm 正式版為 3.0.5，綁定 Mermaid 11。本契約於發布後適用於升級至 4.x 的套件使用者。
+
 本文件是 `@barzhsieh/nuxt-content-mermaid` 4.x 對套件使用者的公開 Compatibility Contract。[3.x 契約](./DEPENDENCY_AND_MIGRATION_CONTRACT.md)保留為歷史契約；變更詳見 [v4 遷移指南](./MIGRATION_V4.md)。
 
 ## 相依與瀏覽器邊界
@@ -8,15 +10,15 @@
 
 Mermaid 是 Module-Owned Dependency，綁定為 `mermaid@~12.2.0`；請勿只是為了本模組而另裝 Mermaid。新安裝可取得 Mermaid 12.2 的 patch，但新的 minor／major 必須由套件明確更新。相容性不代表每個相容上游版本都安全；請維持應用程式 lockfile 與安全工具，使用已修補的宿主版本。
 
-依 [Mermaid 12.2 固定版本需求](https://github.com/mermaid-js/mermaid/blob/1fb7869866dd619168d840291c9c54b4f129758b/packages/mermaid/src/docs/config/usage.md#L27-L33)，瀏覽器門檻為 ES2024／Safari 17.4+，包含 iOS／iPadOS 17.4+。舊瀏覽器不在此契約內。語法轉譯不會提供 `Object.groupBy` 等 API；選擇舊環境的應用程式必須自行提供並驗證轉譯／polyfill。目前的 Playwright 引擎證據不等於真實 Safari 17.4 或 iOS 實機驗證。
+依 [Mermaid 12.2 固定版本需求](https://github.com/mermaid-js/mermaid/blob/1fb7869866dd619168d840291c9c54b4f129758b/packages/mermaid/src/docs/config/usage.md#L27-L33)，瀏覽器門檻為 ES2024／Safari 17.4+，包含 iOS／iPadOS 17.4+。4.x 是本套件首次明確宣告瀏覽器最低版本；3.x 未明列 Safari 最低版本，也未保證所有舊瀏覽器。提高的是 Mermaid 11 升至 12 的上游需求。舊瀏覽器不在此契約內。語法轉譯不會提供 `Object.groupBy` 等 API；選擇舊環境的應用程式必須自行提供並驗證轉譯／polyfill。目前的 Playwright 引擎證據不等於真實 Safari 17.4 或 iOS 實機驗證。
 
 ## 設定與遷移邊界
 
 模組預設 `layout: 'dagre'`、`look: 'classic'`，使用者可覆寫。Default／dark 主題策略，以及既有 Runtime、Page、Direct Mermaid Config 的傳輸、驗證、合併與隔離語意繼續適用。Page 與 Direct 設定仍互斥。
 
-Mermaid 12 公開型別移除 `flowchart.defaultRenderer`、`class.defaultRenderer` 與 `state.defaultRenderer`，object literal 可能產生 TS2353。請將 `'dagre-wrapper'` 改為頂層 `layout: 'dagre'`，將 `'elk'` 改為 `layout: 'elk'`。執行期傳輸會保留這些 Mermaid 擁有的鍵，但引擎忽略它們。開發模式每個「來源 × 欄位」在整頁載入期間只提示一次；production 移除警告。不提供自動轉換或型別相容層。
+Mermaid 12 公開型別移除 `flowchart.defaultRenderer`、`class.defaultRenderer` 與 `state.defaultRenderer`，object literal 可能產生 TS2353。請於所需範圍選擇頂層 `layout: 'dagre'` 或 `layout: 'elk'`：runtime 初始化是應用程式共用預設，Page config 涵蓋該頁支援此 layout 的圖表，Direct config 涵蓋該元件實例。因此把單一圖種的鍵移到頂層 layout，也可能影響其他支援的圖種；遷移指南另有單圖做法。執行期傳輸會保留這些 Mermaid 擁有的鍵，但引擎忽略它們。開發模式每個「來源 × 欄位」在整頁載入期間只提示一次；production 移除警告。不提供自動轉換或型別相容層。
 
-應用程式的 `^3.x` 範圍不會自動取得 4.x 或 Mermaid 12。請明確切換 4.x 並遵循遷移指南。本次 major 的理由是公開型別變窄與瀏覽器門檻提高；geometry 不決定版本號。
+應用程式的 `^3.x` 範圍不會自動取得 4.x 或 Mermaid 12。請明確切換 4.x 並遵循遷移指南。公開型別變窄需要 major，此版也採用首次明列的瀏覽器門檻；geometry 不決定版本號。
 
 ## 套件擁有的渲染行為
 
