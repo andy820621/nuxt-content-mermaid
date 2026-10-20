@@ -14,9 +14,14 @@ const RUNTIME_VERSIONS = Object.freeze({
   typescript: '5.9.3',
   vueTsc: '3.2.5',
 })
-const FINAL_TOOLCHAIN_RESOLUTIONS = Object.freeze({
+// Minimum keeps the published @nuxt/kit floor; Known-Latest follows its Nuxt dimension.
+const MINIMUM_TOOLCHAIN_RESOLUTIONS = Object.freeze({
   nuxtKit: '4.5.2',
   nuxtSchema: '4.5.2',
+})
+const KNOWN_LATEST_TOOLCHAIN_RESOLUTIONS = Object.freeze({
+  nuxtKit: '4.6.2',
+  nuxtSchema: '4.6.2',
 })
 
 function parseExpectedResolutions(input) {
@@ -85,7 +90,7 @@ export function parseVersionProfile(input) {
   })
 }
 
-function defineFinalVersionProfile(id, nodeVersion, nuxt, nuxtContent) {
+function defineFinalVersionProfile(id, nodeVersion, nuxt, nuxtContent, expectedResolutions) {
   return parseVersionProfile({
     id,
     nodeVersion,
@@ -94,17 +99,24 @@ function defineFinalVersionProfile(id, nodeVersion, nuxt, nuxtContent) {
       nuxt,
       nuxtContent,
     },
-    expectedResolutions: FINAL_TOOLCHAIN_RESOLUTIONS,
+    expectedResolutions,
   })
 }
 
 export const VERSION_PROFILES = Object.freeze({
-  'v3-minimum': defineFinalVersionProfile('v3-minimum', '22.19.0', '4.1.0', '3.5.0'),
+  'v3-minimum': defineFinalVersionProfile(
+    'v3-minimum',
+    '22.19.0',
+    '4.1.0',
+    '3.5.0',
+    MINIMUM_TOOLCHAIN_RESOLUTIONS,
+  ),
   'v3-known-latest': defineFinalVersionProfile(
     'v3-known-latest',
     '24.19.0',
-    '4.5.2',
+    '4.6.2',
     '3.15.2',
+    KNOWN_LATEST_TOOLCHAIN_RESOLUTIONS,
   ),
 })
 

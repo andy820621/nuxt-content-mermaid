@@ -60,12 +60,12 @@ describe('release verification Version Profiles', () => {
       nodeVersion: '24.19.0',
       versions: {
         ...runtimeVersions,
-        nuxt: '4.5.2',
+        nuxt: '4.6.2',
         nuxtContent: '3.15.2',
       },
       expectedResolutions: {
-        nuxtKit: '4.5.2',
-        nuxtSchema: '4.5.2',
+        nuxtKit: '4.6.2',
+        nuxtSchema: '4.6.2',
       },
     })
     expect(selectVersionProfile('v3-minimum')).toBe(VERSION_PROFILES['v3-minimum'])
