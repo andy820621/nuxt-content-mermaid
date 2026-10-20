@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { addComponent, addTemplate } from '@nuxt/kit'
 import { defineNuxtConfig } from 'nuxt/config'
 import MyModule from '../../../src/module'
 
@@ -9,13 +10,14 @@ export default defineNuxtConfig({
   modules: [
     MyModule,
     '@nuxt/content',
-  ],
-  components: [
-    '~/components',
-    {
-      path: resolve(fixtureDir, '../../../website/components'),
-      pattern: 'LandingMermaidDemo.vue',
-      pathPrefix: false,
+    () => {
+      // Compile the website source within the fixture's prepared Nuxt project.
+      const { dst } = addTemplate({
+        src: resolve(fixtureDir, '../../../website/components/LandingMermaidDemo.vue'),
+        filename: 'components/LandingMermaidDemo.vue',
+        write: true,
+      })
+      addComponent({ name: 'LandingMermaidDemo', filePath: dst })
     },
   ],
   alias: {
