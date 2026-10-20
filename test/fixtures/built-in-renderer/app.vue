@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAsyncData, useRoute } from '#app'
+import { useAsyncData, useNuxtApp, useRoute } from '#app'
 import { computed, onErrorCaptured, reactive, ref, resolveComponent, shallowRef } from 'vue'
 import type { MermaidConfig } from 'mermaid'
 import type { PageMermaidConfig } from '../../../src/types/config'
@@ -77,6 +77,11 @@ const reactiveConflictDirectConfig = shallowRef<MermaidConfig>()
 const reactiveConflictCode = ref('graph TD;REACTIVE_CONFLICT-->LEGAL')
 const MermaidComponent = resolveComponent('Mermaid')
 const route = useRoute()
+const landingDemo = route.path.startsWith('/landing-demo-')
+const landingContentComponents = { ContentMermaidTransport: resolveComponent('LandingMermaidDemo') }
+if (landingDemo)
+  useNuxtApp().vueApp.config.globalProperties.$t = (key: string) => key
+
 const withoutConfigSchema = route.path === '/markdown-no-config-schema'
 const bodyOnly = route.path === '/markdown-body-only'
 const projectedPageConfig = bodyOnly || route.path === '/markdown-projected-page-config'
@@ -91,9 +96,11 @@ const { data: markdownMissingPageConfig } = await useAsyncData('markdown-missing
     .path(withoutConfigSchema ? '/without-config-schema/diagram' : '/markdown-missing-page-config')
   return projectedPageConfig ? query.select('path', 'body').first() : query.first()
 })
+const markdownMissingRendererValue = computed(() => bodyOnly ? markdownMissingPageConfig.value?.body : markdownMissingPageConfig.value)
+const landingDemoPage = computed(() => route.path === '/landing-demo-page-config' ? markdownPage.value : markdownMissingPageConfig.value)
 
 onErrorCaptured((error) => {
-  if (runtimeOnlyMarkdown || route.path === '/markdown-invalid-page-config') {
+  if (landingDemo || runtimeOnlyMarkdown || route.path === '/markdown-invalid-page-config') {
     // Let the error reach Nuxt so this fixture exposes SSR regressions as HTTP 500.
     return
   }
@@ -223,17 +230,25 @@ function reenterReactiveConflict() {
 </script>
 
 <template>
-  <main v-if="runtimeOnlyMarkdown">
+  <main v-if="landingDemo">
+    <ContentRenderer
+      v-if="landingDemoPage"
+      :value="landingDemoPage"
+      :components="landingContentComponents"
+    />
+  </main>
+
+  <main v-else-if="runtimeOnlyMarkdown">
     <section id="markdown-missing-page-config">
       <ContentRenderer
-        v-if="markdownMissingPageConfig"
-        :value="bodyOnly ? markdownMissingPageConfig.body : markdownMissingPageConfig"
+        v-if="markdownMissingRendererValue"
+        :value="markdownMissingRendererValue"
       />
       <output
         id="markdown-missing-page-config-status"
         :data-loaded="String(Boolean(markdownMissingPageConfig))"
         :data-path="markdownMissingPageConfig?.path"
-        :data-has-config="String(Object.hasOwn(markdownMissingPageConfig || {}, 'config'))"
+        :data-has-config="String(Object.hasOwn(markdownMissingRendererValue || {}, 'config'))"
       />
     </section>
   </main>

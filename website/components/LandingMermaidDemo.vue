@@ -8,7 +8,7 @@ type DemoTab = 'source' | 'preview'
 type MermaidToolbar = NonNullable<MermaidComponentProps['toolbar']>
 
 const props = defineProps<{
-  pageConfig?: PageMermaidConfig | null
+  pageData?: { config?: PageMermaidConfig | null }
   toolbar?: MermaidToolbar
   code?: string
 }>()
@@ -114,7 +114,7 @@ async function handleTabKeydown(event: KeyboardEvent, index: number) {
       >
         <component
           :is="ContentMermaidTransport"
-          :page-config="props.pageConfig"
+          :page-data="props.pageData"
           :toolbar="props.toolbar"
           :code="props.code"
         />

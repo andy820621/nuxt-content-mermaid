@@ -201,8 +201,11 @@ describe('transformMarkdownDiagrams', () => {
     expect(transformMarkdownDiagrams(body)).toBe(body)
   })
 
-  it('preserves the entire fence when inline metadata has an invalid trailing token', () => {
-    const body = ['```mermaid {title="ok" @bad}', 'graph TD; A-->B', '```'].join('\n')
+  it.each([
+    'title="ok" @bad',
+    'title="x", toolbar.title="y"',
+  ])('preserves the entire fence when inline metadata has an invalid trailing token: %s', (metadata) => {
+    const body = ['```mermaid {' + metadata + '}', 'graph TD; A-->B', '```'].join('\n')
     expect(transformMarkdownDiagrams(body)).toBe(body)
   })
 

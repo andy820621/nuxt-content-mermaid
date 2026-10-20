@@ -830,6 +830,28 @@ describe('built-in renderer integration', async () => {
   })
 
   it.each([
+    { path: '/landing-demo-page-config', source: 'MARKDOWN_PAGE_CONFIG', theme: 'forest', extension: true },
+    { path: '/landing-demo-no-config', source: 'MARKDOWN_MISSING_PAGE_CONFIG', theme: 'default', extension: false },
+  ])('forwards renderer data through the real landing demo at $path', { timeout: 20000 }, async ({ path, source, theme, extension }) => {
+    const page = await createPage()
+    const response = await page.goto(url(path))
+
+    expect(response?.status()).toBe(200)
+    await waitForRuns(page, 1)
+    expect(await page.evaluate(() => {
+      return (window as MermaidTestWindow).__mermaidControl__?.runs[0]
+    })).toEqual(expect.objectContaining({
+      source: expect.stringContaining(source),
+      theme,
+      securityLevel: 'strict',
+      unknownMermaidExtensionEnabled: extension,
+    }))
+
+    await releaseNext(page)
+    await page.locator('#landing-demo-preview-panel svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
+  it.each([
     { path: '/markdown-missing-page-config', source: 'MARKDOWN_MISSING_PAGE_CONFIG', hasConfig: true, scenario: 'config is absent from a declared field' },
     { path: '/markdown-no-config-schema', source: 'MARKDOWN_NO_CONFIG_SCHEMA', hasConfig: false, scenario: 'config is not declared in the collection schema' },
     { path: '/markdown-projected-page-config', source: 'MARKDOWN_MISSING_PAGE_CONFIG', hasConfig: false, scenario: 'the renderer payload omits the declared config field' },

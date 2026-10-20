@@ -10,6 +10,14 @@ export default defineNuxtConfig({
     MyModule,
     '@nuxt/content',
   ],
+  components: [
+    '~/components',
+    {
+      path: resolve(fixtureDir, '../../../website/components'),
+      pattern: 'LandingMermaidDemo.vue',
+      pathPrefix: false,
+    },
+  ],
   alias: {
     'html-to-image': resolve(fixtureDir, 'html-to-image-stub.ts'),
     'mermaid': resolve(fixtureDir, 'mermaid-stub.ts'),

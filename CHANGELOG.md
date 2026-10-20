@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Upgrade notes
+
+- The fix for [#131](https://github.com/andy820621/nuxt-content-mermaid/issues/131) changes generated Markdown to bind `:page-data="runtimeData"`. Stop the Nuxt/Docus application, remove the default generated `.data/content` cache (or the actual configured local cache path), then restart or rebuild before deployment. Invalidate restored build/CI caches too; otherwise old parsed markup can still produce the SSR `pageConfig` plain-object error. See [recovery steps](website/content/6.troubleshooting.md#ssr-still-fails-after-upgrading). The renderer's public `pageConfig` prop is unchanged.
+- Inline metadata attributes must be separated by whitespace. `{title="x", toolbar.title="y"}` now preserves the entire original fence instead of applying only the valid prefix; use `{title="x" toolbar.title="y"}`.
+
 ## v3.0.4
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.3...v3.0.4)
