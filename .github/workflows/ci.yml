@@ -32,7 +32,13 @@ jobs:
         run: npm run dev:prepare
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          if ! npx playwright install --with-deps chromium; then
+            echo "::warning::Playwright installation failed; retrying once in 15 seconds."
+            sleep 15
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Verify source
         run: pnpm verify:source
@@ -67,7 +73,13 @@ jobs:
         run: npm run dev:prepare
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          if ! npx playwright install --with-deps chromium; then
+            echo "::warning::Playwright installation failed; retrying once in 15 seconds."
+            sleep 15
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Verify Package Compatibility Profile
         run: npm run test:compatibility-profile -- --profile ${{ matrix.profile }}
