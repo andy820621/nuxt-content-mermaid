@@ -11,7 +11,7 @@ import type {
 } from '../scripts/release-verification/runner.mjs'
 
 const knownLatestProfile = {
-  id: 'v3-known-latest',
+  id: 'known-latest',
   nodeVersion: process.versions.node,
   versions: {
     betterSqlite3: '12.11.1',

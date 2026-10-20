@@ -86,7 +86,7 @@ jobs:
         run: |
           mkdir -p "$ARTIFACT_DIRECTORY"
           node scripts/release-verification/package-artifact.mjs \
-            --profile v3-known-latest \
+            --profile known-latest \
             --artifact-directory "$ARTIFACT_DIRECTORY"
 
           set -- "$ARTIFACT_DIRECTORY"/*.tgz

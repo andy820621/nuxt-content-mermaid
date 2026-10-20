@@ -33,7 +33,7 @@ const profile = {
 }
 
 const finalProfile = {
-  id: 'v3-known-latest',
+  id: 'known-latest',
   nodeVersion: process.versions.node,
   versions: {
     ...profile.versions,

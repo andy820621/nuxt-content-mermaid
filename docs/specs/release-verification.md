@@ -2,7 +2,7 @@
 
 ## 目的
 
-本規格定義目前 4.x stable release 的最小可靠模型；既有 `v3-minimum`／`v3-known-latest` profile ID 保留，實際版本以 profile 定義為準：
+本規格定義目前 4.x stable release 的最小可靠模型；實際版本以 profile 定義為準：
 
 `annotated tag → 一個 publish job → 一個 tarball → npm → GitHub Release`
 
@@ -82,11 +82,11 @@ archive 內存在的 package-owned file。
 
 | Profile | Node | 目的 |
 | --- | --- | --- |
-| `v3-minimum` | `22.19.0` | 保護公開相容範圍下界 |
-| `v3-known-latest` | `24.19.0` | 驗證目前刻意支援的最新固定組合 |
+| `minimum` | `22.19.0` | 保護公開相容範圍下界 |
+| `known-latest` | `24.19.0` | 驗證目前刻意支援的最新固定組合 |
 
 PR CI 在各自 exact Node runtime 執行兩個 profiles。Tag workflow 在固定 Node
-`24.19.0` 執行 `v3-known-latest`，驗證即將交給 npm 的實際 tarball。Profiles
+`24.19.0` 執行 `known-latest`，驗證即將交給 npm 的實際 tarball。Profiles
 是固定 evidence，不是 exhaustive support matrix，也不在 release 時動態解析
 registry latest。
 

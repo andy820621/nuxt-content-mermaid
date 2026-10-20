@@ -39,11 +39,11 @@ describe('release verification Version Profiles', () => {
 
   it('defines independently selectable final 3.x compatibility profiles', () => {
     expect(Object.keys(VERSION_PROFILES)).toEqual([
-      'v3-minimum',
-      'v3-known-latest',
+      'minimum',
+      'known-latest',
     ])
-    expect(VERSION_PROFILES['v3-minimum']).toEqual({
-      id: 'v3-minimum',
+    expect(VERSION_PROFILES['minimum']).toEqual({
+      id: 'minimum',
       nodeVersion: '22.19.0',
       versions: {
         ...runtimeVersions,
@@ -55,8 +55,8 @@ describe('release verification Version Profiles', () => {
         nuxtSchema: '4.5.2',
       },
     })
-    expect(VERSION_PROFILES['v3-known-latest']).toEqual({
-      id: 'v3-known-latest',
+    expect(VERSION_PROFILES['known-latest']).toEqual({
+      id: 'known-latest',
       nodeVersion: '24.19.0',
       versions: {
         ...runtimeVersions,
@@ -68,8 +68,8 @@ describe('release verification Version Profiles', () => {
         nuxtSchema: '4.6.2',
       },
     })
-    expect(selectVersionProfile('v3-minimum')).toBe(VERSION_PROFILES['v3-minimum'])
-    expect(selectVersionProfile('v3-known-latest')).toBe(VERSION_PROFILES['v3-known-latest'])
+    expect(selectVersionProfile('minimum')).toBe(VERSION_PROFILES['minimum'])
+    expect(selectVersionProfile('known-latest')).toBe(VERSION_PROFILES['known-latest'])
   })
 
   it('rejects an unknown profile selection', () => {
