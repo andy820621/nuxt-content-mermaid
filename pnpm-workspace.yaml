@@ -20,6 +20,7 @@ catalogs:
     destr: ^2.0.5
     eslint: ^10.13.0
     nuxt: 4.5.2
+    oxc-parser: ^0.143.0
     typescript: ~5.9.3
     vue-tsc: ^3.3.13
     yaml: ^2.9.0
