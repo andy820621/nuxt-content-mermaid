@@ -149,9 +149,10 @@ describe('createMermaidRenderer', () => {
     vi.stubGlobal('document', undefined)
     vi.stubGlobal('window', undefined)
     vi.stubGlobal('SVGSVGElement', undefined)
-    vi.stubGlobal('performance', undefined)
 
     const { createMermaidRenderer } = await import('../src/runtime/mermaid-rendering')
+    // Vitest 5 module loading reads performance.now(), so remove it only after import.
+    vi.stubGlobal('performance', undefined)
     const loadMermaid = vi.fn()
     const beforeCommit = vi.fn()
     const readRenderData = vi.fn(() => ({
