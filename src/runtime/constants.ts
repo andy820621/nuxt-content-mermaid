@@ -14,6 +14,8 @@ export const FULLSCREEN_ZOOM_HINT_DURATION_MS = 3000
 export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
   startOnLoad: false,
   theme: 'default',
+  layout: 'dagre',
+  look: 'classic',
   fontFamily: 'Arial, sans-serif, 微軟正黑體',
   securityLevel: 'strict',
 }
@@ -92,13 +94,13 @@ export const DEFAULT_RUNTIME_OPTIONS = {
 
 export const DEFAULT_FRONTMATTER_CONFIG_KEY = 'config'
 
-export const MERMAID_11_16_1_REGEXP_PATHS = [
+export const MERMAID_12_2_0_REGEXP_PATHS = [
   ['dompurifyConfig', 'ALLOWED_URI_REGEXP'],
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'attributeNameCheck'],
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'tagNameCheck'],
 ] as const
 
-export const MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS = [
+export const MERMAID_12_2_0_FUNCTION_CAPABILITY_PATHS = [
   ['sequence', 'actorFont'],
   ['sequence', 'messageFont'],
   ['sequence', 'noteFont'],

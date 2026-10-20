@@ -2,8 +2,8 @@ import type { MermaidConfig } from 'mermaid'
 import { createMermaidComponentConfigurationError } from './component-configuration-error'
 import {
   DOMPURIFY_3_4_13_OPAQUE_CAPABILITY_PATHS,
-  MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS,
-  MERMAID_11_16_1_REGEXP_PATHS,
+  MERMAID_12_2_0_FUNCTION_CAPABILITY_PATHS,
+  MERMAID_12_2_0_REGEXP_PATHS,
 } from './constants'
 
 type ConfigPath = readonly (string | number)[]
@@ -48,7 +48,7 @@ function matchesSupportedPath(
 
 function isFunctionCapability(value: unknown, path: ConfigPath): boolean {
   return typeof value === 'function'
-    && matchesSupportedPath(path, MERMAID_11_16_1_FUNCTION_CAPABILITY_PATHS)
+    && matchesSupportedPath(path, MERMAID_12_2_0_FUNCTION_CAPABILITY_PATHS)
 }
 
 function isOpaqueObjectCapability(value: unknown, path: ConfigPath): value is object {
@@ -66,13 +66,13 @@ function validateDirectValue(
     return
 
   if (typeof value === 'function')
-    invalidDirectConfig(path, 'a supported capability at its exact Mermaid 11.17.0 or DOMPurify 3.4.13 path')
+    invalidDirectConfig(path, 'a supported capability at its exact Mermaid 12.2.0 or DOMPurify 3.4.13 path')
   if (typeof value === 'symbol' || typeof value === 'bigint')
     invalidDirectConfig(path, 'structural data')
   if (value === null || typeof value !== 'object') return
 
   if (value instanceof RegExp) {
-    if (!matchesSupportedPath(path, MERMAID_11_16_1_REGEXP_PATHS))
+    if (!matchesSupportedPath(path, MERMAID_12_2_0_REGEXP_PATHS))
       invalidDirectConfig(path, 'a RegExp at an exact DOMPurify 3.4.13 RegExp path')
     if (Reflect.ownKeys(value).some(key => key !== 'lastIndex'))
       invalidDirectConfig(path, 'a RegExp without custom properties')
