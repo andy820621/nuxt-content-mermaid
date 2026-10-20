@@ -25,14 +25,14 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         shell: bash
         run: |
-          title_pattern='^(feat|fix|refactor|test|docs|chore|build|ci|perf|revert)(\([^():]+\))?: .*[[:graph:]].*$'
+          title_pattern='^(feat|fix|refactor|test|docs|chore|build|ci|perf|revert)(\([^():]+\))?!?: .*[[:graph:]].*$'
 
           if [[ "$PR_TITLE" =~ $title_pattern ]]; then
             exit 0
           fi
 
           echo "Invalid pull request title: $PR_TITLE"
-          echo "Expected: <type>: <description> or <type>(<scope>): <description>"
+          echo "Expected: <type>: <description> or <type>(<scope>): <description>; add ! before : for a breaking change"
           echo "Types: feat, fix, refactor, test, docs, chore, build, ci, perf, revert"
-          echo "Examples: feat: add toolbar | fix(rendering): preserve last diagram | chore(deps): update mermaid"
+          echo "Examples: feat: add toolbar | fix(rendering): preserve last diagram | chore(deps): update mermaid | feat!: drop legacy option"
           exit 1
