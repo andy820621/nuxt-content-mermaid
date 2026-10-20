@@ -5,6 +5,25 @@ import {
 import { resolveExpandOptions, resolveModuleConfiguration } from '../src/runtime/configuration/module'
 
 describe('runtime options snapshot resolver', () => {
+  it.each([0, 0.5, 1])('preserves the valid lazy threshold %s', (threshold) => {
+    const snapshot = resolveRuntimeOptionsSnapshot({ loader: { lazy: { threshold } } })
+    expect(snapshot.loader?.lazy).toEqual({ threshold })
+  })
+
+  it.each([-0.1, 1.1, 2])('rejects the out-of-range lazy threshold %s at its owned path', (threshold) => {
+    expect(() => resolveRuntimeOptionsSnapshot({ loader: { lazy: { threshold } } })).toThrowError(
+      expect.objectContaining({
+        name: 'ContentMermaidConfigurationError',
+        code: 'CONTENT_MERMAID_CONFIGURATION_ERROR',
+        message: expect.stringContaining('runtimeConfig.public.contentMermaid.loader.lazy.threshold'),
+      }),
+    )
+  })
+
+  it('preserves an explicit lazy false', () => {
+    expect(resolveRuntimeOptionsSnapshot({ loader: { lazy: false } }).loader?.lazy).toBe(false)
+  })
+
   it('applies runtime and debug defaults before deeply freezing the owned result', () => {
     const snapshot = resolveRuntimeOptionsSnapshot({})
 

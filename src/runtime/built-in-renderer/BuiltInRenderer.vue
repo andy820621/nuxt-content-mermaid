@@ -19,6 +19,7 @@ import type { MermaidComponentSource } from '../component-configuration'
 import { materializeMermaidConfigForInvocation, resolveMermaidTheme } from '../mermaid-config'
 import { createMermaidRenderer } from '../mermaid-rendering'
 import { getRuntimeMermaidSnapshot } from '../runtime-snapshot'
+import { createPngRasterizerLoader } from '../png-rasterizer-loader'
 import {
   createSafeStandaloneSvgClone,
   downloadBlob,
@@ -47,14 +48,8 @@ type BuiltInRendererProps = MermaidComponentProps & {
   spinnerComponent: Component | string
 }
 
-type PngRasterizerModule = typeof import('../png-rasterizer')
-
-let pngRasterizerModulePromise: Promise<PngRasterizerModule> | undefined
-
-function loadPngRasterizer(): Promise<PngRasterizerModule> {
-  return pngRasterizerModulePromise
-    ??= import('../png-rasterizer')
-}
+// shortcut: browsers may cache failed imports; add chunk recovery if in-page network retries are required.
+const loadPngRasterizer = createPngRasterizerLoader(() => import('../png-rasterizer'))
 
 interface CommittedExportSnapshot {
   svg: SVGSVGElement

@@ -133,7 +133,9 @@ function extractInlineAttrsBlock(info: string): string | null {
     const char = info[i]!
 
     if (quote) {
-      if (char === quote && info[i - 1] !== '\\')
+      if (char === '\\')
+        i += 1
+      else if (char === quote)
         quote = null
       continue
     }
@@ -173,7 +175,7 @@ function parseInlineAttrsBlock(raw: string): Record<string, unknown> | null {
 
     const key = raw.slice(keyStart, index).trim()
     if (!key)
-      break
+      return null
 
     index = skipWhitespace(raw, index)
 
@@ -274,7 +276,9 @@ function readBalancedValue(input: string, start: number) {
     const char = input[i]!
 
     if (quote) {
-      if (char === quote && input[i - 1] !== '\\')
+      if (char === '\\')
+        i += 1
+      else if (char === quote)
         quote = null
       continue
     }

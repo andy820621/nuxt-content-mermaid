@@ -12,7 +12,7 @@ import {
 import { isNonEmptyRecord } from './runtime/utils/is'
 
 const MERMAID_COMPONENT_NAME = 'ContentMermaidTransport'
-const PAGE_MERMAID_CONFIG_EXPRESSION = 'config'
+const PAGE_RENDER_DATA_EXPRESSION = 'runtimeData'
 
 function serializeInlineAttributeRecord(value: Record<string, unknown>) {
   return JSON.stringify(value)
@@ -83,7 +83,7 @@ export function transformMarkdownDiagrams(body: string) {
 
   const buildComponentTag = (encoded: string, toolbar?: MermaidToolbarOptions) => {
     const attrs = [
-      `:page-config="${PAGE_MERMAID_CONFIG_EXPRESSION}"`,
+      `:page-data="${PAGE_RENDER_DATA_EXPRESSION}"`,
     ]
 
     if (toolbar && isNonEmptyRecord(toolbar)) {

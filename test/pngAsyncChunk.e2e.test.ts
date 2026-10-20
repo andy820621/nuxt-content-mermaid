@@ -80,4 +80,50 @@ describe('PNG production async chunk', async () => {
     expect((await secondPngDownload).suggestedFilename()).toBe('mermaid-diagram.png')
     expect(requestedAssets.filter(path => path.endsWith(`/${htmlToImageAsset}`))).toHaveLength(1)
   })
+
+  it('keeps SVG download available after a PNG chunk load failure', { timeout: 60_000 }, async () => {
+    const assetDir = resolve(useTestContext().nuxt!.options.buildDir, 'output/public/_nuxt')
+    const assetNames = (await readdir(assetDir)).filter(name => name.endsWith('.js'))
+    const assetSources = await Promise.all(assetNames.map(name => readFile(resolve(assetDir, name), 'utf8')))
+    const pngAsset = assetNames.find((_, index) => assetSources[index]!.includes(HTML_TO_IMAGE_MARKER))
+    expect(pngAsset).toBeDefined()
+
+    const page = await createPage()
+    let importRequests = 0
+    const downloads: string[] = []
+    const pngErrors: string[] = []
+    page.on('download', (download) => {
+      downloads.push(download.suggestedFilename())
+    })
+    page.on('console', (message) => {
+      if (message.text().includes('[nuxt-content-mermaid] Failed to download PNG:'))
+        pngErrors.push(message.text())
+    })
+    await page.route(`**/_nuxt/${pngAsset}`, async (route) => {
+      importRequests++
+      if (importRequests === 1) await route.abort('connectionreset')
+      else await route.continue()
+    })
+    await page.goto(url('/'), { waitUntil: 'networkidle' })
+    const diagram = page.locator('.mermaid-wrapper svg')
+    await diagram.waitFor()
+    const originalDiagram = await diagram.elementHandle()
+
+    const trigger = page.getByRole('button', { name: 'Download diagram' })
+    await trigger.click()
+    const failure = page.waitForEvent('console', {
+      predicate: message => message.text().includes('[nuxt-content-mermaid] Failed to download PNG:'),
+    })
+    await page.getByRole('button', { name: 'Download as PNG' }).click()
+    await failure
+    expect(downloads).toEqual([])
+    expect(pngErrors).toHaveLength(1)
+    expect(importRequests).toBe(1)
+
+    await trigger.click()
+    const fallback = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Download as SVG' }).click()
+    expect((await fallback).suggestedFilename()).toBe('mermaid-diagram.svg')
+    expect(await originalDiagram?.evaluate(element => element.isConnected)).toBe(true)
+  })
 })

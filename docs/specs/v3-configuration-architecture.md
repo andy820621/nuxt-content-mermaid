@@ -118,7 +118,7 @@ The component accepts exactly one optional configuration source:
 
 The props are a TypeScript discriminated union. A source is provided when its value is not `undefined`; providing both is a component configuration error before either value is inspected, merged, materialized, or selected. With neither source, diagram configuration comes from the Runtime Mermaid Snapshot alone.
 
-The Markdown Diagram Transform emits the Page Mermaid Config protocol. Page and direct configs are source discriminators rather than competing override layers, so no precedence exists between them.
+The Markdown Diagram Transform binds the MDC renderer's data object. The Markdown-only transport reads `config` from that object, preserving a missing renderer-payload field as `undefined` and normalizing Nuxt Content's absent-field `null` sentinel. Without a payload value, diagrams use the Runtime Mermaid Snapshot alone. Explicit values still pass through the shared Component Source Resolver, including invalid values. Page and direct configs are source discriminators rather than competing override layers, so no precedence exists between them.
 
 The Diagram Config Resolver combines runtime configuration with the selected source using its source-specific validation and materialization policy. Theme Resolution Policy remains separate from structural merge.
 

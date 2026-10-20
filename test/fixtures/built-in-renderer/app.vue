@@ -7,11 +7,12 @@ import type { PageMermaidConfig } from '../../../src/types/config'
 type MarkdownPage = {
   path: string
   config?: PageMermaidConfig
-  body: unknown
+  body: Record<string, unknown>
 }
 
-declare const queryCollection: (collection: 'content') => {
+declare const queryCollection: (collection: 'content' | 'withoutConfig') => {
   path: (path: string) => {
+    first: () => Promise<MarkdownPage | null>
     select: (...fields: string[]) => {
       first: () => Promise<MarkdownPage | null>
     }
@@ -76,15 +77,23 @@ const reactiveConflictDirectConfig = shallowRef<MermaidConfig>()
 const reactiveConflictCode = ref('graph TD;REACTIVE_CONFLICT-->LEGAL')
 const MermaidComponent = resolveComponent('Mermaid')
 const route = useRoute()
+const withoutConfigSchema = route.path === '/markdown-no-config-schema'
+const bodyOnly = route.path === '/markdown-body-only'
+const projectedPageConfig = bodyOnly || route.path === '/markdown-projected-page-config'
+const runtimeOnlyMarkdown = ['/markdown-missing-page-config', '/markdown-no-config-schema', '/markdown-projected-page-config', '/markdown-body-only'].includes(route.path)
 const { data: markdownPage } = await useAsyncData('markdown-page-config', () =>
-  queryCollection('content').path('/markdown-page-config').select('path', 'config', 'body').first(),
+  queryCollection('content')
+    .path(route.path === '/markdown-invalid-page-config' ? route.path : '/markdown-page-config')
+    .select('path', 'config', 'body').first(),
 )
-const { data: markdownMissingPageConfig } = await useAsyncData('markdown-missing-page-config', () =>
-  queryCollection('content').path('/markdown-missing-page-config').select('path', 'config', 'body').first(),
-)
+const { data: markdownMissingPageConfig } = await useAsyncData('markdown-missing-page-config', () => {
+  const query = queryCollection(withoutConfigSchema ? 'withoutConfig' : 'content')
+    .path(withoutConfigSchema ? '/without-config-schema/diagram' : '/markdown-missing-page-config')
+  return projectedPageConfig ? query.select('path', 'body').first() : query.first()
+})
 
 onErrorCaptured((error) => {
-  if (route.path === '/markdown-missing-page-config') {
+  if (runtimeOnlyMarkdown || route.path === '/markdown-invalid-page-config') {
     // Let the error reach Nuxt so this fixture exposes SSR regressions as HTTP 500.
     return
   }
@@ -214,18 +223,26 @@ function reenterReactiveConflict() {
 </script>
 
 <template>
-  <main v-if="route.path === '/markdown-missing-page-config'">
+  <main v-if="runtimeOnlyMarkdown">
     <section id="markdown-missing-page-config">
       <ContentRenderer
         v-if="markdownMissingPageConfig"
-        :value="markdownMissingPageConfig"
+        :value="bodyOnly ? markdownMissingPageConfig.body : markdownMissingPageConfig"
       />
       <output
         id="markdown-missing-page-config-status"
         :data-loaded="String(Boolean(markdownMissingPageConfig))"
         :data-path="markdownMissingPageConfig?.path"
+        :data-has-config="String(Object.hasOwn(markdownMissingPageConfig || {}, 'config'))"
       />
     </section>
+  </main>
+
+  <main v-else-if="route.path === '/markdown-invalid-page-config'">
+    <ContentRenderer
+      v-if="markdownPage"
+      :value="markdownPage"
+    />
   </main>
 
   <main v-else>

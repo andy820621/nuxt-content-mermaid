@@ -829,18 +829,24 @@ describe('built-in renderer integration', async () => {
     await page.locator('#markdown-page-config svg[data-run-id="2"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
-  it('SSR renders Content-authored Markdown without Page Mermaid Config through runtime-only fallback', { timeout: 20000 }, async () => {
+  it.each([
+    { path: '/markdown-missing-page-config', source: 'MARKDOWN_MISSING_PAGE_CONFIG', hasConfig: true, scenario: 'config is absent from a declared field' },
+    { path: '/markdown-no-config-schema', source: 'MARKDOWN_NO_CONFIG_SCHEMA', hasConfig: false, scenario: 'config is not declared in the collection schema' },
+    { path: '/markdown-projected-page-config', source: 'MARKDOWN_MISSING_PAGE_CONFIG', hasConfig: false, scenario: 'the renderer payload omits the declared config field' },
+    { path: '/markdown-body-only', source: 'MARKDOWN_MISSING_PAGE_CONFIG', hasConfig: false, scenario: 'only the Markdown body is passed to the renderer' },
+  ])('SSR renders Markdown through runtime-only fallback when $scenario', { timeout: 20000 }, async ({ path, source, hasConfig }) => {
     const page = await createPage()
-    const response = await page.goto(url('/markdown-missing-page-config'))
+    const response = await page.goto(url(path))
 
     expect(response?.status()).toBe(200)
     expect(await page.locator('#markdown-missing-page-config-status').getAttribute('data-loaded')).toBe('true')
+    expect(await page.locator('#markdown-missing-page-config-status').getAttribute('data-has-config')).toBe(String(hasConfig))
     await waitForRuns(page, 1)
 
     expect(await page.evaluate(() => {
       return (window as MermaidTestWindow).__mermaidControl__?.runs[0]
     })).toEqual(expect.objectContaining({
-      source: expect.stringContaining('MARKDOWN_MISSING_PAGE_CONFIG'),
+      source: expect.stringContaining(source),
       theme: 'default',
       securityLevel: 'strict',
       unknownMermaidExtensionEnabled: false,
@@ -848,6 +854,16 @@ describe('built-in renderer integration', async () => {
 
     await releaseNext(page)
     await page.locator('#markdown-missing-page-config svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
+  })
+
+  it('rejects an explicit config string through the SSR Page Mermaid Config transport', async () => {
+    const page = await createPage()
+    const response = await page.request.get(url('/markdown-invalid-page-config'), {
+      headers: { accept: 'application/json' },
+    })
+
+    expect(response.status()).toBe(500)
+    expect(await response.json()).toMatchObject({ message: '`pageConfig` must be a plain object.' })
   })
 
   it('defers the SSR Content download disclosure relationship until hydration', { timeout: 20000 }, async () => {
