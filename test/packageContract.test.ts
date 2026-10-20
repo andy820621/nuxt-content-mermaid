@@ -37,6 +37,8 @@ describe('package root runtime contract', () => {
         node: '24.19.0',
       },
     })
+    // Exact pin: 1.11.12+ regressed SVG capture (foreignObject, nested <g>), which
+    // Mermaid labels rely on. See bubkoo/html-to-image#515, #520, #524.
     expect(packageJson.dependencies['html-to-image']).toBe('1.11.11')
     expect(packageJson.peerDependencies).not.toHaveProperty('html-to-image')
     expect(packageJson.exports).not.toHaveProperty('./png-rasterizer')
