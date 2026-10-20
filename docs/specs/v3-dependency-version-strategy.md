@@ -85,7 +85,7 @@ and basic browser SVG rendering:
 | Profile | Node | Nuxt | Nuxt Content | Mermaid | Kit resolution | Schema resolution |
 | --- | --- | --- | --- | --- | --- | --- |
 | `v3-minimum` | `22.19.0` | `4.1.0` | `3.5.0` | `11.17.0` | `4.5.2` | `4.5.2` |
-| `v3-known-latest` | `24.19.0` | `4.5.2` | `3.15.2` | `11.17.0` | `4.5.2` | `4.5.2` |
+| `v3-known-latest` | `24.19.0` | `4.6.2` | `3.15.2` | `11.17.0` | `4.6.2` | `4.6.2` |
 
 Each profile runs under its exact declared Node runtime. Kit and Schema remain
 one shallow pair of expected artifact resolutions rather than additional
