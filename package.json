@@ -52,6 +52,7 @@
     "dev": "pnpm dev:prepare && nuxi dev playground",
     "dev:build": "nuxi build playground",
     "dev:prepare": "pnpm nuxt-module-build build --stub && pnpm nuxt-module-build prepare && nuxi prepare playground",
+    "audit:published": "node scripts/release-verification/audit-published.mjs",
     "lint": "eslint .",
     "release:prepare:major": "changelogen --release --major --no-commit --no-tag --no-github && pnpm install --lockfile-only --ignore-scripts",
     "release:prepare:minor": "changelogen --release --minor --no-commit --no-tag --no-github && pnpm install --lockfile-only --ignore-scripts",

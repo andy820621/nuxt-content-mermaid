@@ -1,0 +1,38 @@
+name: audit-published-dependencies
+
+# Path-filtered on purpose; do not make this a required check, or PRs that
+# skip it would be blocked.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - package.json
+      - pnpm-workspace.yaml
+      - scripts/release-verification/audit-published.*
+      - .github/workflows/audit-published.yml
+
+permissions: {}
+
+jobs:
+  audit-published-dependencies:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.19.0'
+          package-manager-cache: false
+
+      - name: Enable pinned package managers
+        run: |
+          npm install --global --force corepack@0.35.0
+          corepack enable
+          npm install --global npm@11.17.0
+
+      - name: Audit published dependencies
+        run: node scripts/release-verification/audit-published.mjs

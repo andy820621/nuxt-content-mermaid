@@ -90,6 +90,11 @@ jobs:
           fi
           echo "archive=$1" >> "$GITHUB_OUTPUT"
 
+      - name: Audit published dependencies
+        env:
+          PACKAGE_ARCHIVE: ${{ steps.artifact.outputs.archive }}
+        run: node scripts/release-verification/audit-published.mjs "$PACKAGE_ARCHIVE"
+
       - name: Publish verified package
         env:
           PACKAGE_ARCHIVE: ${{ steps.artifact.outputs.archive }}
