@@ -61,7 +61,7 @@ describe('release verification Version Profiles', () => {
       versions: {
         ...runtimeVersions,
         nuxt: '4.6.2',
-        nuxtContent: '3.15.2',
+        nuxtContent: '3.16.2',
       },
       expectedResolutions: {
         nuxtKit: '4.6.2',
