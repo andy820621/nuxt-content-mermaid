@@ -55,6 +55,7 @@ describe('removed defaultRenderer development warnings', () => {
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(`${source}.${diagram}.defaultRenderer`))
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('layout: \'dagre\''))
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('layout: \'elk\''))
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(`inside ${diagram}`))
     expect(config).toEqual({ [diagram]: { defaultRenderer: value } })
   })
 

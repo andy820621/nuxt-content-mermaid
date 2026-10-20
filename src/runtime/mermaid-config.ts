@@ -4,7 +4,7 @@ import type { JsonObject } from '../types/config'
 import type { MermaidComponentSource } from './component-configuration'
 import { mergeDirectMermaidConfigForInvocation } from './direct-mermaid-config'
 import type { MermaidThemeMode } from './composables/useMermaidTheme'
-import { MERMAID_LOG_PREFIX } from './constants'
+import { MERMAID_LOG_PREFIX, PAGE_MERMAID_CONFIG_PHASE } from './constants'
 
 const defaultRendererWarnings = import.meta.dev ? new Set<string>() : undefined
 
@@ -94,10 +94,11 @@ export function materializeMermaidConfigForInvocation(
   }
 
   if (import.meta.dev && defaultRendererWarnings) {
+    const sourceLabel = options.source.kind === 'page' ? PAGE_MERMAID_CONFIG_PHASE.name : 'Direct Mermaid Config'
+    const sourceConfig = options.source.kind === 'runtime-only' ? undefined : options.source.config
     const sources = [
       ['loader.init', options.runtimeConfig],
-      [options.source.kind === 'page' ? 'Page Mermaid Config' : 'Direct Mermaid Config',
-        options.source.kind === 'runtime-only' ? undefined : options.source.config],
+      [sourceLabel, sourceConfig],
     ] as const
 
     for (const [source, config] of sources) {
@@ -107,7 +108,7 @@ export function materializeMermaidConfigForInvocation(
         if (!diagramConfig || !Object.hasOwn(diagramConfig, 'defaultRenderer') || defaultRendererWarnings.has(key)) continue
 
         defaultRendererWarnings.add(key)
-        console.warn(`${MERMAID_LOG_PREFIX} ${key} is ignored by Mermaid 12. Use top-level layout: 'dagre' (previously 'dagre-wrapper') or layout: 'elk' instead.`)
+        console.warn(`${MERMAID_LOG_PREFIX} ${key} is ignored by Mermaid 12. Set layout: 'dagre' (previously 'dagre-wrapper') or layout: 'elk' inside ${diagram} to keep the per-type scope, or at top level for every supporting diagram type.`)
       }
     }
   }
