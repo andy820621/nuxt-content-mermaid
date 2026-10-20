@@ -115,7 +115,7 @@ export const VERSION_PROFILES = Object.freeze({
     'v3-known-latest',
     '24.19.0',
     '4.6.2',
-    '3.15.2',
+    '3.16.2',
     KNOWN_LATEST_TOOLCHAIN_RESOLUTIONS,
   ),
 })
