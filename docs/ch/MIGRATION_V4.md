@@ -16,15 +16,25 @@ Node.js `>=22.19.0`、Nuxt `^4.1.0` 與 Nuxt Content `>=3.5.0 <4.0.0` 不變。4
 | Direct Mermaid Config | 元件的 `config` prop | 該元件實例 |
 | Runtime Mermaid Config | `contentMermaid.loader.init` 或 `runtimeConfig.public.contentMermaid.loader.init` | 應用程式共用預設 |
 
-若要使用 dagre（舊 `'dagre-wrapper'` 值的設定意圖），請選頂層 `layout: 'dagre'`；若要使用 ELK，請明確選頂層 `layout: 'elk'`。其他圖種選項留在原物件內。請先選擇所需範圍：將巢狀 `flowchart.defaultRenderer` 移到頂層 `layout`，也可能影響該範圍內的其他圖種，並非保留只設定 flowchart 的範圍。
+若要使用 dagre（舊 `'dagre-wrapper'` 值的設定意圖），請選 `layout: 'dagre'`；若要使用 ELK，請明確選 `layout: 'elk'`。其他圖種選項留在原物件內。
 
-這裡指支援所選 layout 的圖種，例如 flowchart、class、state 與 ER；並非每種 Mermaid 圖表都支援 ELK。`flowchart.layout`、`class.layout`、`state.layout` 可能通過 Mermaid 型別檢查，但這三個 renderer 仍從設定物件頂層選擇 layout。
+Mermaid 12 除了全域設定，也會按圖種解析 `layout`。`flowchart.defaultRenderer: 'elk'` 的一對一替代寫法是 `flowchart: { layout: 'elk' }`，選擇範圍仍只限 flowchart。頂層 `layout` 則套用到該來源範圍內所有支援的圖種（flowchart、class、state、ER、requirement、use case）。優先序由高到低：該圖自己的圍欄 frontmatter 或 directive，接著是本模組的 Runtime／Page／Direct 設定，再來是該圖種的預設值，最後是全域預設值；同一層中，圖種範圍的鍵優先於全域鍵。
+
+這裡指支援所選 layout 的圖種，例如 flowchart、class、state 與 ER；並非每種 Mermaid 圖表都支援 ELK。
 
 ```yaml
 # 舊 Page Mermaid Config
 config:
   flowchart:
     defaultRenderer: elk
+    htmlLabels: false
+```
+
+```yaml
+# 只讓 flowchart 選用 ELK（一對一遷移）
+config:
+  flowchart:
+    layout: elk
     htmlLabels: false
 ```
 
@@ -65,7 +75,7 @@ export default defineNuxtConfig({
 })
 ```
 
-Mermaid 12 在執行期會直接忽略舊鍵。本模組保留輸入，並在開發模式對每個「**來源 × 欄位**」於整頁載入期間只提示一次；多張圖或重新 render 不會重複提示。Production 建置會移除警告。模組不會自動轉換；Mermaid 12 需要明確的頂層 `layout: 'elk'` 才會選用 ELK。
+Mermaid 12 在執行期會直接忽略舊鍵。本模組保留輸入，並在開發模式對每個「**來源 × 欄位**」於整頁載入期間只提示一次；多張圖或重新 render 不會重複提示。Production 建置會移除警告。模組不會自動轉換；Mermaid 12 需要在頂層或該圖種的區段內明確設定 `layout: 'elk'` 才會選用 ELK。
 
 本模組預設 `layout: 'dagre'` 與 `look: 'classic'`，使用者可以覆寫。既有 default／dark 主題策略不變；只有圖表選用 `layout: 'elk'` 時才載入 ELK。
 

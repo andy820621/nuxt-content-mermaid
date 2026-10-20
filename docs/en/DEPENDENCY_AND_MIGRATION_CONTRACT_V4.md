@@ -41,11 +41,10 @@ remain in force. Page and Direct configuration remain mutually exclusive.
 
 Mermaid 12 removes `flowchart.defaultRenderer`, `class.defaultRenderer`, and
 `state.defaultRenderer` from its public types. Object literals can produce
-TS2353. Select top-level `layout: 'dagre'` or `layout: 'elk'` at the required
-scope: runtime initialization is an application-wide default, Page config covers
-supporting diagrams on the page, and Direct config covers that component instance.
-Moving a diagram-specific key to top-level layout can therefore affect other
-supporting diagram types. The migration guide shows single-diagram choices.
+TS2353. Select `layout: 'dagre'` or `layout: 'elk'` inside the diagram type's
+section to keep the legacy per-type scope, or at top level to apply it to every
+supporting diagram type at that scope (runtime initialization is application-wide,
+Page config covers that page, Direct config covers that component instance).
 Runtime transport preserves these Mermaid-owned keys, but the
 engine ignores them. Development warns once per source × field per page load;
 production removes that warning. There is no automatic conversion or type shim.
