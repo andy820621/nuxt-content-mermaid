@@ -89,6 +89,7 @@
     "changelogen": "catalog:dev",
     "eslint": "catalog:dev",
     "nuxt": "catalog:dev",
+    "oxc-parser": "catalog:dev",
     "playwright": "catalog:test",
     "typescript": "catalog:dev",
     "vitest": "catalog:test",
