@@ -157,4 +157,40 @@ describe('playground integration', async () => {
     expect(downloaded.textContent).toContain('Budget')
     expect(await visibleSvg.locator('foreignObject').count()).toBeGreaterThan(0)
   })
+
+  it('renders an ELK layout flowchart through the bundled lazy chunk', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    // Production chunks are named `_nuxt/[hash].js`, so find the lazy ELK chunk by the elkjs bundle it carries.
+    const elkChunks: Promise<string | undefined>[] = []
+    page.on('response', (response) => {
+      if (response.request().resourceType() !== 'script') return
+      elkChunks.push(response.text().then(
+        body => body.includes('org.eclipse.elk') ? response.url() : undefined,
+        () => undefined,
+      ))
+    })
+    const response = await page.goto(url('/mermaid/flowchart/elk-layout'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 20000 })
+
+    expect(await block.locator('.mermaid-error').count()).toBe(0)
+    expect((await Promise.all(elkChunks)).filter(Boolean).length).toBeGreaterThan(0)
+  })
+
+  it('renders a use case diagram with the Mermaid 12 parser', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid/usecase/basic'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    const svg = block.locator('.mermaid > svg')
+    await block.scrollIntoViewIfNeeded()
+    await svg.waitFor({ state: 'visible', timeout: 20000 })
+
+    expect(await block.locator('.mermaid-error').count()).toBe(0)
+    expect(await svg.textContent()).toContain('Customer')
+  })
 })
