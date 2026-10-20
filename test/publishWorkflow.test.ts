@@ -112,6 +112,21 @@ describe('stable publish workflow contract', () => {
     expect(source).not.toMatch(/registry-smoke|release-workflow\.mjs/)
   })
 
+  it('audits the verified tarball dependencies before npm publication', async () => {
+    const { workflow } = await readWorkflow()
+    const publish = workflow.jobs.publish
+    const auditIndex = publish.steps.findIndex(step => step.name === 'Audit published dependencies')
+    const publishIndex = publish.steps.findIndex(step => step.name === 'Publish verified package')
+    const audit = publish.steps[auditIndex]
+
+    expect(auditIndex).toBeGreaterThan(publish.steps.findIndex(step => step.id === 'artifact'))
+    expect(auditIndex).toBeLessThan(publishIndex)
+    expect(audit?.env).toEqual({
+      PACKAGE_ARCHIVE: '${{ steps.artifact.outputs.archive }}',
+    })
+    expect(audit?.run).toBe('node scripts/release-verification/audit-published.mjs "$PACKAGE_ARCHIVE"')
+  })
+
   it('creates the GitHub Release only after npm publication', async () => {
     const { workflow } = await readWorkflow()
     const publish = workflow.jobs.publish

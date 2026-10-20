@@ -41,6 +41,10 @@ gh pr create \
   --body "Prepare v$version package version and changelog."
 ```
 
+Before publishing, `publish.yml` audits the dependencies a consumer installs
+from the verified tarball and stops on any high or critical advisory. Run
+`pnpm audit:published` before tagging to catch that early.
+
 Review the changelog, wait for every required check, and squash-merge the PR.
 Do not commit `dist`, package archives, or other generated output.
 
