@@ -7,15 +7,15 @@ import { describe, expect, it } from 'vitest'
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '../playground')
 type BrowserPage = Awaited<ReturnType<typeof createPage>>
 
-async function downloadSvg(page: BrowserPage, selector: string) {
+async function downloadFile(page: BrowserPage, selector: string, encoding: BufferEncoding = 'utf8') {
   const downloadPromise = page.waitForEvent('download')
   await page.locator(selector).click()
   const download = await downloadPromise
   const downloadPath = await download.path()
-  if (!downloadPath) throw new Error('Expected the SVG download to have a local path')
+  if (!downloadPath) throw new Error('Expected the download to have a local path')
   return {
     filename: download.suggestedFilename(),
-    text: await readFile(downloadPath, 'utf8'),
+    text: await readFile(downloadPath, encoding),
   }
 }
 
@@ -126,7 +126,7 @@ describe('playground integration', async () => {
 
     const downloadTrigger = block.getByLabel('Download diagram')
     await downloadTrigger.click()
-    const svgDownload = await downloadSvg(
+    const svgDownload = await downloadFile(
       page,
       '.mermaid-block [aria-label="Download as SVG"]',
     )
@@ -192,5 +192,42 @@ describe('playground integration', async () => {
 
     expect(await block.locator('.mermaid-error').count()).toBe(0)
     expect(await svg.textContent()).toContain('Customer')
+  })
+
+  it('downloads a decodable PNG with non-background pixels', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid/classdiagram/finance-ledger'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 15000 })
+
+    await block.getByLabel('Download diagram').click()
+    const pngDownload = await downloadFile(
+      page,
+      '.mermaid-block [aria-label="Download as PNG"]',
+      'base64',
+    )
+
+    const png = await page.evaluate(async (base64) => {
+      const image = new Image()
+      image.src = `data:image/png;base64,${base64}`
+      await image.decode()
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth
+      canvas.height = image.naturalHeight
+      const context = canvas.getContext('2d')!
+      context.drawImage(image, 0, 0)
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
+      const colors = new Set<string>()
+      for (let i = 0; i < data.length; i += 4 * 97) colors.add(`${data[i]},${data[i + 1]},${data[i + 2]},${data[i + 3]}`)
+      return { width: image.naturalWidth, height: image.naturalHeight, distinctColors: colors.size }
+    }, pngDownload.text)
+
+    expect(pngDownload.filename).toBe('mermaid-diagram.png')
+    expect(png.width).toBeGreaterThan(0)
+    expect(png.height).toBeGreaterThan(0)
+    expect(png.distinctColors).toBeGreaterThan(1)
   })
 })
