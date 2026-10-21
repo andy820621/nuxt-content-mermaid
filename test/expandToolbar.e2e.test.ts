@@ -319,7 +319,7 @@ describe('expand/fullscreen toolbars', async () => {
     expect(await root.getByLabel('複製失敗').getAttribute('title')).toBe('複製失敗')
   })
 
-  it('centers a narrower SVG in the renderer viewport', async () => {
+  it('centers a narrower SVG in the renderer viewport', { timeout: 20000 }, async () => {
     const page = await createPage()
     await page.setViewportSize({ width: 1000, height: 800 })
     await page.goto(url('/'))

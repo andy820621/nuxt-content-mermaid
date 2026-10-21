@@ -78,7 +78,7 @@ describe('documentation website site controls', async () => {
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
   })
 
-  it('redraws the Mermaid SVG when the color mode changes', { timeout: 10000 }, async () => {
+  it('redraws the Mermaid SVG when the color mode changes', async () => {
     const page = await createSiteControlsPage()
     await loadWithSystemColorMode(page, 'light')
 
