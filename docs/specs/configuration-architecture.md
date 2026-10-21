@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the 3.x release line. This specification is the source of truth for integrated seam ownership, public release boundaries, and verification scope.
+Introduced in 3.0 and current for the 4.x line. This specification is the source of truth for integrated seam ownership, public release boundaries, and verification scope.
 
 ## Release Boundary
 

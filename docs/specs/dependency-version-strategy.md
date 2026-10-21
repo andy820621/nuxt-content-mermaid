@@ -1,8 +1,7 @@
 # Dependency Version Strategy
 
-The active support line is 4.x after
-4.0 publication; the initial 3.0 dependency contract below is historical and is
-not rewritten.
+The active support line is 4.x; the initial 3.0 dependency contract below is
+historical and is not rewritten.
 
 ## Context
 
