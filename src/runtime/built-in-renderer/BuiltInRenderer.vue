@@ -864,6 +864,7 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
       class="mermaid-wrapper"
       :class="{
         'ncm-is-loading': isLoading && !hasRenderedOnce,
+        'ncm-is-error': hasError && !isLoading && !hasRenderedOnce,
         'ncm-expand-hidden': isExpandActive,
         'ncm-expand-clickable': expandEnabled && allowOpenDiagramClick && !isFullscreen,
         'ncm-fullscreen-zoom': isFullscreen,
@@ -1079,9 +1080,9 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   display: block;
   margin: 0 auto;
 }
-.mermaid-wrapper > .mermaid :deep(pre),
-.mermaid-wrapper > .mermaid :deep(code) {
-  /* Hide SSR fallback text before Mermaid renders; error slot content stays visible. */
+.mermaid-wrapper > .mermaid > :deep(pre),
+.mermaid-wrapper > .mermaid > :deep(code) {
+  /* Hide only the SSR fallback before Mermaid renders; error content and rendered labels stay visible. */
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1096,6 +1097,11 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
 .mermaid:not([data-processed]) {
   color: transparent;
   min-height: 100px;
+}
+.mermaid-wrapper.ncm-is-error > .mermaid {
+  /* Nothing rendered: let the error content take the whole row. */
+  width: 0;
+  min-height: 0;
 }
 
 /* Fullscreen styles */

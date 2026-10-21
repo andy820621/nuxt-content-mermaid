@@ -7,6 +7,20 @@ import { describe, expect, it } from 'vitest'
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '../playground')
 type BrowserPage = Awaited<ReturnType<typeof createPage>>
 
+async function readBox(page: BrowserPage, selector: string) {
+  return page.locator(selector).evaluate((element) => {
+    const { width, height } = element.getBoundingClientRect()
+    const { clip, clipPath } = getComputedStyle(element)
+    return { width, height, clip, clipPath }
+  })
+}
+
+function expectReadable(box: Awaited<ReturnType<typeof readBox>>) {
+  expect(box.width).toBeGreaterThan(1)
+  expect(box.height).toBeGreaterThan(1)
+  expect(box).toMatchObject({ clip: 'auto', clipPath: 'none' })
+}
+
 async function downloadFile(page: BrowserPage, selector: string, encoding: BufferEncoding = 'utf8') {
   const downloadPromise = page.waitForEvent('download')
   await page.locator(selector).click()
@@ -49,32 +63,56 @@ describe('playground integration', async () => {
     expect(await syntaxErrorBlock.locator('details code').textContent()).toContain('A --')
   })
 
-  it('shows the error component source while waiting SSR source stays hidden', { timeout: 30000 }, async () => {
+  it('shows the error component source in the full row while waiting SSR source stays hidden', { timeout: 30000 }, async () => {
     // A short viewport keeps the last diagram outside the lazy-render threshold.
     const page = await createPage(undefined, { viewport: { width: 1280, height: 320 } })
     const response = await page.goto(url('/test-debug'))
     expect(response?.status()).toBe(200)
 
-    const readSourceBox = (selector: string) => page.locator(selector).evaluate((element) => {
-      const { width, height } = element.getBoundingClientRect()
-      const { clip, clipPath } = getComputedStyle(element)
-      return { width, height, clip, clipPath }
-    })
     const hiddenSource = { width: 1, height: 1, clipPath: 'inset(50%)' }
     const syntaxErrorBlock = '#syntax-error-chart-should-display-full-error-stack + * .mermaid-block'
     const queuedBlock = '#another-normal-chart-test-queue-mechanism + * .mermaid-block'
 
-    expect(await readSourceBox(`${queuedBlock} .mermaid > pre`)).toMatchObject(hiddenSource)
+    expect(await page.locator(`${queuedBlock} .mermaid > svg`).count(), 'last diagram still waits for lazy rendering').toBe(0)
+    expect(await readBox(page, `${queuedBlock} .mermaid > pre`)).toMatchObject(hiddenSource)
 
     await page.locator(syntaxErrorBlock).scrollIntoViewIfNeeded()
     await page.locator(`${syntaxErrorBlock} .mermaid-error`).waitFor({ state: 'visible', timeout: 10000 })
     await page.locator(`${syntaxErrorBlock} details summary`).click()
 
-    const errorSource = await readSourceBox(`${syntaxErrorBlock} details pre`)
-    expect(errorSource.width).toBeGreaterThan(1)
-    expect(errorSource.height).toBeGreaterThan(1)
-    expect(errorSource).toMatchObject({ clip: 'auto', clipPath: 'none' })
-    expect(await readSourceBox(`${syntaxErrorBlock} .mermaid > pre`)).toMatchObject(hiddenSource)
+    const errorSource = await readBox(page, `${syntaxErrorBlock} details pre`)
+    const wrapperContentWidth = await page.locator(`${syntaxErrorBlock} .mermaid-wrapper`).evaluate((element) => {
+      const { paddingLeft, paddingRight } = getComputedStyle(element)
+      return element.clientWidth - Number.parseFloat(paddingLeft) - Number.parseFloat(paddingRight)
+    })
+    expectReadable(errorSource)
+    // clientWidth is rounded, so allow 1px.
+    expect(errorSource.width).toBeGreaterThan(wrapperContentWidth - 1)
+    expect(await readBox(page, `${syntaxErrorBlock} .mermaid > pre`)).toMatchObject(hiddenSource)
+  })
+
+  it('shows explicit error slot source', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid-slot-error'))
+    expect(response?.status()).toBe(200)
+
+    await page.locator('.mermaid-error').waitFor({ state: 'visible', timeout: 10000 })
+    await page.locator('.mermaid-error details summary').click()
+
+    expectReadable(await readBox(page, '.mermaid-error details pre'))
+  })
+
+  it('keeps code inside rendered HTML labels visible', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid/flowchart/html-code-label'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 10000 })
+
+    expect(await page.locator('.mermaid svg code').textContent()).toBe('render()')
+    expectReadable(await readBox(page, '.mermaid svg code'))
   })
 
   it('keeps the startup snapshot while showing page, direct, and conflict recovery paths', { timeout: 30000 }, async () => {
