@@ -16,6 +16,11 @@ export const DEFAULT_MERMAID_CONFIG: MermaidConfig = {
   theme: 'default',
   layout: 'dagre',
   look: 'classic',
+  // Mermaid 12 resolves a top-level layout above each diagram type's own schema
+  // default, and mindmap skips cose-bilkent whenever any top-level layout is set,
+  // so the types whose 3.x layout was never dagre keep theirs explicitly.
+  mindmap: { layout: 'cose-bilkent' },
+  swimlane: { layout: 'swimlane' },
   fontFamily: 'Arial, sans-serif, 微軟正黑體',
   securityLevel: 'strict',
 }

@@ -230,4 +230,26 @@ describe('playground integration', async () => {
     expect(png.height).toBeGreaterThan(0)
     expect(png.distinctColors).toBeGreaterThan(1)
   })
+
+  it('keeps mindmaps on the cose-bilkent layout under the module defaults', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    // A top-level layout would silently move mindmaps to dagre; the cose-bilkent chunk only loads while it stays selected.
+    const layoutChunks: Promise<string | undefined>[] = []
+    page.on('response', (response) => {
+      if (response.request().resourceType() !== 'script') return
+      layoutChunks.push(response.text().then(
+        body => body.includes('cose-bilkent') ? response.url() : undefined,
+        () => undefined,
+      ))
+    })
+    const response = await page.goto(url('/mermaid/mindmap/product-vision'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 20000 })
+
+    expect(await block.locator('.mermaid-error').count()).toBe(0)
+    expect((await Promise.all(layoutChunks)).filter(Boolean).length).toBeGreaterThan(0)
+  })
 })
