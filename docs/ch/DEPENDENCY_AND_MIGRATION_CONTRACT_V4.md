@@ -1,7 +1,5 @@
 # 4.x 相依與遷移契約
 
-> **即將推出的 4.x 契約；4.0 尚未發布。** 目前 npm 正式版為 3.0.5，綁定 Mermaid 11。本契約於發布後適用於升級至 4.x 的套件使用者。
-
 本文件是 `@barzhsieh/nuxt-content-mermaid` 4.x 對套件使用者的公開 Compatibility Contract。[3.x 契約](./DEPENDENCY_AND_MIGRATION_CONTRACT.md)保留為歷史契約；變更詳見 [v4 遷移指南](./MIGRATION_V4.md)。
 
 ## 相依與瀏覽器邊界
@@ -28,6 +26,6 @@ Mermaid 12 公開型別移除 `flowchart.defaultRenderer`、`class.defaultRender
 
 ## 3.x Frozen Policy
 
-4.0 發布後，3.x 成為供 Nuxt 4 使用的 Frozen Legacy Release。既有 npm 版本仍可安裝，不會自動 deprecated，但不再更新相依、擴張相容性、增加功能或提供一般修正。
+自 4.0.0 起，3.x 為供 Nuxt 4 使用的 Frozen Legacy Release。既有 npm 版本仍可安裝，不會自動 deprecated，但不再更新相依、擴張相容性、增加功能或提供一般修正。
 
 4.0 發布後前三個月是 Migration Assistance Window，優先處理遷移文件、使用指引，以及阻礙遷移的 4.x 缺陷。由套件引起的嚴重安全問題，可個別考慮低風險 backport，但不重啟一般 3.x 維護。若有大量 3.x 需求證據，可考慮延長協助，但不預先承諾。

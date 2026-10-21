@@ -1,16 +1,12 @@
 # Migration to v4
 
-> **Applies to the upcoming 4.x release (not yet published).** The current npm
-> release is 3.0.5 and bundles Mermaid 11. The changes below take effect after
-> upgrading to 4.x; publishing this guide does not upgrade installed packages.
-
 Version 4 bundles Mermaid `~12.2.0`. This is a major release because Mermaid's
 public configuration types remove `defaultRenderer`. It also adopts Mermaid 12's
 ES2024 / Safari 17.4+ requirements. Layout, geometry, and dimensions remain outside
 the package's rendering contract.
 
 Node.js `>=22.19.0`, Nuxt `^4.1.0`, and Nuxt Content `>=3.5.0 <4.0.0` are unchanged.
-After 4.0 is published, install `@barzhsieh/nuxt-content-mermaid@^4` to opt in.
+Install `@barzhsieh/nuxt-content-mermaid@^4` to opt in.
 An application's `^3.x` range does **not** receive Mermaid 12 automatically.
 
 ## Replace defaultRenderer with layout
@@ -171,7 +167,7 @@ Byte-identical SVG and geometry are not package compatibility guarantees.
 
 ## 3.x becomes frozen
 
-On 4.0 publication, 3.x remains installable but receives no dependency updates,
+Since 4.0.0, 3.x remains installable but receives no dependency updates,
 compatibility expansion, features, or ordinary fixes. The first three months
 prioritize migration documentation, guidance, and 4.x defects blocking migration.
 Critical package-caused security backports are considered individually.

@@ -1,9 +1,5 @@
 # Dependency and Migration Contract for 4.x
 
-> **Upcoming 4.x contract; 4.0 is not yet published.** The current npm release is
-> 3.0.5 with Mermaid 11. This contract takes effect for Package Users who upgrade
-> to 4.x after publication.
-
 This is the public Compatibility Contract for Package Users of
 `@barzhsieh/nuxt-content-mermaid` 4.x. The [3.x contract](./DEPENDENCY_AND_MIGRATION_CONTRACT.md)
 remains a historical contract; the [v4 migration guide](./MIGRATION_V4.md) explains the changes.
@@ -74,7 +70,7 @@ CSS visibility is tracked separately in [#145](https://github.com/andy820621/nux
 
 ## 3.x Frozen Policy
 
-When 4.0 publishes, 3.x becomes a Frozen Legacy Release for Nuxt 4. Existing npm
+Since 4.0.0, 3.x is a Frozen Legacy Release for Nuxt 4. Existing npm
 versions remain installable and are not automatically deprecated, but the line
 receives no dependency updates, compatibility expansion, new features, or ordinary fixes.
 

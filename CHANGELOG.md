@@ -1,5 +1,41 @@
 # Changelog
 
+## v4.0.0
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.5...v4.0.0)
+
+### ⚠️ Breaking Changes
+
+- Bundle Mermaid `~12.2.0` instead of `~11.17.0` ([#146](https://github.com/andy820621/nuxt-content-mermaid/pull/146)). Mermaid 12 removes `flowchart.defaultRenderer`, `class.defaultRenderer`, and `state.defaultRenderer` from its public configuration types, so object literals report TS2353, and ignores the keys at runtime. Set `layout: 'dagre'` or `layout: 'elk'` inside the diagram type's section to keep the per-type choice, or at top level for every supporting diagram type. Development builds warn once per configuration source and field.
+- Adopt Mermaid 12's browser baseline: ES2024, Safari 17.4+, and iOS / iPadOS 17.4+ ([#146](https://github.com/andy820621/nuxt-content-mermaid/pull/146)). This is the package's first explicit browser floor; older browsers are outside the contract. Node.js `>=22.19.0`, Nuxt `^4.1.0`, and `@nuxt/content >=3.5.0 <4.0.0` are unchanged.
+
+### 🚀 Highlights
+
+- Keep the 3.x rendering direction under Mermaid 12: module defaults select `layout: 'dagre'`, `look: 'classic'`, and the default/dark theme policy, and keep mindmap on `cose-bilkent` and swimlane on `swimlane` ([#146](https://github.com/andy820621/nuxt-content-mermaid/pull/146)). Each default can be overridden; diagram spacing and dimensions can still change.
+- ELK now ships inside Mermaid and loads as a separate chunk only when a diagram selects `layout: 'elk'` ([#146](https://github.com/andy820621/nuxt-content-mermaid/pull/146)).
+
+### 🩹 Fixes
+
+- **deps:** Resolve a single unhead 3 release for the website ([#148](https://github.com/andy820621/nuxt-content-mermaid/pull/148))
+
+### 🤖 CI
+
+- Audit published dependencies before release ([#140](https://github.com/andy820621/nuxt-content-mermaid/pull/140))
+- Retry Playwright installation once ([#142](https://github.com/andy820621/nuxt-content-mermaid/pull/142))
+- Allow breaking-change marker in PR titles ([#147](https://github.com/andy820621/nuxt-content-mermaid/pull/147))
+
+### 📘 Migration
+
+Follow the [v4 migration guide](https://nuxt-content-mermaid.barz.app/migration/v4) and the [4.x dependency and migration contract](https://github.com/andy820621/nuxt-content-mermaid/blob/main/docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md). An application's `^3.x` range does not receive Mermaid 12; install `@barzhsieh/nuxt-content-mermaid@^4` to opt in.
+
+With 4.0.0, 3.x becomes a Frozen Legacy Release: it stays installable but receives no dependency updates, compatibility expansion, features, or ordinary fixes. The three months after 4.0.0 publication form a migration assistance window for documentation, usage guidance, and 4.x defects that block migration.
+
+Known limitation: source shown in an error slot can be clipped by existing CSS ([#145](https://github.com/andy820621/nuxt-content-mermaid/issues/145)). It predates Mermaid 12 and is tracked separately.
+
+### ❤️ Contributors
+
+- Yao Tsu Hsieh ([@andy820621](https://github.com/andy820621))
+
 ## v3.0.5
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.4...v3.0.5)

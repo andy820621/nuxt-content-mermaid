@@ -1,4 +1,4 @@
-> **Frozen 3.x:** When 4.0 is published, 3.x becomes a Frozen Legacy Release. This historical contract remains unchanged; see the [4.x contract](./DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md) and [v4 migration guide](./MIGRATION_V4.md) for the active line and migration assistance policy.
+> **Frozen 3.x:** Since 4.0.0, 3.x is a Frozen Legacy Release. This historical contract remains unchanged; see the [4.x contract](./DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md) and [v4 migration guide](./MIGRATION_V4.md) for the active line and migration assistance policy.
 
 # Dependency and Migration Contract for 3.x
 
