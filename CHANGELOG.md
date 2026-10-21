@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.0.1
+
+[compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v4.0.0...v4.0.1)
+
+### 🩹 Fixes
+
+- Keep error-slot source visible ([#150](https://github.com/andy820621/nuxt-content-mermaid/pull/150)). Source shown by an `#error` slot or a custom error component is no longer clipped, error content takes the full row when no diagram has rendered yet, and `<code>` inside rendered HTML labels stays visible. This resolves the 4.0.0 known limitation ([#145](https://github.com/andy820621/nuxt-content-mermaid/issues/145)). The pre-render hiding rule now applies only to a `<pre>` or `<code>` placed directly in the default slot: a fallback wrapped in another element is no longer hidden before rendering, so its box can show while its text stays transparent. The rule's selector specificity also rose, so application CSS that overrode the old rule may need a more specific selector.
+
+### 💅 Refactors
+
+- Remove versioned names from specs and Mermaid allowlists ([#151](https://github.com/andy820621/nuxt-content-mermaid/pull/151))
+
+### ✅ Tests
+
+- Give browser E2E cases an explicit timeout ([#153](https://github.com/andy820621/nuxt-content-mermaid/pull/153))
+
+### ❤️ Contributors
+
+- Yao Tsu Hsieh ([@andy820621](https://github.com/andy820621))
+
 ## v4.0.0
 
 [compare changes](https://github.com/andy820621/nuxt-content-mermaid/compare/v3.0.5...v4.0.0)
