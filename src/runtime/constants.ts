@@ -99,7 +99,8 @@ export const DEFAULT_RUNTIME_OPTIONS = {
 
 export const DEFAULT_FRONTMATTER_CONFIG_KEY = 'config'
 
-// These capability allowlists were reviewed against Mermaid 12.2.0 and DOMPurify 3.4.13.
+// Capability paths were audited against Mermaid 12.2.0 and DOMPurify 3.4.13.
+// Rechecked DOMPurify 3.4.17: its Config declaration is unchanged from that baseline.
 export const MERMAID_REGEXP_CAPABILITY_PATHS = [
   ['dompurifyConfig', 'ALLOWED_URI_REGEXP'],
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'attributeNameCheck'],
