@@ -107,6 +107,16 @@ warning. No automatic conversion occurs. Mermaid 12 itself defaults to ELK with 
 its default/dark theme policy, so ELK requires an explicit `layout: 'elk'` at top
 level or inside the diagram type's section.
 
+The warning covers only the three package configuration sources above. A
+diagram's own fence frontmatter or `%%{init: ...}%%` directive can carry the same
+keys, and Mermaid 12 ignores them there too, without any warning. Search the
+Markdown content as well and apply the same `layout` replacement inside the
+diagram source:
+
+```bash
+grep -rn "defaultRenderer" content/
+```
+
 The module defaults to `layout: 'dagre'` and `look: 'classic'`, and keeps
 `mindmap.layout: 'cose-bilkent'` and `swimlane.layout: 'swimlane'` explicitly,
 because a top-level layout would otherwise override those diagram types' own
