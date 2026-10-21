@@ -11,10 +11,9 @@
 [![Mermaid](https://img.shields.io/badge/mermaid-12.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
-> **Version scope:** This branch documents the upcoming 4.x release, which is not
-> yet published. The current npm release is 3.0.5 with Mermaid 11; its
-> [3.x contract](./docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT.md) still applies.
-> The Mermaid 12 and browser requirements below apply after upgrading to 4.x.
+> This README covers 4.x, which bundles Mermaid 12. The frozen 3.x line keeps its
+> [3.x contract](./docs/en/DEPENDENCY_AND_MIGRATION_CONTRACT.md); to upgrade, follow
+> [Migration to v4](https://nuxt-content-mermaid.barz.app/migration/v4).
 
 **@barzhsieh/nuxt-content-mermaid** turns `mermaid` code blocks in Nuxt
 Content Markdown into responsive, interactive diagrams. It supports lazy

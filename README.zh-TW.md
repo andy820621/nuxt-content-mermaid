@@ -11,7 +11,7 @@
 [![Mermaid](https://img.shields.io/badge/mermaid-12.x-0f5b9d?logo=mermaid)](https://mermaid.js.org/)
 [![Nuxt Content](https://img.shields.io/badge/Nuxt%20Content-3.x-00DC82?logo=nuxt.js)](https://content.nuxt.com/)
 
-> **適用版本：** 此分支說明即將推出、尚未發布的 4.x。目前 npm 正式版為 3.0.5，綁定 Mermaid 11，仍適用 [3.x 契約](./docs/ch/DEPENDENCY_AND_MIGRATION_CONTRACT.md)。下列 Mermaid 12 與瀏覽器需求在升級至 4.x 後才生效。
+> 本文件說明綁定 Mermaid 12 的 4.x。已凍結的 3.x 仍適用 [3.x 契約](./docs/ch/DEPENDENCY_AND_MIGRATION_CONTRACT.md)；升級請參閱[升級至 v4](https://nuxt-content-mermaid.barz.app/zh/migration/v4)。
 
 **@barzhsieh/nuxt-content-mermaid** 會將 Nuxt Content Markdown 中的
 `mermaid` 程式碼圍欄 (fence) 轉換為響應式、可互動的圖表，並支援延遲載入、深淺色

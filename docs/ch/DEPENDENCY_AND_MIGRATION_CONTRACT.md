@@ -1,4 +1,4 @@
-> **3.x 凍結說明：** 4.0 發布後，3.x 成為 Frozen Legacy Release。以下歷史契約保留原狀；現行支援線與遷移協助政策請見 [4.x 契約](./DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md)及 [v4 遷移指南](./MIGRATION_V4.md)。
+> **3.x 凍結說明：** 自 4.0.0 起，3.x 為 Frozen Legacy Release。以下歷史契約保留原狀；現行支援線與遷移協助政策請見 [4.x 契約](./DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md)及 [v4 遷移指南](./MIGRATION_V4.md)。
 
 # 3.x 相依與遷移契約
 
