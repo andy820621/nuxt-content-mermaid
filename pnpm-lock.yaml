@@ -7760,14 +7760,6 @@ packages:
   unhead@2.1.17:
     resolution: {integrity: sha512-HLMKXOszRhAPBrr6VlqCeVeJq2kbC4kXwzGLEZvvojPLWNYTJw22xG7Bfwhsvs31+IBet3Wl8ADg9dwYdyphfQ==}
 
-  unhead@3.3.1:
-    resolution: {integrity: sha512-eqHlbLyuvIXw898WopQmosTml4PdYW5ZhXDom/sf7ysAqQB9uvYrw2/dNvbrmkJTufSkmNmgGCjoQcvoT2mS/A==}
-    peerDependencies:
-      vite: '>=6.4.2'
-    peerDependenciesMeta:
-      vite:
-        optional: true
-
   unhead@3.4.3:
     resolution: {integrity: sha512-0FZI/qCCyIey14CKlGMFpiQumWSatlthJy7Xvro7H3nmi/V2owkcCXG03k0GXDc2/TV1K6bvrbAwhzTRe5Nhdw==}
     peerDependencies:
@@ -11608,7 +11600,7 @@ snapshots:
       oxc-walker: 0.7.0(oxc-parser@0.141.0)
       pathe: 2.0.3
       ufo: 1.6.4
-      unhead: 3.3.1(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.3.4(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))
+      unhead: 3.4.3(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.3.4(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))
       unplugin: 3.3.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.3.4(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))
       unrouting: 0.2.2
       unstorage: 1.17.5(db0@0.4.1)(ioredis@5.11.1)
@@ -19423,22 +19415,6 @@ snapshots:
   unhead@2.1.17:
     dependencies:
       hookable: 6.1.2
-
-  unhead@3.3.1(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.3.4(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0)):
-    dependencies:
-      hookable: 6.1.1
-      unplugin: 3.3.0(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.3.4(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0))
-    optionalDependencies:
-      vite: 8.3.4(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0)
-    transitivePeerDependencies:
-      - '@farmfe/core'
-      - '@rspack/core'
-      - bun-types-no-globals
-      - esbuild
-      - rolldown
-      - rollup
-      - unloader
-      - webpack
 
   unhead@3.4.3(esbuild@0.28.2)(rolldown@1.2.14)(rollup@4.62.4)(vite@8.3.4(@types/node@25.3.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.44.1)(yaml@2.9.0)):
     dependencies:
