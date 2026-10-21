@@ -1,8 +1,10 @@
-# V3 Configuration Architecture
+# Configuration Architecture
 
 ## Status
 
-Accepted for the 3.x release line. This specification is the source of truth for integrated seam ownership, public release boundaries, and verification scope.
+Introduced in 3.0 and current for the 4.x line. This specification is the source of truth for integrated seam ownership, configuration and rendering semantics, and verification scope.
+
+The 3.0 release boundary and breaking changes below record the original release. The Mermaid 11.12.3 browser verification is historical evidence for the staging design. For current dependency, browser, and migration boundaries, see the [4.x public contract](../en/DEPENDENCY_AND_MIGRATION_CONTRACT_V4.md) and [v4 migration guide](../en/MIGRATION_V4.md).
 
 ## Release Boundary
 
@@ -105,7 +107,7 @@ Neither error class nor its internal issue types are exported from the package e
 
 The Universal Runtime Adapter runs once per Nuxt application instance, including each SSR render context. It starts from the actual public payload, removes framework reactivity without retaining proxies, validates the raw phase, applies runtime defaults and domain shorthands, validates the final phase, creates a wholly package-owned tree, and always deep-freezes it.
 
-The adapter publishes one app-scoped Runtime Mermaid Snapshot through a private internal seam. The snapshot is initialization state, not a live control plane. Loader and component code consume only this snapshot; later mutation of public runtime config is outside the 3.0 contract.
+The adapter publishes one app-scoped Runtime Mermaid Snapshot through a private internal seam. The snapshot is initialization state, not a live control plane. Loader and component code consume only this snapshot; later mutation of public runtime config is outside the configuration contract.
 
 ### 6. Component Configuration Sources
 
@@ -182,9 +184,11 @@ Every Render Request belongs to a component-local Render Generation. Only the la
 
 Each attempt renders in a Staging Render Target isolated from the live target. Commit uses one synchronous live-target replacement only after rendering succeeds and generation and configuration eligibility are rechecked. Failed, stale, or conflict-invalidated attempts leave the latest Committed Diagram unchanged.
 
-Browser verification against Mermaid 11.12.3 established that a truly disconnected flowchart target fails while querying layout geometry. Both strict SVG and sandbox iframe output succeed when staging is temporarily connected to a package-owned offscreen measurement host and can be moved into the live target. Staging isolation therefore means outside the live render subtree, not necessarily disconnected from the document; the measurement host is always removed after the attempt.
+Historical browser verification against Mermaid 11.12.3 established that a truly disconnected flowchart target fails while querying layout geometry. Both strict SVG and sandbox iframe output succeed when staging is temporarily connected to a package-owned offscreen measurement host and can be moved into the live target. Staging isolation therefore means outside the live render subtree, not necessarily disconnected from the document; the measurement host is always removed after the attempt.
 
 ## Public Interface and Breaking Changes
+
+The table records the public interface changes introduced in 3.0.
 
 | Area | 3.0 contract | Migration impact |
 | --- | --- | --- |
