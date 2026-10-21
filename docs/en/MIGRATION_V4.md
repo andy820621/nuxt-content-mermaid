@@ -155,8 +155,6 @@ older Safari, and cannot guarantee the whole application's compatibility.
 Applications that require older browsers must supply and verify the necessary
 transforms / polyfills themselves, or remain on 3.x and verify their application's
 browser behavior. Real Safari 17.4 and physical iOS devices have not been verified.
-Source shown in an error slot may be clipped
-by existing CSS; this separate limitation is tracked in [#145](https://github.com/andy820621/nuxt-content-mermaid/issues/145).
 
 ## Review diagram dimensions
 
