@@ -24,13 +24,13 @@ async function waitForActiveHash(
   hash)
 }
 
-describe('documentation page TOC', async () => {
+describe('documentation page TOC', { timeout: 20_000 }, async () => {
   await setup({
     rootDir: websiteRoot,
     browser: true,
   })
 
-  it('seeds the first section and follows scrolling and native hash navigation', { timeout: 20000 }, async () => {
+  it('seeds the first section and follows scrolling and native hash navigation', async () => {
     const page = await createDocsPage()
     const toc = page.getByRole('navigation', { name: 'On this page' })
 

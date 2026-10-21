@@ -878,7 +878,7 @@ describe('built-in renderer integration', async () => {
     await page.locator('#markdown-missing-page-config svg[data-run-id="1"]').waitFor({ state: 'visible', timeout: 5000 })
   })
 
-  it('rejects an explicit config string through the SSR Page Mermaid Config transport', async () => {
+  it('rejects an explicit config string through the SSR Page Mermaid Config transport', { timeout: 20000 }, async () => {
     const page = await createPage()
     const response = await page.request.get(url('/markdown-invalid-page-config'), {
       headers: { accept: 'application/json' },

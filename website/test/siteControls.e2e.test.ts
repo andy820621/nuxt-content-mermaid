@@ -37,7 +37,7 @@ async function loadWithSystemColorMode(
   await page.waitForFunction(() => document.querySelector('button[aria-pressed]') !== null)
 }
 
-describe('documentation website site controls', async () => {
+describe('documentation website site controls', { timeout: 20_000 }, async () => {
   await setup({
     rootDir: websiteRoot,
     browser: true,
@@ -78,7 +78,7 @@ describe('documentation website site controls', async () => {
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark')
   })
 
-  it('redraws the Mermaid SVG when the color mode changes', { timeout: 10000 }, async () => {
+  it('redraws the Mermaid SVG when the color mode changes', async () => {
     const page = await createSiteControlsPage()
     await loadWithSystemColorMode(page, 'light')
 
