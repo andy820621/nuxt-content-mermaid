@@ -99,13 +99,14 @@ export const DEFAULT_RUNTIME_OPTIONS = {
 
 export const DEFAULT_FRONTMATTER_CONFIG_KEY = 'config'
 
-export const MERMAID_12_2_0_REGEXP_PATHS = [
+// These capability allowlists were reviewed against Mermaid 12.2.0.
+export const MERMAID_REGEXP_CONFIG_PATHS = [
   ['dompurifyConfig', 'ALLOWED_URI_REGEXP'],
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'attributeNameCheck'],
   ['dompurifyConfig', 'CUSTOM_ELEMENT_HANDLING', 'tagNameCheck'],
 ] as const
 
-export const MERMAID_12_2_0_FUNCTION_CAPABILITY_PATHS = [
+export const MERMAID_FUNCTION_CAPABILITY_PATHS = [
   ['sequence', 'actorFont'],
   ['sequence', 'messageFont'],
   ['sequence', 'noteFont'],
