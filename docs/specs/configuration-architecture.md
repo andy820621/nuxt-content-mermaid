@@ -1,4 +1,4 @@
-# V3 Configuration Architecture
+# Configuration Architecture
 
 ## Status
 

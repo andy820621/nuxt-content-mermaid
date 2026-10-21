@@ -1,6 +1,6 @@
-# 3.x Dependency Version Strategy
+# Dependency Version Strategy
 
-This policy remains at its original path. The active support line is 4.x after
+The active support line is 4.x after
 4.0 publication; the initial 3.0 dependency contract below is historical and is
 not rewritten.
 
