@@ -233,12 +233,13 @@ describe('playground integration', async () => {
 
   it('keeps mindmaps on the cose-bilkent layout under the module defaults', { timeout: 30000 }, async () => {
     const page = await createPage()
-    // A top-level layout would silently move mindmaps to dagre; the cose-bilkent chunk only loads while it stays selected.
+    // A top-level layout would silently move mindmaps to dagre. The plain 'cose-bilkent' name also sits in Mermaid's
+    // config and registry chunks, so match a log string that only the lazily loaded layout implementation carries.
     const layoutChunks: Promise<string | undefined>[] = []
     page.on('response', (response) => {
       if (response.request().resourceType() !== 'script') return
       layoutChunks.push(response.text().then(
-        body => body.includes('cose-bilkent') ? response.url() : undefined,
+        body => body.includes('Starting cose-bilkent layout algorithm') ? response.url() : undefined,
         () => undefined,
       ))
     })
