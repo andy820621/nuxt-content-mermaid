@@ -22,7 +22,7 @@ Mermaid 12 公開型別移除 `flowchart.defaultRenderer`、`class.defaultRender
 
 綁定引擎成功渲染時，Built-in Renderer 會依 transactional rendering contract commit 可用的 SVG。Mermaid 載入或渲染失敗時，適用套件擁有的 error 與 fallback semantics。除上述遷移外，已文件化的 Nuxt／Content activation、Markdown transformation、configuration transport、public types、theme、toolbar、lazy rendering、extension 與 styling hooks 保持原語意。
 
-契約排除 Mermaid input acceptance、精確 SVG serialization／element order、未文件化 DOM／class／generated identifier、layout、geometry、coordinates、dimensions、font measurement、Mermaid internals，以及每個圖表功能的完整正確性。維持視覺快照時，請自行控制應用程式 lockfile、瀏覽器、字型與 viewport。錯誤原始碼的 CSS 可見性問題另外追蹤於 [#145](https://github.com/andy820621/nuxt-content-mermaid/issues/145)。
+契約排除 Mermaid input acceptance、精確 SVG serialization／element order、未文件化 DOM／class／generated identifier、layout、geometry、coordinates、dimensions、font measurement、Mermaid internals，以及每個圖表功能的完整正確性。維持視覺快照時，請自行控制應用程式 lockfile、瀏覽器、字型與 viewport。
 
 ## 3.x Frozen Policy
 

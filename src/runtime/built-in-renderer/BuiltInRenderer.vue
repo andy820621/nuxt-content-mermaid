@@ -1079,9 +1079,9 @@ const { cursorVariables } = useMermaidCursors(iconSize, expandEnabled)
   display: block;
   margin: 0 auto;
 }
-.mermaid-wrapper :deep(pre),
-.mermaid-wrapper :deep(code) {
-  /* Hide SSR fallback text before Mermaid renders. */
+.mermaid-wrapper > .mermaid :deep(pre),
+.mermaid-wrapper > .mermaid :deep(code) {
+  /* Hide SSR fallback text before Mermaid renders; error slot content stays visible. */
   position: absolute;
   width: 1px;
   height: 1px;

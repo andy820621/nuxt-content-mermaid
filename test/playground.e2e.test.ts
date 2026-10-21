@@ -49,6 +49,34 @@ describe('playground integration', async () => {
     expect(await syntaxErrorBlock.locator('details code').textContent()).toContain('A --')
   })
 
+  it('shows the error component source while waiting SSR source stays hidden', { timeout: 30000 }, async () => {
+    // A short viewport keeps the last diagram outside the lazy-render threshold.
+    const page = await createPage(undefined, { viewport: { width: 1280, height: 320 } })
+    const response = await page.goto(url('/test-debug'))
+    expect(response?.status()).toBe(200)
+
+    const readSourceBox = (selector: string) => page.locator(selector).evaluate((element) => {
+      const { width, height } = element.getBoundingClientRect()
+      const { clip, clipPath } = getComputedStyle(element)
+      return { width, height, clip, clipPath }
+    })
+    const hiddenSource = { width: 1, height: 1, clipPath: 'inset(50%)' }
+    const syntaxErrorBlock = '#syntax-error-chart-should-display-full-error-stack + * .mermaid-block'
+    const queuedBlock = '#another-normal-chart-test-queue-mechanism + * .mermaid-block'
+
+    expect(await readSourceBox(`${queuedBlock} .mermaid > pre`)).toMatchObject(hiddenSource)
+
+    await page.locator(syntaxErrorBlock).scrollIntoViewIfNeeded()
+    await page.locator(`${syntaxErrorBlock} .mermaid-error`).waitFor({ state: 'visible', timeout: 10000 })
+    await page.locator(`${syntaxErrorBlock} details summary`).click()
+
+    const errorSource = await readSourceBox(`${syntaxErrorBlock} details pre`)
+    expect(errorSource.width).toBeGreaterThan(1)
+    expect(errorSource.height).toBeGreaterThan(1)
+    expect(errorSource).toMatchObject({ clip: 'auto', clipPath: 'none' })
+    expect(await readSourceBox(`${syntaxErrorBlock} .mermaid > pre`)).toMatchObject(hiddenSource)
+  })
+
   it('keeps the startup snapshot while showing page, direct, and conflict recovery paths', { timeout: 30000 }, async () => {
     const page = await createPage()
 

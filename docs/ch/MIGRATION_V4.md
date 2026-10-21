@@ -95,7 +95,7 @@ Mermaid 12 的目標為 ES2024／Safari 17.4+，包含 iOS／iPadOS 17.4+（[上
 
 語法轉譯與 API polyfill 解決不同問題；降低 build target 不會補上缺少的 API。正式建置的瀏覽器測試移除 `Object.groupBy` 後，flowchart 仍能渲染，但 usecase parser 載入失敗。模組將失敗處理為圖表錯誤，周圍頁面內容與 Vue 互動仍正常。對延遲載入模組注入 SyntaxError，也能進入圖表錯誤處理。這些測試不是舊版 Safari 的等效模擬，不能保證整個應用程式的相容性。
 
-需要支援更舊瀏覽器的應用程式，必須自行提供並驗證所需轉譯／polyfill，或保留 3.x 並驗證應用程式的瀏覽器行為。尚未驗證真實 Safari 17.4 與 iOS 實體裝置。錯誤 slot 的原始碼可能被既有 CSS 裁切；此獨立限制追蹤於 [#145](https://github.com/andy820621/nuxt-content-mermaid/issues/145)。
+需要支援更舊瀏覽器的應用程式，必須自行提供並驗證所需轉譯／polyfill，或保留 3.x 並驗證應用程式的瀏覽器行為。尚未驗證真實 Safari 17.4 與 iOS 實體裝置。
 
 ## 檢查圖表尺寸
 

@@ -65,8 +65,7 @@ The contract excludes Mermaid input acceptance, exact SVG serialization or
 element order, undocumented DOM / classes / generated identifiers, layout,
 geometry, coordinates, dimensions, font measurement, Mermaid internals, and
 exhaustive diagram-feature correctness. Control the application lockfile,
-browser, fonts, and viewport when maintaining visual snapshots. Error-source
-CSS visibility is tracked separately in [#145](https://github.com/andy820621/nuxt-content-mermaid/issues/145).
+browser, fonts, and viewport when maintaining visual snapshots.
 
 ## 3.x Frozen Policy
 
