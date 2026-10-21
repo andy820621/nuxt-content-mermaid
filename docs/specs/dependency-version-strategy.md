@@ -200,13 +200,13 @@ dimensions remain excluded and do not determine the bump.
 
 ## 3.x Frozen Policy
 
-When 4.0 publishes, 3.x becomes a Frozen Legacy Release for Nuxt 4. Existing npm versions remain installable and are not automatically deprecated, but the line receives no dependency updates, compatibility expansion, new features, or ordinary fixes.
+Since 4.0.0, 3.x is a Frozen Legacy Release for Nuxt 4. Existing npm versions remain installable and are not automatically deprecated, but the line receives no dependency updates, compatibility expansion, new features, or ordinary fixes.
 
 The first three months after 4.0 form a Migration Assistance Window for documentation, usage guidance, and 4.x defects that prevent migration. A low-risk backport for a package-caused critical security issue may be considered individually without reopening ordinary 3.x maintenance. Evidence of substantial 3.x demand may justify extending assistance, but no extension is promised in advance.
 
 ## 2.x Frozen Policy
 
-When 3.0 publishes, 2.x becomes a Frozen Legacy Release for Nuxt 3. Existing npm versions remain installable and are not automatically deprecated, but the line receives no dependency updates, compatibility expansion, new features, or ordinary fixes.
+Since 3.0.0, 2.x is a Frozen Legacy Release for Nuxt 3. Existing npm versions remain installable and are not automatically deprecated, but the line receives no dependency updates, compatibility expansion, new features, or ordinary fixes.
 
 The first three months after 3.0 form a Migration Assistance Window for documentation, usage guidance, and 3.x defects that prevent migration. A low-risk backport for a package-caused critical security issue may be considered individually without reopening ordinary 2.x maintenance. Evidence of substantial Nuxt 3 demand may justify extending assistance, but no extension is promised in advance.
 
