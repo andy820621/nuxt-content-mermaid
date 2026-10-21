@@ -49,11 +49,11 @@ describe('CI workflow contract', () => {
       'matrix': {
         include: [
           {
-            'profile': 'v3-minimum',
+            'profile': 'minimum',
             'node-version': '22.19.0',
           },
           {
-            'profile': 'v3-known-latest',
+            'profile': 'known-latest',
             'node-version': '24.19.0',
           },
         ],

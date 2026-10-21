@@ -4,6 +4,9 @@ import type { JsonObject } from '../types/config'
 import type { MermaidComponentSource } from './component-configuration'
 import { mergeDirectMermaidConfigForInvocation } from './direct-mermaid-config'
 import type { MermaidThemeMode } from './composables/useMermaidTheme'
+import { MERMAID_LOG_PREFIX, PAGE_MERMAID_CONFIG_PHASE } from './constants'
+
+const defaultRendererWarnings = import.meta.dev ? new Set<string>() : undefined
 
 interface ThemeOptions {
   colorModeValue?: string
@@ -88,6 +91,26 @@ export function materializeMermaidConfigForInvocation(
       value: options.theme,
       writable: true,
     })
+  }
+
+  if (import.meta.dev && defaultRendererWarnings) {
+    const sourceLabel = options.source.kind === 'page' ? PAGE_MERMAID_CONFIG_PHASE.name : 'Direct Mermaid Config'
+    const sourceConfig = options.source.kind === 'runtime-only' ? undefined : options.source.config
+    const sources = [
+      ['loader.init', options.runtimeConfig],
+      [sourceLabel, sourceConfig],
+    ] as const
+
+    for (const [source, config] of sources) {
+      for (const diagram of ['flowchart', 'class', 'state'] as const) {
+        const diagramConfig = config?.[diagram]
+        const key = `${source}.${diagram}.defaultRenderer`
+        if (!diagramConfig || !Object.hasOwn(diagramConfig, 'defaultRenderer') || defaultRendererWarnings.has(key)) continue
+
+        defaultRendererWarnings.add(key)
+        console.warn(`${MERMAID_LOG_PREFIX} ${key} is ignored by Mermaid 12. Set layout: 'dagre' (previously 'dagre-wrapper') or layout: 'elk' inside ${diagram} to keep the per-type scope, or at top level for every supporting diagram type.`)
+      }
+    }
   }
 
   return sourceWorkingCopy

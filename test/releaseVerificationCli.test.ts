@@ -29,19 +29,19 @@ describe('release verification CLI', () => {
   it('selects one profile and an optional retained artifact directory', () => {
     expect(parseVerificationSelection([
       '--profile',
-      'v3-minimum',
+      'minimum',
       '--artifact-directory',
       '/tmp/release-artifact',
     ])).toEqual({
       artifactDirectory: '/tmp/release-artifact',
-      profileId: 'v3-minimum',
+      profileId: 'minimum',
     })
 
     expect(parseVerificationSelection([
       '--profile',
-      'v3-minimum',
+      'minimum',
     ])).toEqual({
-      profileId: 'v3-minimum',
+      profileId: 'minimum',
     })
   })
 
@@ -49,9 +49,9 @@ describe('release verification CLI', () => {
     [[], 'Choose one Version Profile'],
     [['--profile'], 'Missing value for --profile'],
     [['--unknown', 'value'], 'Unknown option: --unknown'],
-    [['--package-source', 'pack', '--profile', 'v3-minimum'], 'Unknown option: --package-source'],
-    [['--artifact-directory', 'relative', '--profile', 'v3-minimum'], 'Artifact directory must be absolute'],
-    [['--profile', 'v3-minimum', '--profile', 'v3-known-latest'], 'Duplicate option: --profile'],
+    [['--package-source', 'pack', '--profile', 'minimum'], 'Unknown option: --package-source'],
+    [['--artifact-directory', 'relative', '--profile', 'minimum'], 'Artifact directory must be absolute'],
+    [['--profile', 'minimum', '--profile', 'known-latest'], 'Duplicate option: --profile'],
   ])('rejects invalid arguments %#', (argv, message) => {
     expect(() => parseVerificationSelection(argv)).toThrow(message)
   })
@@ -60,12 +60,12 @@ describe('release verification CLI', () => {
     const operations = createOperations()
     const runner = vi.fn(async () => ({
       success: true,
-      profile: { id: 'v3-minimum' },
+      profile: { id: 'minimum' },
     }))
     const writeEvidence = vi.fn()
 
     await runReleaseVerificationCli({
-      argv: ['--profile', 'v3-minimum'],
+      argv: ['--profile', 'minimum'],
       operations: operations as never,
       repositoryRoot: '/repo',
       runner: runner as never,
@@ -79,12 +79,12 @@ describe('release verification CLI', () => {
     })
     expect(runner).toHaveBeenCalledWith({
       artifact,
-      profile: VERSION_PROFILES['v3-minimum'],
+      profile: VERSION_PROFILES['minimum'],
     }, operations)
     expect(operations.cleanupWorkspace).toHaveBeenCalledWith('/tmp/workspace')
     expect(writeEvidence).toHaveBeenCalledWith({
       success: true,
-      profile: { id: 'v3-minimum' },
+      profile: { id: 'minimum' },
     })
   })
 
@@ -94,7 +94,7 @@ describe('release verification CLI', () => {
 
     await runReleaseVerificationCli({
       argv: [
-        '--profile', 'v3-minimum',
+        '--profile', 'minimum',
         '--artifact-directory', '/tmp/release-artifact',
       ],
       operations: operations as never,
@@ -111,7 +111,7 @@ describe('release verification CLI', () => {
     })
     expect(runner).toHaveBeenCalledWith({
       artifact,
-      profile: VERSION_PROFILES['v3-minimum'],
+      profile: VERSION_PROFILES['minimum'],
     }, operations)
     expect(operations.cleanupWorkspace).not.toHaveBeenCalled()
   })
@@ -121,7 +121,7 @@ describe('release verification CLI', () => {
     const failure = new Error('profile failed')
 
     await expect(runReleaseVerificationCli({
-      argv: ['--profile', 'v3-minimum'],
+      argv: ['--profile', 'minimum'],
       operations: operations as never,
       repositoryRoot: '/repo',
       runner: vi.fn(async () => { throw failure }) as never,

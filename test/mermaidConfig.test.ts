@@ -1,10 +1,102 @@
-import { describe, it, expect } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest'
+import { createServer, type ViteDevServer } from 'vite'
 import type { MermaidConfig } from 'mermaid'
 import type { PageMermaidConfig } from '../src/types/config'
 import {
   materializeMermaidConfigForInvocation,
   resolveMermaidTheme,
 } from '../src/runtime/mermaid-config'
+
+describe('removed defaultRenderer development warnings', () => {
+  let server: ViteDevServer
+  let materialize: typeof materializeMermaidConfigForInvocation
+  let moduleId = 0
+
+  beforeAll(async () => {
+    server = await createServer({
+      configFile: false,
+      define: { 'import.meta.dev': 'true' },
+      server: { middlewareMode: true, watch: null, hmr: false },
+      appType: 'custom',
+    })
+  })
+
+  beforeEach(async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // A fresh dev module gives each case a new page-level warning Set.
+    const helpers = await server.ssrLoadModule(`/src/runtime/mermaid-config.ts?warning-case=${++moduleId}`)
+    materialize = helpers.materializeMermaidConfigForInvocation
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+  afterAll(async () => server?.close())
+
+  const cases = (['Page Mermaid Config', 'Direct Mermaid Config', 'loader.init'] as const).flatMap(source =>
+    (['flowchart', 'class', 'state'] as const).flatMap(diagram =>
+      (['dagre-wrapper', 'elk'] as const).map(value => ({ source, diagram, value })),
+    ),
+  )
+
+  it.each(cases)('warns once per page for $source.$diagram.defaultRenderer = $value', ({ source, diagram, value }) => {
+    const config = Object.freeze({ [diagram]: Object.freeze({ defaultRenderer: value }) }) as unknown as MermaidConfig
+    const options: Parameters<typeof materialize>[0] = source === 'loader.init'
+      ? { runtimeConfig: config, source: { kind: 'runtime-only' } }
+      : source === 'Page Mermaid Config'
+        ? { source: { kind: 'page', config: config as PageMermaidConfig } }
+        : { source: { kind: 'direct', config } }
+
+    for (const theme of ['default', 'dark', 'forest'] as const) {
+      const result = materialize({ ...options, theme })
+      expect(result).toMatchObject({ [diagram]: { defaultRenderer: value }, theme })
+      expect(result).not.toBe(config)
+    }
+
+    expect(console.warn).toHaveBeenCalledOnce()
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(`${source}.${diagram}.defaultRenderer`))
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('layout: \'dagre\''))
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('layout: \'elk\''))
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(`inside ${diagram}`))
+    expect(config).toEqual({ [diagram]: { defaultRenderer: value } })
+  })
+
+  it('deduplicates the same legacy field across multiple diagrams on one page', () => {
+    for (const value of ['dagre-wrapper', 'elk']) {
+      materialize({
+        runtimeConfig: { flowchart: { defaultRenderer: value } } as unknown as MermaidConfig,
+        source: { kind: 'runtime-only' },
+      })
+    }
+    expect(console.warn).toHaveBeenCalledOnce()
+  })
+
+  it('warns separately for each source and field', () => {
+    const config = {
+      flowchart: { defaultRenderer: 'elk' },
+      class: { defaultRenderer: 'elk' },
+      state: { defaultRenderer: 'elk' },
+    } as unknown as MermaidConfig
+
+    materialize({ runtimeConfig: config, source: { kind: 'page', config: config as PageMermaidConfig } })
+    materialize({ runtimeConfig: config, source: { kind: 'direct', config } })
+    expect(console.warn).toHaveBeenCalledTimes(9)
+  })
+
+  it('warns about a legacy field even when top-level layout is already present', () => {
+    materialize({
+      source: { kind: 'direct', config: { layout: 'dagre', state: { defaultRenderer: 'elk' } } as unknown as MermaidConfig },
+    })
+    expect(console.warn).toHaveBeenCalledOnce()
+  })
+
+  it('does not warn without legacy fields', () => {
+    materialize({ source: { kind: 'runtime-only' } })
+    materialize({
+      runtimeConfig: { layout: 'dagre' },
+      source: { kind: 'page', config: { layout: 'elk', flowchart: { htmlLabels: false } } },
+    })
+    expect(console.warn).not.toHaveBeenCalled()
+  })
+})
 
 describe('mermaid config helpers', () => {
   it('deep merges base and override configs', () => {

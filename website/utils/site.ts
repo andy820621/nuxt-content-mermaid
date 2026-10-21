@@ -14,6 +14,7 @@ export const PUBLIC_ROUTES = [
   '/advanced/interactions',
   '/troubleshooting',
   '/migration/v3',
+  '/migration/v4',
   '/zh',
   '/zh/getting-started',
   '/zh/writing-diagrams',
@@ -23,6 +24,7 @@ export const PUBLIC_ROUTES = [
   '/zh/advanced/interactions',
   '/zh/troubleshooting',
   '/zh/migration/v3',
+  '/zh/migration/v4',
 ] as const
 
 export function toSiteURL(path: string) {

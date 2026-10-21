@@ -8,12 +8,12 @@ tags:
   - lifecycle
   - nested-states
 config:
+  layout: dagre
   state:
     nodeSpacing: 60
     rankSpacing: 80
     fontSize: 14
     radius: 4
-    defaultRenderer: dagre-wrapper
 expect: Demonstrates basic state transitions, start/end markers, labels, and a nested auth state machine.
 notes:
   - Use this page to verify that state diagrams render correctly with the module and respond to theme changes.

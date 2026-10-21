@@ -7,15 +7,15 @@ import { describe, expect, it } from 'vitest'
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '../playground')
 type BrowserPage = Awaited<ReturnType<typeof createPage>>
 
-async function downloadSvg(page: BrowserPage, selector: string) {
+async function downloadFile(page: BrowserPage, selector: string, encoding: BufferEncoding = 'utf8') {
   const downloadPromise = page.waitForEvent('download')
   await page.locator(selector).click()
   const download = await downloadPromise
   const downloadPath = await download.path()
-  if (!downloadPath) throw new Error('Expected the SVG download to have a local path')
+  if (!downloadPath) throw new Error('Expected the download to have a local path')
   return {
     filename: download.suggestedFilename(),
-    text: await readFile(downloadPath, 'utf8'),
+    text: await readFile(downloadPath, encoding),
   }
 }
 
@@ -126,7 +126,7 @@ describe('playground integration', async () => {
 
     const downloadTrigger = block.getByLabel('Download diagram')
     await downloadTrigger.click()
-    const svgDownload = await downloadSvg(
+    const svgDownload = await downloadFile(
       page,
       '.mermaid-block [aria-label="Download as SVG"]',
     )
@@ -156,5 +156,101 @@ describe('playground integration', async () => {
     expect(downloaded.textContent).toContain('Transaction')
     expect(downloaded.textContent).toContain('Budget')
     expect(await visibleSvg.locator('foreignObject').count()).toBeGreaterThan(0)
+  })
+
+  it('renders an ELK layout flowchart through the bundled lazy chunk', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    // Production chunks are named `_nuxt/[hash].js`, so find the lazy ELK chunk by the elkjs bundle it carries.
+    const elkChunks: Promise<string | undefined>[] = []
+    page.on('response', (response) => {
+      if (response.request().resourceType() !== 'script') return
+      elkChunks.push(response.text().then(
+        body => body.includes('org.eclipse.elk') ? response.url() : undefined,
+        () => undefined,
+      ))
+    })
+    const response = await page.goto(url('/mermaid/flowchart/elk-layout'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 20000 })
+
+    expect(await block.locator('.mermaid-error').count()).toBe(0)
+    expect((await Promise.all(elkChunks)).filter(Boolean).length).toBeGreaterThan(0)
+  })
+
+  it('renders a use case diagram with the Mermaid 12 parser', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid/usecase/basic'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    const svg = block.locator('.mermaid > svg')
+    await block.scrollIntoViewIfNeeded()
+    await svg.waitFor({ state: 'visible', timeout: 20000 })
+
+    expect(await block.locator('.mermaid-error').count()).toBe(0)
+    expect(await svg.textContent()).toContain('Customer')
+  })
+
+  it('downloads a decodable PNG with non-background pixels', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    const response = await page.goto(url('/mermaid/classdiagram/finance-ledger'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 15000 })
+
+    await block.getByLabel('Download diagram').click()
+    const pngDownload = await downloadFile(
+      page,
+      '.mermaid-block [aria-label="Download as PNG"]',
+      'base64',
+    )
+
+    const png = await page.evaluate(async (base64) => {
+      const image = new Image()
+      image.src = `data:image/png;base64,${base64}`
+      await image.decode()
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth
+      canvas.height = image.naturalHeight
+      const context = canvas.getContext('2d')!
+      context.drawImage(image, 0, 0)
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
+      const colors = new Set<string>()
+      for (let i = 0; i < data.length; i += 4 * 97) colors.add(`${data[i]},${data[i + 1]},${data[i + 2]},${data[i + 3]}`)
+      return { width: image.naturalWidth, height: image.naturalHeight, distinctColors: colors.size }
+    }, pngDownload.text)
+
+    expect(pngDownload.filename).toBe('mermaid-diagram.png')
+    expect(png.width).toBeGreaterThan(0)
+    expect(png.height).toBeGreaterThan(0)
+    expect(png.distinctColors).toBeGreaterThan(1)
+  })
+
+  it('keeps mindmaps on the cose-bilkent layout under the module defaults', { timeout: 30000 }, async () => {
+    const page = await createPage()
+    // A top-level layout would silently move mindmaps to dagre. The plain 'cose-bilkent' name also sits in Mermaid's
+    // config and registry chunks, so match a log string that only the lazily loaded layout implementation carries.
+    const layoutChunks: Promise<string | undefined>[] = []
+    page.on('response', (response) => {
+      if (response.request().resourceType() !== 'script') return
+      layoutChunks.push(response.text().then(
+        body => body.includes('Starting cose-bilkent layout algorithm') ? response.url() : undefined,
+        () => undefined,
+      ))
+    })
+    const response = await page.goto(url('/mermaid/mindmap/product-vision'))
+    expect(response?.status()).toBe(200)
+
+    const block = page.locator('.mermaid-block')
+    await block.scrollIntoViewIfNeeded()
+    await block.locator('.mermaid > svg').waitFor({ state: 'visible', timeout: 20000 })
+
+    expect(await block.locator('.mermaid-error').count()).toBe(0)
+    expect((await Promise.all(layoutChunks)).filter(Boolean).length).toBeGreaterThan(0)
   })
 })

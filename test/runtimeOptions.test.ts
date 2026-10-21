@@ -31,6 +31,13 @@ describe('runtime options snapshot resolver', () => {
       debug: false,
       loader: {
         init: {
+          theme: 'default',
+          layout: 'dagre',
+          look: 'classic',
+          // Mermaid 12 resolves a top-level layout above each diagram type's own
+          // default, so types whose 3.x layout was never dagre keep it explicitly.
+          mindmap: { layout: 'cose-bilkent' },
+          swimlane: { layout: 'swimlane' },
           logLevel: 5,
           suppressErrorRendering: true,
         },
@@ -62,6 +69,26 @@ describe('runtime options snapshot resolver', () => {
     expect(Object.isFrozen(snapshot.expand)).toBe(true)
     expect(Object.isFrozen(snapshot.toolbar)).toBe(true)
     expect(Object.isFrozen(snapshot.toolbar?.labels)).toBe(true)
+  })
+
+  it('keeps the mindmap and swimlane layouts when an application selects a top-level layout', () => {
+    const snapshot = resolveRuntimeOptionsSnapshot({ loader: { init: { layout: 'elk' } } })
+
+    expect(snapshot.loader?.init).toMatchObject({
+      layout: 'elk',
+      mindmap: { layout: 'cose-bilkent' },
+      swimlane: { layout: 'swimlane' },
+    })
+  })
+
+  it('preserves explicit layout, look, and theme overrides', () => {
+    const snapshot = resolveRuntimeOptionsSnapshot({
+      loader: { init: { layout: 'elk', look: 'neo' } },
+      theme: { light: 'forest', dark: 'neutral' },
+    })
+
+    expect(snapshot.loader?.init).toMatchObject({ layout: 'elk', look: 'neo' })
+    expect(snapshot.theme).toEqual({ light: 'forest', dark: 'neutral' })
   })
 
   it('preserves explicit Mermaid debug values and derives only absent values', () => {

@@ -95,7 +95,7 @@ describe('stable publish workflow contract', () => {
     const publishStep = publish.steps.find(step => step.name === 'Publish verified package')
 
     expect(source.match(/package-artifact\.mjs/g)).toHaveLength(1)
-    expect(commands).toContain('--profile v3-known-latest')
+    expect(commands).toContain('--profile known-latest')
     expect(commands).toContain('--artifact-directory "$ARTIFACT_DIRECTORY"')
     expect(commands).not.toMatch(/\+\s+--/)
     expect(commands).toContain('playwright install --with-deps chromium')

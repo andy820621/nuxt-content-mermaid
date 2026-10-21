@@ -1,5 +1,9 @@
 # 3.x Dependency Version Strategy
 
+This policy remains at its original path. The active support line is 4.x after
+4.0 publication; the initial 3.0 dependency contract below is historical and is
+not rewritten.
+
 ## Context
 
 nuxt-content-mermaid integrates Nuxt Content with Mermaid and is maintained by one person for a package with roughly 400 weekly downloads. Version policy must keep the current release compatible with the active Nuxt and Nuxt Content lines without creating a governance system that costs more to maintain than the package itself.
@@ -8,7 +12,7 @@ The policy therefore separates the public Compatibility Contract from fixed comp
 
 ## Goals
 
-- Keep the current 3.x release able to follow the latest stable Nuxt Content 3 release on Nuxt 4.
+- Keep the active 4.x release able to follow the latest stable Nuxt Content 3 release on Nuxt 4.
 - Own the package's Nuxt and Nuxt Content Compatibility Contract instead of copying upstream metadata mechanically.
 - Preserve already published ranges as prospective promises rather than reinterpreting them after an upstream release.
 - Give releases reproducible minimum and known-latest artifact evidence.
@@ -23,6 +27,7 @@ The policy therefore separates the public Compatibility Contract from fixed comp
 - No complete upstream security-version database.
 - No guarantee for exact Mermaid SVG serialization, layout, undocumented DOM, or every Mermaid diagram feature.
 - No parallel feature or ordinary bug-fix maintenance for the 2.x line after 3.0 ships.
+- No parallel feature or ordinary bug-fix maintenance for the 3.x line after 4.0 ships.
 
 ## Public Dependency Contract
 
@@ -76,16 +81,20 @@ The Known-Latest Compatibility Profile is one atomic exact tuple of Node, Nuxt, 
 
 Known-Latest Versions are evidence baselines, not peer-range ceilings. Updating only repository pins, the lockfile, or fixed evidence without changing the publishable artifact or runtime code does not require an npm release.
 
-### Fixed 3.x Compatibility Profiles
+### Current Compatibility Profiles
 
-The 3.x Compatibility Contract retains two fixed profiles that verify the
+The 4.x Compatibility Contract retains two fixed profiles that verify the
 Publishable Package Artifact through clean installation, public types, production build,
 and basic browser SVG rendering:
 
 | Profile | Node | Nuxt | Nuxt Content | Mermaid | Kit resolution | Schema resolution |
 | --- | --- | --- | --- | --- | --- | --- |
-| `v3-minimum` | `22.19.0` | `4.1.0` | `3.5.0` | `11.17.0` | `4.5.2` | `4.5.2` |
-| `v3-known-latest` | `24.19.0` | `4.6.2` | `3.16.2` | `11.17.0` | `4.6.2` | `4.6.2` |
+| `minimum` | `22.19.0` | `4.1.0` | `3.5.0` | `12.2.0` | `4.5.2` | `4.5.2` |
+| `known-latest` | `24.19.0` | `4.6.2` | `3.16.2` | `12.2.0` | `4.6.2` | `4.6.2` |
+
+These profiles verify the 4.x Mermaid 12.2 dependency. Profile IDs name the
+verification role, not a package major. The 4.x Module-Owned Dependency range
+is `~12.2.0`; host floors remain unchanged.
 
 Each profile runs under its exact declared Node runtime. Kit and Schema remain
 one shallow pair of expected artifact resolutions rather than additional
@@ -165,7 +174,7 @@ Compatibility means the integration is expected to operate; it does not certify 
 
 Nuxt and Nuxt Content are Package User-owned peers, so ordinary upstream advisories remain the responsibility of the application's lockfile, Dependabot, and security tooling. This package publishes targeted guidance or a correction when its own feature path necessarily exposes the vulnerability or requires a package change to mitigate it.
 
-For Mermaid, Kit, or another direct dependency, a fixed upstream security correction raises the dependency range lower bound and ships in a package patch when Package-Owned Integration Behavior remains compatible. If safe use requires raising the Nuxt, Nuxt Content, or Node floor, the narrowed contract requires a package major. Security urgency never skips the relevant package artifact verification.
+For Mermaid, Kit, or another direct dependency, a fixed upstream security correction raises the dependency range lower bound and ships in a package patch when Package-Owned Integration Behavior remains compatible. If safe use requires raising the Nuxt, Nuxt Content, Node, or browser floor, the narrowed contract requires a package major. Security urgency never skips the relevant package artifact verification.
 
 ## Package Semver
 
@@ -179,10 +188,22 @@ Package semver follows the highest Package User-visible impact in a release:
 | Add a public capability or preserve old ranges while adding an upstream major | Minor |
 | Lower a minimum supported version | Minor |
 | Raise a Nuxt, Nuxt Content, or Node floor | Major |
+| Raise a minimum supported browser version | Major |
 | Remove a peer major, narrow a peer range, or change dependency ownership | Major |
 | Require Package User migration | Major |
 
 A Mermaid release number does not mechanically dictate this package's bump. A compatible engine or security update is normally a patch, an intentionally exposed capability is a minor, and a required migration of existing package-owned behavior is a major.
+
+Browser floors are part of the Compatibility Contract. Mermaid 12 requires a
+package major because public configuration types narrow and the supported
+browser baseline rises to ES2024 / Safari 17.4 / iOS 17.4. Layout, geometry, and
+dimensions remain excluded and do not determine the bump.
+
+## 3.x Frozen Policy
+
+When 4.0 publishes, 3.x becomes a Frozen Legacy Release for Nuxt 4. Existing npm versions remain installable and are not automatically deprecated, but the line receives no dependency updates, compatibility expansion, new features, or ordinary fixes.
+
+The first three months after 4.0 form a Migration Assistance Window for documentation, usage guidance, and 4.x defects that prevent migration. A low-risk backport for a package-caused critical security issue may be considered individually without reopening ordinary 3.x maintenance. Evidence of substantial 3.x demand may justify extending assistance, but no extension is promised in advance.
 
 ## 2.x Frozen Policy
 
@@ -192,7 +213,7 @@ The first three months after 3.0 form a Migration Assistance Window for document
 
 ## Release Acceptance
 
-A 3.x release is eligible for publication only when:
+A 4.x release is eligible for publication only when:
 
 - its manifest and Nuxt compatibility metadata express the approved ranges;
 - its Package-Owned Integration Behavior remains within the documented boundary;

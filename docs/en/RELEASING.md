@@ -26,11 +26,21 @@ pnpm release:prepare:patch
 # pnpm release:prepare:major
 ```
 
+For a major release, also remove the pre-release notices that main carries
+between the breaking PR and the release from both READMEs, `docs/{en,ch}`, and
+`website/content`, including the website migration page `description`. The
+exact marker strings live in `test/releaseNotices.test.ts`; `pnpm test` fails
+through that file once `package.json` declares the new major while any marker
+remains, and the runbook itself must not quote them. Replace them with
+version-scoped wording that stays true after publication, for example "This
+document applies to 4.x; see the 3.x contract for the frozen line". Keep the
+bilingual migration guides identical to their website copies.
+
 Review the generated version, lockfile, and changelog in your editor, then open
 the PR:
 
 ```bash
-git add -- package.json pnpm-lock.yaml CHANGELOG.md
+git add -- package.json pnpm-lock.yaml CHANGELOG.md README.md README.zh-TW.md docs website/content
 git commit -m "chore(release): prepare v$version"
 git push -u origin "$branch"
 

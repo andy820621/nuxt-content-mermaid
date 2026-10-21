@@ -10,7 +10,7 @@ const VERSION_KEYS = Object.freeze([
 ])
 const RUNTIME_VERSIONS = Object.freeze({
   betterSqlite3: '12.11.1',
-  mermaid: '11.17.0',
+  mermaid: '12.2.0',
   typescript: '5.9.3',
   vueTsc: '3.2.5',
 })
@@ -104,15 +104,15 @@ function defineFinalVersionProfile(id, nodeVersion, nuxt, nuxtContent, expectedR
 }
 
 export const VERSION_PROFILES = Object.freeze({
-  'v3-minimum': defineFinalVersionProfile(
-    'v3-minimum',
+  'minimum': defineFinalVersionProfile(
+    'minimum',
     '22.19.0',
     '4.1.0',
     '3.5.0',
     MINIMUM_TOOLCHAIN_RESOLUTIONS,
   ),
-  'v3-known-latest': defineFinalVersionProfile(
-    'v3-known-latest',
+  'known-latest': defineFinalVersionProfile(
+    'known-latest',
     '24.19.0',
     '4.6.2',
     '3.16.2',
