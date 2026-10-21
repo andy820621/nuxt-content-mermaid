@@ -14,7 +14,7 @@ Mermaid 是 Module-Owned Dependency，綁定為 `mermaid@~12.2.0`；請勿只是
 
 ## 設定與遷移邊界
 
-模組預設 `layout: 'dagre'`、`look: 'classic'`，使用者可覆寫。Default／dark 主題策略，以及既有 Runtime、Page、Direct Mermaid Config 的傳輸、驗證、合併與隔離語意繼續適用。Page 與 Direct 設定仍互斥。
+模組預設 `layout: 'dagre'`、`look: 'classic'`，並明確設定 `mindmap.layout: 'cose-bilkent'` 與 `swimlane.layout: 'swimlane'`，避免頂層 layout 覆蓋這兩種圖的原生預設；使用者可覆寫以上各項。Default／dark 主題策略，以及既有 Runtime、Page、Direct Mermaid Config 的傳輸、驗證、合併與隔離語意繼續適用。Page 與 Direct 設定仍互斥。
 
 Mermaid 12 公開型別移除 `flowchart.defaultRenderer`、`class.defaultRenderer` 與 `state.defaultRenderer`，object literal 可能產生 TS2353。在該圖種的區段內選擇 `layout: 'dagre'` 或 `layout: 'elk'` 可保留舊的按圖種範圍；設在頂層則套用到該範圍內所有支援的圖種（runtime 初始化涵蓋整個應用程式，Page config 涵蓋該頁，Direct config 涵蓋該元件實例）。執行期傳輸會保留這些 Mermaid 擁有的鍵，但引擎忽略它們。開發模式每個「來源 × 欄位」在整頁載入期間只提示一次；production 移除警告。不提供自動轉換或型別相容層。
 

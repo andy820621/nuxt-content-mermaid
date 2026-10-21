@@ -34,8 +34,10 @@ is not verification of real Safari 17.4 or physical iOS devices.
 
 ## Configuration and migration boundary
 
-The module defaults to `layout: 'dagre'` and `look: 'classic'`; Package Users can
-override both. The default/dark theme policy and the existing Runtime, Page,
+The module defaults to `layout: 'dagre'` and `look: 'classic'`, with explicit
+`mindmap.layout: 'cose-bilkent'` and `swimlane.layout: 'swimlane'` so that a
+top-level layout does not override those diagram types' own defaults; Package
+Users can override all of them. The default/dark theme policy and the existing Runtime, Page,
 and Direct Mermaid Config transport, validation, merge, and isolation semantics
 remain in force. Page and Direct configuration remain mutually exclusive.
 
