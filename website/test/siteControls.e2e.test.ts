@@ -37,7 +37,7 @@ async function loadWithSystemColorMode(
   await page.waitForFunction(() => document.querySelector('button[aria-pressed]') !== null)
 }
 
-describe('documentation website site controls', { timeout: 20_000 }, async () => {
+describe('documentation website site controls', async () => {
   await setup({
     rootDir: websiteRoot,
     browser: true,

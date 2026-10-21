@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 
-describe('documentation Markdown line breaks', { timeout: 20_000 }, async () => {
+describe('documentation Markdown line breaks', async () => {
   await setup({ rootDir: websiteRoot, browser: true })
 
   it('serves the localized migration page on direct navigation', async () => {

@@ -24,7 +24,7 @@ async function waitForActiveHash(
   hash)
 }
 
-describe('documentation page TOC', { timeout: 20_000 }, async () => {
+describe('documentation page TOC', async () => {
   await setup({
     rootDir: websiteRoot,
     browser: true,

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url))
 
-describe('documentation callout', { timeout: 20_000 }, async () => {
+describe('documentation callout', async () => {
   await setup({ rootDir: websiteRoot, browser: true })
 
   it('renders the warning callout with Markdown content', async () => {

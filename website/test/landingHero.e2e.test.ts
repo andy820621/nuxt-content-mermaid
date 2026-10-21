@@ -22,7 +22,7 @@ async function createLightPage() {
   return page
 }
 
-describe('documentation website landing hero', { timeout: 20_000 }, async () => {
+describe('documentation website landing hero', async () => {
   await setup({
     rootDir: websiteRoot,
     browser: true,
