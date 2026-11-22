@@ -61,6 +61,7 @@ TODOLIST
 skills-lock.json
 vendor/agent-skills
 .agents/skills
+.claude/skills
 
 # Agent workflow scratch space
 .superpowers/
